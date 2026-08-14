@@ -1,7 +1,0 @@
-spring:
-  application:
-    name: messager
-  data:
-    mongodb:
-      uri: mongodb://localhost:27017/solaria_messenger_db
-      auto-index-creation: true
