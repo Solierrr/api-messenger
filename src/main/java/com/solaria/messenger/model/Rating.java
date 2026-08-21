@@ -1,5 +1,6 @@
 package com.solaria.messenger.model;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -8,7 +9,8 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
-import com.solaria.messenger.model.enums.MessageType;
+import com.solaria.messenger.model.enums.RatingStatus;
+import com.solaria.messenger.model.enums.RatingType;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -18,27 +20,28 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "messages")
-public class Message {
+@Document(collection = "rating")
+public class Rating {
 
     @Id
     private String id;
 
     @Indexed
-    @Field("conversation_id")
-    private String conversationId;
+    @Field("evaluator_id")
+    private UUID evaluatorId;
 
-    @Field("sender_id")
-    private UUID senderId;
+    @Indexed
+    @Field("evaluated_id")
+    private UUID evaluatedId;
 
-    private String role;
+    @Field("type_rate")
+    private RatingType typeRate;
 
-    @Field("message_type")
-    private MessageType messageType;
+    private String comment;
 
-    private String content;
+    private BigDecimal rating;
 
-    private MessageMetadata metadata;
+    private RatingStatus status;
 
     private Instant timestamp;
 }
