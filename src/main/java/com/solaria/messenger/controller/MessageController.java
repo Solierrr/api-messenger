@@ -19,7 +19,7 @@ import com.solaria.messenger.service.MessageService;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/api/v1/messages")
+@RequestMapping("/messaging/messages")
 public class MessageController implements MessageOpenApi {
 
     private final MessageService messageService;
