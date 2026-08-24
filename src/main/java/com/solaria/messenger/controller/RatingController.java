@@ -23,7 +23,7 @@ import com.solaria.messenger.service.RatingService;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/api/v1/ratings")
+@RequestMapping("/messaging/ratings")
 public class RatingController implements RatingOpenApi {
 
     private final RatingService ratingService;

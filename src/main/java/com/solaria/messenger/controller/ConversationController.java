@@ -21,7 +21,7 @@ import jakarta.validation.Valid;
 
 
 @RestController
-@RequestMapping("/api/v1/conversations")
+@RequestMapping("/messaging/conversations")
 public class ConversationController implements ConversationOpenApi {
 
     private final ConversationService conversationService;
