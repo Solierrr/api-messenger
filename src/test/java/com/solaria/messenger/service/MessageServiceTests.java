@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,16 +18,19 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
+import com.solaria.messenger.dto.request.MessageRequestDTO;
+import com.solaria.messenger.dto.response.MessageResponseDTO;
+import com.solaria.messenger.exception.InvalidFieldException;
+import com.solaria.messenger.exception.ResourceNotFoundException;
 import com.solaria.messenger.model.Conversation;
 import com.solaria.messenger.model.Message;
+import com.solaria.messenger.model.enums.ConversationStatus;
+import com.solaria.messenger.model.enums.ConversationType;
+import com.solaria.messenger.model.enums.MessageType;
 import com.solaria.messenger.repository.MessageRepository;
+import com.solaria.messenger.security.rbac.RbacAuthorizationService;
 
 @ExtendWith(MockitoExtension.class)
 class MessageServiceTests {
@@ -37,47 +41,90 @@ class MessageServiceTests {
     @Mock
     private ConversationService conversationService;
 
+    @Mock
+    private RbacAuthorizationService rbac;
+
     @InjectMocks
     private MessageService messageService;
 
     @Test
-    void sendsMessageAndUpdatesConversationInteraction() {
-        Conversation conversation = new Conversation("conversation-1", 1L, "session-1", "active", null, null, null);
-        Message message = new Message(null, "conversation-1", "user", "Hello", null);
-        given(conversationService.getConversationById("conversation-1")).willReturn(conversation);
-        given(messageRepository.save(message)).willReturn(message);
+    void sendsUserMessageAndUpdatesConversationInteraction() {
+        UUID senderId = UUID.randomUUID();
+        Conversation conversation = conversation();
+        MessageRequestDTO dto = messageRequest(MessageType.USER_TO_USER);
 
-        Message savedMessage = messageService.sendMessage(message);
+        given(conversationService.requireEntityById("conversation-1")).willReturn(conversation);
+        given(rbac.currentUserId()).willReturn(senderId);
+        given(messageRepository.save(any(Message.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        MessageResponseDTO response = messageService.sendUserMessage(dto);
 
         ArgumentCaptor<Instant> timestamp = ArgumentCaptor.forClass(Instant.class);
-        assertThat(savedMessage).isSameAs(message);
-        assertThat(savedMessage.getTimestamp()).isNotNull();
-        verify(messageRepository).save(message);
+        assertThat(response.getSenderId()).isEqualTo(senderId);
+        assertThat(response.getConversationId()).isEqualTo("conversation-1");
+        assertThat(response.getContent()).isEqualTo("Hello");
+        assertThat(response.getTimestamp()).isNotNull();
+        verify(conversationService).requireParticipant(conversation);
         verify(conversationService).updateLastInteraction(eq(conversation), timestamp.capture());
-        assertThat(timestamp.getValue()).isEqualTo(savedMessage.getTimestamp());
+        assertThat(timestamp.getValue()).isEqualTo(response.getTimestamp());
+    }
+
+    @Test
+    void rejectsChatbotToUserMessageType() {
+        MessageRequestDTO dto = messageRequest(MessageType.CHATBOT_TO_USER);
+
+        assertThatThrownBy(() -> messageService.sendUserMessage(dto))
+                .isInstanceOf(InvalidFieldException.class);
+
+        verifyNoInteractions(messageRepository, conversationService);
     }
 
     @Test
     void doesNotPersistMessageWhenConversationDoesNotExist() {
-        Message message = new Message(null, "missing", "user", "Hello", null);
-        given(conversationService.getConversationById("missing"))
-                .willThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversation not found"));
+        MessageRequestDTO dto = messageRequest(MessageType.USER_TO_USER);
+        dto.setConversationId("missing");
 
-        assertThatThrownBy(() -> messageService.sendMessage(message))
-                .isInstanceOf(ResponseStatusException.class);
+        given(conversationService.requireEntityById("missing"))
+                .willThrow(new ResourceNotFoundException("Conversa não encontrada com id: missing"));
+
+        assertThatThrownBy(() -> messageService.sendUserMessage(dto))
+                .isInstanceOfSatisfying(ResourceNotFoundException.class,
+                        exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
 
         verifyNoInteractions(messageRepository);
     }
 
     @Test
-    void getsMessagesByConversationIdWithPagination() {
-        Pageable pageable = PageRequest.of(0, 20);
-        Page<Message> messages = new PageImpl<>(List.of(new Message("message-1", "conversation-1", "user", "Hello", Instant.now())));
-        given(messageRepository.findByConversationIdOrderByTimestampAsc("conversation-1", pageable)).willReturn(messages);
+    void getsMessagesByConversationId() {
+        Conversation conversation = conversation();
+        List<Message> messages = List.of(message());
+        given(conversationService.requireEntityById("conversation-1")).willReturn(conversation);
+        given(messageRepository.findByConversationIdOrderByTimestampAsc("conversation-1")).willReturn(messages);
 
-        Page<Message> foundMessages = messageService.getMessagesByConversationId("conversation-1", pageable);
+        List<MessageResponseDTO> foundMessages = messageService.getMessagesByConversationId("conversation-1");
 
-        assertThat(foundMessages).isSameAs(messages);
-        verify(messageRepository).findByConversationIdOrderByTimestampAsc("conversation-1", pageable);
+        assertThat(foundMessages).hasSize(1);
+        assertThat(foundMessages.get(0).getId()).isEqualTo(messages.get(0).getId());
+        verify(conversationService).requireParticipant(conversation);
+    }
+
+    private MessageRequestDTO messageRequest(MessageType messageType) {
+        MessageRequestDTO dto = new MessageRequestDTO();
+        dto.setConversationId("conversation-1");
+        dto.setMessageType(messageType);
+        dto.setRole("user");
+        dto.setContent("Hello");
+        return dto;
+    }
+
+    private Conversation conversation() {
+        return new Conversation("conversation-1", UUID.randomUUID(), UUID.randomUUID(),
+                ConversationType.USER_CONVERSATION, null, null, ConversationStatus.ACTIVE,
+                Instant.now(), Instant.now());
+    }
+
+    private Message message() {
+        return new Message("message-1", "conversation-1", UUID.randomUUID(), "user",
+                MessageType.USER_TO_USER, "Hello", null, Instant.now());
     }
 }
