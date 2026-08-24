@@ -15,7 +15,6 @@ import com.solaria.messenger.service.MessageService;
 
 import jakarta.validation.Valid;
 
-=
 @RestController
 @RequestMapping("/internal/messages")
 public class ChatbotMessageController implements ChatbotMessageOpenApi {
