@@ -24,6 +24,7 @@ import com.solaria.messenger.dto.request.MessageRequestDTO;
 import com.solaria.messenger.dto.response.MessageResponseDTO;
 import com.solaria.messenger.exception.handler.ProblemDetailFactory;
 import com.solaria.messenger.model.enums.MessageType;
+import com.solaria.messenger.model.enums.Environment;
 import com.solaria.messenger.service.MessageService;
 
 @WebMvcTest(MessageController.class)
@@ -50,6 +51,24 @@ class MessageControllerTests {
     }
 
     @Test
+    void sendsMessageToChatbotWithEnvironment() throws Exception {
+        given(messageService.sendUserMessage(any(MessageRequestDTO.class)))
+                .willReturn(messageResponseWithEnvironment());
+
+        mockMvc.perform(post("/messaging/messages")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"conversationId\":\"conversation-1\","
+                                + "\"messageType\":\"USER_TO_CHATBOT\","
+                                + "\"role\":\"user\","
+                                + "\"environment\":\"QA\","
+                                + "\"content\":\"Como escolher uma placa solar?\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value("message-1"))
+                .andExpect(jsonPath("$.environment").value("QA"))
+                .andExpect(jsonPath("$.messageType").value("USER_TO_CHATBOT"));
+    }
+
+    @Test
     void getsMessagesByConversationId() throws Exception {
         given(messageService.getMessagesByConversationId(eq("conversation-1")))
                 .willReturn(List.of(messageResponse()));
@@ -67,6 +86,19 @@ class MessageControllerTests {
                 .role("user")
                 .messageType(MessageType.USER_TO_USER)
                 .content("Hello")
+                .timestamp(Instant.now())
+                .build();
+    }
+
+    private MessageResponseDTO messageResponseWithEnvironment() {
+        return MessageResponseDTO.builder()
+                .id("message-1")
+                .conversationId("conversation-1")
+                .senderId(UUID.randomUUID())
+                .role("user")
+                .messageType(MessageType.USER_TO_CHATBOT)
+                .environment(Environment.QA)
+                .content("Como escolher uma placa solar?")
                 .timestamp(Instant.now())
                 .build();
     }

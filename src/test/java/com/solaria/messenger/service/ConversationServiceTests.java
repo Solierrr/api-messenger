@@ -18,12 +18,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 
+import com.solaria.messenger.dto.request.ChatbotConversationRequestDTO;
 import com.solaria.messenger.dto.request.UserConversationRequestDTO;
 import com.solaria.messenger.dto.response.ConversationResponseDTO;
 import com.solaria.messenger.exception.ResourceNotFoundException;
 import com.solaria.messenger.model.Conversation;
 import com.solaria.messenger.model.enums.ConversationStatus;
 import com.solaria.messenger.model.enums.ConversationType;
+import com.solaria.messenger.model.enums.Environment;
 import com.solaria.messenger.repository.ConversationRepository;
 import com.solaria.messenger.security.rbac.RbacAuthorizationService;
 
@@ -59,6 +61,30 @@ class ConversationServiceTests {
         assertThat(response.getStartedAt()).isNotNull();
         assertThat(response.getLastInteractionAt()).isEqualTo(response.getStartedAt());
     }
+
+    @Test
+    void createsChatbotConversationWithEnvironment() {
+    Environment environment = Environment.LOCAL;
+
+    ChatbotConversationRequestDTO dto = new ChatbotConversationRequestDTO();
+    dto.setEnvironment(environment);
+    dto.setUserType("fornecedor");
+
+    UUID receiverId = UUID.randomUUID();
+    given(rbac.currentUserId()).willReturn(receiverId);
+    given(conversationRepository.save(any(Conversation.class)))
+            .willAnswer(invocation -> invocation.getArgument(0));
+
+    ConversationResponseDTO response = conversationService.createChatbotConversation(dto);
+
+    assertThat(response.getReceiverId()).isEqualTo(receiverId);
+    assertThat(response.getConversationType()).isEqualTo(ConversationType.CHAT_BOT);
+    assertThat(response.getEnvironment()).isEqualTo(Environment.LOCAL);
+    assertThat(response.getUserType()).isEqualTo("fornecedor");
+    assertThat(response.getStatus()).isEqualTo(ConversationStatus.ACTIVE);
+    assertThat(response.getStartedAt()).isNotNull();
+    assertThat(response.getLastInteractionAt()).isEqualTo(response.getStartedAt());
+}
 
     @Test
     void getsConversationById() {
@@ -105,8 +131,15 @@ class ConversationServiceTests {
     }
 
     private Conversation conversation() {
-        return new Conversation("conversation-1", UUID.randomUUID(), UUID.randomUUID(),
-                ConversationType.USER_CONVERSATION, null, null, ConversationStatus.ACTIVE,
-                Instant.now(), Instant.now());
+        Conversation conversation = new Conversation();
+        conversation.setId("conversation-1");
+        conversation.setSenderId(UUID.randomUUID());
+        conversation.setReceiverId(UUID.randomUUID());
+        conversation.setConversationType(ConversationType.USER_CONVERSATION);
+        conversation.setStatus(ConversationStatus.ACTIVE);
+        conversation.setStartedAt(Instant.now());
+        conversation.setLastInteractionAt(Instant.now());
+
+        return conversation;
     }
 }
