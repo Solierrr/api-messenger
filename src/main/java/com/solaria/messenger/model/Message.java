@@ -8,6 +8,7 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
+import com.solaria.messenger.model.enums.Environment;
 import com.solaria.messenger.model.enums.MessageType;
 
 import lombok.AllArgsConstructor;
@@ -32,6 +33,9 @@ public class Message {
     private UUID senderId;
 
     private String role;
+
+    @Field("environment")
+    private Environment environment;
 
     @Field("message_type")
     private MessageType messageType;

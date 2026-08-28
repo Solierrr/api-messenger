@@ -11,6 +11,7 @@ import org.springframework.data.mongodb.core.mapping.Field;
 
 import com.solaria.messenger.model.enums.ConversationStatus;
 import com.solaria.messenger.model.enums.ConversationType;
+import com.solaria.messenger.model.enums.Environment;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -36,6 +37,9 @@ public class Conversation {
 
     @Field("conversation_type")
     private ConversationType conversationType;
+
+    @Field("environment")
+    private Environment environment;
 
     @Field("user_type")
     private String userType;
