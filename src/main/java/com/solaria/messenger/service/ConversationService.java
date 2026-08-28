@@ -13,6 +13,7 @@ import com.solaria.messenger.exception.ResourceNotFoundException;
 import com.solaria.messenger.model.Conversation;
 import com.solaria.messenger.model.enums.ConversationStatus;
 import com.solaria.messenger.model.enums.ConversationType;
+import com.solaria.messenger.model.enums.Environment;
 import com.solaria.messenger.repository.ConversationRepository;
 import com.solaria.messenger.security.rbac.RbacAuthorizationService;
 
@@ -46,6 +47,7 @@ public class ConversationService {
         Conversation conversation = new Conversation();
         conversation.setReceiverId(rbac.currentUserId());
         conversation.setConversationType(ConversationType.CHAT_BOT);
+        conversation.setEnvironment(dto.getEnvironment());
         conversation.setUserType(dto.getUserType());
         conversation.setUserDetails(dto.getUserDetails());
         conversation.setStatus(ConversationStatus.ACTIVE);
@@ -98,6 +100,7 @@ public class ConversationService {
                 .senderId(conversation.getSenderId())
                 .receiverId(conversation.getReceiverId())
                 .conversationType(conversation.getConversationType())
+                .environment(conversation.getEnvironment())
                 .userType(conversation.getUserType())
                 .userDetails(conversation.getUserDetails())
                 .status(conversation.getStatus())
