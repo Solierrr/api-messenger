@@ -7,6 +7,7 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
+import com.solaria.messenger.model.enums.Environment;
 import com.solaria.messenger.model.enums.ObservabilityStepType;
 
 import lombok.AllArgsConstructor;
@@ -38,6 +39,9 @@ public class LlmObservability {
     @Indexed
     @Field("conversation_id")
     private String conversationId;
+
+    @Field("environment")
+    private Environment environment;
 
     @Field("tokens_in")
     private Integer tokensIn;
