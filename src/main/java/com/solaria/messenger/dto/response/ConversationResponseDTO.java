@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import com.solaria.messenger.model.enums.ConversationStatus;
 import com.solaria.messenger.model.enums.ConversationType;
+import com.solaria.messenger.model.enums.Environment;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -24,6 +25,7 @@ public class ConversationResponseDTO {
     private UUID senderId;
     private UUID receiverId;
     private ConversationType conversationType;
+    private Environment environment;
     private String userType;
     private Map<String, Object> userDetails;
     private ConversationStatus status;

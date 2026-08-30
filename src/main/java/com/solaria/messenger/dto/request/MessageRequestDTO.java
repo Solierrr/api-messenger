@@ -1,5 +1,6 @@
 package com.solaria.messenger.dto.request;
 
+import com.solaria.messenger.model.enums.Environment;
 import com.solaria.messenger.model.enums.MessageType;
 
 import jakarta.validation.constraints.NotBlank;
@@ -21,6 +22,8 @@ public class MessageRequestDTO {
     @NotBlank(message = "role é obrigatório")
     @Size(max = 32, message = "role deve ter no máximo 32 caracteres")
     private String role;
+
+    private Environment environment;
 
     @NotBlank(message = "content é obrigatório")
     @Size(max = 8000, message = "content deve ter no máximo 8000 caracteres")
