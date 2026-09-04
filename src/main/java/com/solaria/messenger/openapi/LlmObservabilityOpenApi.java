@@ -16,7 +16,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @Tag(
     name = "Observabilidade de LLM",
 description = "Telemetria interna do pipeline de LLM -> roteador/nós do grafo reportam métricas de cada passo (chamada a modelo ou a ferramenta). "
-    + "Endpoints M2M, em /internal/observability, autenticados por token de serviço."
+    + "Endpoints internos, em /internal/observability, alcançáveis apenas pela rede interna (nunca via Kong)."
 )
 public interface LlmObservabilityOpenApi {
 

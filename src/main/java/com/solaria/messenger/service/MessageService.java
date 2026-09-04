@@ -45,6 +45,7 @@ public class MessageService {
         message.setSenderId(rbac.currentUserId());
         message.setRole(dto.getRole());
         message.setMessageType(dto.getMessageType());
+        message.setEnvironment(dto.getEnvironment());
         message.setContent(dto.getContent());
 
         Instant now = Instant.now();
@@ -63,6 +64,7 @@ public class MessageService {
         message.setConversationId(dto.getConversationId());
         message.setRole("assistant");
         message.setMessageType(MessageType.CHATBOT_TO_USER);
+        message.setEnvironment(dto.getEnvironment());
         message.setContent(dto.getContent());
         message.setMetadata(dto.getMetadata());
 
@@ -92,6 +94,7 @@ public class MessageService {
                 .senderId(message.getSenderId())
                 .role(message.getRole())
                 .messageType(message.getMessageType())
+                .environment(message.getEnvironment())
                 .content(message.getContent())
                 .metadata(message.getMetadata())
                 .timestamp(message.getTimestamp())
