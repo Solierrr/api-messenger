@@ -27,7 +27,7 @@ public class LlmObservabilityResponseDTO {
     private Integer tokensOut;
     private Integer tokensTotal;
     private Double latencyMs;
-    private Boolean status;
+    private String status;
     private String error;
     private Instant timestamp;
 }

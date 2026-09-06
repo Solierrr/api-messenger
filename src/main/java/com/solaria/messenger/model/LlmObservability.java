@@ -55,7 +55,7 @@ public class LlmObservability {
     @Field("latency_ms")
     private Double latencyMs;
 
-    private Boolean  status;
+    private String status;
 
     private String error;
 

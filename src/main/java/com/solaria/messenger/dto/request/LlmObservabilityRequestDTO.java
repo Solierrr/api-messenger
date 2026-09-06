@@ -47,7 +47,7 @@ public class LlmObservabilityRequestDTO {
     private Double latencyMs;
 
     @NotBlank(message = "status é obrigatório")
-    private Boolean status;
+    private String status;
 
     private String error;
 

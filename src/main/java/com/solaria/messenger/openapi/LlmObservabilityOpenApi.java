@@ -49,5 +49,5 @@ public interface LlmObservabilityOpenApi {
     ResponseEntity<List<LlmObservabilityResponseDTO>> search(
             @Parameter(description = "Filtra pelo identificador da conversa", required = false) String conversationId,
             @Parameter(description = "Filtra pelo nó do grafo que originou a chamada", required = false) String node,
-            @Parameter(description = "Filtra pelo status da chamada ( erro -> false / ok-> true)", required = false) String status);
+            @Parameter(description = "Filtra pelo status da chamada (valores possíveis: ok, error, rate_limited, timeout, connection_error)", required = false) String status);
 }
