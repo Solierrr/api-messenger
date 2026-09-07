@@ -11,4 +11,4 @@ exec infisical run \
   --projectId=2296d19c-5f3b-41e1-afa3-fcde39966a71 \
   --env="${INFISICAL_ENV:-qa}" \
   --path=/ \
-  -- sh -c 'exec java -jar app.jar --spring.data.mongodb.uri="$DB_MONGO_URI/$DB_MONGO_MESSENGER?uuidRepresentation=standard"'
+  -- java -jar app.jar
