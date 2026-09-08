@@ -152,6 +152,8 @@ public class SecurityConfig {
                 configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
                 // headers permitidos
                 configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "apikey"));
+                // expoe o X-Trace-Id para poder ler o traceId 
+                configuration.setExposedHeaders(List.of("X-Trace-Id"));
                 // Aplica esta CorsConfiguration a todos os paths ("/**")
                 UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
                 source.registerCorsConfiguration("/**", configuration);
