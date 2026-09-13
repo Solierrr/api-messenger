@@ -2,6 +2,7 @@ package com.solaria.messenger.service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 
@@ -11,6 +12,7 @@ import com.solaria.messenger.dto.response.MessageResponseDTO;
 import com.solaria.messenger.exception.InvalidFieldException;
 import com.solaria.messenger.model.Conversation;
 import com.solaria.messenger.model.Message;
+import com.solaria.messenger.model.enums.ConversationType;
 import com.solaria.messenger.model.enums.MessageType;
 import com.solaria.messenger.repository.MessageRepository;
 import com.solaria.messenger.security.rbac.RbacAuthorizationService;
@@ -39,6 +41,8 @@ public class MessageService {
 
         Conversation conversation = conversationService.requireEntityById(dto.getConversationId());
         conversationService.requireParticipant(conversation);
+        conversationService.requireActive(conversation);
+        requireMessageTypeMatchesConversation(dto.getMessageType(), conversation.getConversationType());
 
         Message message = new Message();
         message.setConversationId(dto.getConversationId());
@@ -85,6 +89,26 @@ public class MessageService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    /**
+     * Garante que o {@code messageType} enviado combina com o tipo da conversa:
+     * <ul>
+     *   <li>{@code GROUP} -> {@code USER_TO_GROUP}</li>
+     *   <li>{@code DIRECT} -> {@code USER_TO_USER}</li>
+     *   <li>{@code CHAT_BOT} -> {@code USER_TO_CHATBOT}</li>
+     * </ul>
+     */
+    private void requireMessageTypeMatchesConversation(MessageType messageType, ConversationType conversationType) {
+        Set<MessageType> allowed = switch (conversationType) {
+            case GROUP -> Set.of(MessageType.USER_TO_GROUP);
+            case DIRECT -> Set.of(MessageType.USER_TO_USER);
+            case CHAT_BOT -> Set.of(MessageType.USER_TO_CHATBOT);
+        };
+        if (!allowed.contains(messageType)) {
+            throw new InvalidFieldException(
+                    "messageType " + messageType + " não é válido para uma conversa do tipo " + conversationType + ".");
+        }
     }
 
     private MessageResponseDTO toResponse(Message message) {
