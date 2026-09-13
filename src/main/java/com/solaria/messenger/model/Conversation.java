@@ -1,7 +1,9 @@
 package com.solaria.messenger.model;
 
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.data.annotation.Id;
@@ -18,6 +20,16 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 
+/**
+ * dados de uma conversa, a participação é baseada por {@link #participantIds}
+ *
+ * <ul>
+ *   <li>{@code DIRECT} -> {@code participantIds} tem exatamente 2 UUIDs</li>
+ *   <li>{@code GROUP} -> {@code participantIds} tem 2+ UUIDs 
+ *       {@code projectId} -> preenchido quando o grupo pertence a um projeto</li>
+ *   <li>{@code CHAT_BOT} -> {@code participantIds} tem só o UUID do usuário dono da conversa</li>
+ * </ul>
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -27,16 +39,22 @@ public class Conversation {
     @Id
     private String id;
 
-    @Indexed
-    @Field("sender_id")
-    private UUID senderId;
-
-    @Indexed
-    @Field("receiver_id")
-    private UUID receiverId;
-
     @Field("conversation_type")
     private ConversationType conversationType;
+
+    @Indexed
+    @Field("participant_ids")
+    private Set<UUID> participantIds = new LinkedHashSet<>();
+
+    @Field("created_by")
+    private UUID createdBy;
+
+    /**  prenchido apenas para {@code GROUP} */
+    private String title;
+
+    @Indexed
+    @Field("community_id")
+    private String communityId;
 
     @Field("environment")
     private Environment environment;
@@ -54,4 +72,8 @@ public class Conversation {
 
     @Field("last_interaction_at")
     private Instant lastInteractionAt;
+
+    public boolean hasParticipant(UUID userId) {
+        return participantIds != null && participantIds.contains(userId);
+    }
 }
