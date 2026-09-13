@@ -103,6 +103,7 @@ public class CommunityService {
 
     public CommunityResponseDTO updateCommunity(String id, CommunityUpdateRequestDTO dto) {
         ProjectCommunity community = requireEntityById(id);
+        requireMember(community);
 
         if (dto.getStatus() != null) {
             requireOwner(community);
