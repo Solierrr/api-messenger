@@ -30,4 +30,5 @@ public class LlmObservabilityResponseDTO {
     private String status;
     private String error;
     private Instant timestamp;
+    private Double costUsd;
 }

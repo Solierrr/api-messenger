@@ -60,4 +60,7 @@ public class LlmObservability {
     private String error;
 
     private Instant timestamp;
+
+    @Field("cost_usd")
+    private Double costUsd;
 }

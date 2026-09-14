@@ -35,6 +35,7 @@ public class LlmObservabilityService {
         observability.setStatus(dto.getStatus());
         observability.setError(dto.getError());
         observability.setTimestamp(dto.getTimestamp() != null ? dto.getTimestamp() : Instant.now());
+        observability.setCostUsd(dto.getCostUsd() != null ? dto.getCostUsd() : 0.0);
 
         return toResponse(llmObservabilityRepository.save(observability));
     }
@@ -103,6 +104,7 @@ public class LlmObservabilityService {
                 .status(observability.getStatus())
                 .error(observability.getError())
                 .timestamp(observability.getTimestamp())
+                .costUsd(observability.getCostUsd())
                 .build();
     }
 }
