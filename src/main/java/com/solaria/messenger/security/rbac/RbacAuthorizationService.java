@@ -1,6 +1,7 @@
 package com.solaria.messenger.security.rbac;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -40,11 +41,25 @@ public class RbacAuthorizationService {
         }
     }
 
+    public void requireParticipant(Collection<UUID> participantIds) {
+        UUID currentUserId = currentUserId();
+        boolean isParticipant = participantIds != null && participantIds.stream()
+                .filter(Objects::nonNull)
+                .anyMatch(currentUserId::equals);
+        if (!isParticipant) {
+            throw new UnauthorizedAccessException("O objeto da operação não foi encontrado.");
+        }
+    }
+
     // métodos de apoio da classe
 
     public UUID currentUserId() {
         return currentUserIdOptional()
             .orElseThrow(() -> new UnauthorizedAccessException("Nenhum usuário autenticado na requisição."));
+    }
+
+    public boolean isCurrentUser(UUID userId) {
+        return currentUserIdOptional().map(id -> id.equals(userId)).orElse(false);
     }
 
     private Optional<UUID> currentUserIdOptional() {
