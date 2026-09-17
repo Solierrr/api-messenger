@@ -28,4 +28,7 @@ public class MessageRequestDTO {
     @NotBlank(message = "content é obrigatório")
     @Size(max = 8000, message = "content deve ter no máximo 8000 caracteres")
     private String content;
+
+    /** usado apenas quando a mensagem chega via websocket */
+    private String clientMessageId;
 }
