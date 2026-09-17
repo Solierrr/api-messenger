@@ -7,6 +7,11 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
 import com.solaria.messenger.dto.request.ChatbotConversationRequestDTO;
@@ -31,13 +36,16 @@ public class ConversationService {
     private final ConversationRepository conversationRepository;
     private final CommunityRepository communityRepository;
     private final RbacAuthorizationService rbac;
+    private final MongoTemplate mongoTemplate;
 
     public ConversationService(ConversationRepository conversationRepository,
             CommunityRepository communityRepository,
-            RbacAuthorizationService rbac) {
+            RbacAuthorizationService rbac,
+            MongoTemplate mongoTemplate) {
         this.conversationRepository = conversationRepository;
         this.communityRepository = communityRepository;
         this.rbac = rbac;
+        this.mongoTemplate = mongoTemplate;
     }
 
 
@@ -195,6 +203,23 @@ public class ConversationService {
     public void updateLastInteraction(Conversation conversation, Instant timestamp) {
         conversation.setLastInteractionAt(timestamp);
         conversationRepository.save(conversation);
+    }
+
+    /**
+     * Gera o próximo número de sequência de uma conversa via {@code findAndModify}
+     * ($inc em {@code lastSequence})
+     */
+    public int nextSequence(String conversationId) {
+        Query query = new Query(Criteria.where("id").is(conversationId));
+        Update update = new Update().inc("lastSequence", 1);
+
+        Conversation updated = mongoTemplate.findAndModify(query, update,
+                FindAndModifyOptions.options().returnNew(true), Conversation.class);
+
+        if (updated == null) {
+            throw new ResourceNotFoundException("Conversa não encontrada com id: " + conversationId);
+        }
+        return updated.getLastSequence();
     }
 
     private void requireGroup(Conversation conversation) {
