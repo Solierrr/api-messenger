@@ -29,4 +29,6 @@ public class MessageResponseDTO {
     private String content;
     private MessageMetadata metadata;
     private Instant timestamp;
+    private String clientMessageId;
+    private int sequence;
 }
