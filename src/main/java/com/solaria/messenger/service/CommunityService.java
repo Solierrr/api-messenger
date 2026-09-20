@@ -22,6 +22,7 @@ import com.solaria.messenger.exception.DuplicateResourceException;
 import com.solaria.messenger.exception.InvalidFieldException;
 import com.solaria.messenger.exception.ResourceNotFoundException;
 import com.solaria.messenger.exception.UnauthorizedAccessException;
+import com.solaria.messenger.integration.ProjectAuthorityClient;
 import com.solaria.messenger.model.CommunityMember;
 import com.solaria.messenger.model.ProjectCommunity;
 import com.solaria.messenger.model.enums.CommunityRole;
@@ -39,18 +40,23 @@ public class CommunityService {
     private final CommunityRepository communityRepository;
     private final ConversationService conversationService;
     private final RbacAuthorizationService rbac;
+    private final ProjectAuthorityClient projectAuthorityClient;
 
     public CommunityService(CommunityRepository communityRepository,
             ConversationService conversationService,
-            RbacAuthorizationService rbac) {
+            RbacAuthorizationService rbac,
+            ProjectAuthorityClient projectAuthorityClient) {
         this.communityRepository = communityRepository;
         this.conversationService = conversationService;
         this.rbac = rbac;
+        this.projectAuthorityClient = projectAuthorityClient;
     }
 
 
     public CommunityResponseDTO createCommunity(CommunityRequestDTO dto) {
         UUID currentUserId = rbac.currentUserId();
+
+        projectAuthorityClient.requireRequester(dto.getProjectId(), currentUserId);
 
         if (communityRepository.existsByProjectId(dto.getProjectId())) {
             throw new DuplicateResourceException(
