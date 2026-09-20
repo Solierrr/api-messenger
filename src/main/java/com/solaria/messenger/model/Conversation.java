@@ -73,6 +73,9 @@ public class Conversation {
     @Field("last_interaction_at")
     private Instant lastInteractionAt;
 
+    @Field("last_sequence")
+    private int lastSequence;
+
     public boolean hasParticipant(UUID userId) {
         return participantIds != null && participantIds.contains(userId);
     }
