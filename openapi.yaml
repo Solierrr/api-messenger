@@ -1,0 +1,1539 @@
+openapi: 3.0.3
+info:
+  title: Solaria — api-messenger
+  description: Contrato HTTP deste serviço. Use um access token emitido pelo api-auth nas operações com bearerAuth.
+    URLs e credenciais são configuradas no cliente HTTP; este arquivo não contém valores privados. Rotas /internal/
+    destinam-se à comunicação entre serviços.
+  version: v1
+servers:
+- url: http://localhost:{port}
+  description: Execução local; ajuste a porta ou substitua o servidor no cliente HTTP.
+  variables:
+    port:
+      default: '8080'
+tags:
+- name: Mensagens
+  description: Mensagens trocadas por pessoas, entre si ou com o chatbot
+- name: Comunidades
+  description: Comunidade do projeto, espaço tipo slack
+- name: Conversas
+  description: Conversas diretas, em grupo e com o chatbot
+- name: Mensagens do chatbot (interno)
+  description: Publicação da resposta do bot numa conversa. Endpoint interno, em /internal/messages, alcançável
+    apenas pela rede interna (nunca via Kong).
+- name: Avaliações
+  description: Avaliações entre usuários, sobre profissional ou produto
+- name: Observabilidade de LLM
+  description: Telemetria interna do pipeline de LLM -> roteador/nós do grafo reportam métricas de cada passo (chamada
+    a modelo ou a ferramenta). Endpoints internos, em /internal/observability, alcançáveis apenas pela rede interna
+    (nunca via Kong).
+paths:
+  /dev/login:
+    post:
+      tags:
+      - Dev
+      summary: Autentica em api-auth e devolve o JWT, para colar no botão Authorize deste Swagger
+      operationId: login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequestDTO'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthLoginResponseDTO'
+      security: []
+  /internal/messages:
+    post:
+      tags:
+      - Mensagens do chatbot (interno)
+      summary: Publica a resposta do bot numa conversa existente
+      description: 'messageType é sempre CHATBOT_TO_USER e role sempre "assistant" Rota interna: a aplicação não
+        exige Bearer; restrinja o acesso pela rede.'
+      operationId: ingestChatbotMessage
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatbotMessageRequestDTO'
+        required: true
+      responses:
+        '201':
+          description: Mensagem publicada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponseDTO'
+        '400':
+          description: Dados de entrada inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponseDTO'
+        '404':
+          description: Conversa não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponseDTO'
+      security: []
+  /internal/observability:
+    get:
+      tags:
+      - Observabilidade de LLM
+      summary: Lista/filtra eventos de telemetria
+      description: 'No máximo um filtro (conversationId, node ou status) pode ser informado por chamada nesta versão;
+        nenhum filtro informado devolve todos os eventos. Rota interna: a aplicação não exige Bearer; restrinja
+        o acesso pela rede.'
+      operationId: search
+      parameters:
+      - name: conversationId
+        in: query
+        description: Filtra pelo identificador da conversa
+        required: false
+        schema:
+          type: string
+      - name: node
+        in: query
+        description: Filtra pelo nó do grafo que originou a chamada
+        required: false
+        schema:
+          type: string
+      - name: status
+        in: query
+        description: 'Filtra pelo status da chamada (valores possíveis: ok, error, rate_limited, timeout, connection_error)'
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Lista de eventos retornada com sucesso
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LlmObservabilityResponseDTO'
+        '400':
+          description: Mais de um filtro informado simultaneamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LlmObservabilityResponseDTO'
+      security: []
+    post:
+      tags:
+      - Observabilidade de LLM
+      summary: Registra um evento de telemetria de um passo do pipeline de LLM
+      description: 'Log de auditoria imutável -> não há update/delete. Se timestamp não for informado o horário
+        de ingestão (Instant.now()) é usado. Rota interna: a aplicação não exige Bearer; restrinja o acesso pela
+        rede.'
+      operationId: ingest
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LlmObservabilityRequestDTO'
+        required: true
+      responses:
+        '201':
+          description: Evento registrado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmObservabilityResponseDTO'
+        '400':
+          description: Dados de entrada inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmObservabilityResponseDTO'
+      security: []
+  /internal/observability/{id}:
+    get:
+      tags:
+      - Observabilidade de LLM
+      summary: Busca um evento de telemetria pelo identificador
+      operationId: findById_3
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Evento encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmObservabilityResponseDTO'
+        '404':
+          description: Evento não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmObservabilityResponseDTO'
+      security: []
+      description: 'Rota interna: a aplicação não exige Bearer; restrinja o acesso pela rede.'
+  /messaging/communities:
+    post:
+      tags:
+      - Comunidades
+      summary: Cria a comunidade de um projeto
+      description: Quem cria vira OWNER | memberIds opcionais entram como MEMBER | Uma comunidade por projeto
+      operationId: createCommunity
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommunityRequestDTO'
+        required: true
+      responses:
+        '201':
+          description: Comunidade criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResponseDTO'
+        '400':
+          description: Dados de entrada inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResponseDTO'
+        '409':
+          description: Já existe uma comunidade para o projeto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResponseDTO'
+      security:
+      - bearerAuth: []
+  /messaging/communities/me:
+    get:
+      tags:
+      - Comunidades
+      summary: Lista as comunidades das quais o usuário autenticado é membro
+      operationId: findMine_1
+      responses:
+        '200':
+          description: Lista retornada com sucesso
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CommunityResponseDTO'
+      security:
+      - bearerAuth: []
+  /messaging/communities/project/{projectId}:
+    get:
+      tags:
+      - Comunidades
+      summary: Busca a comunidade de um projeto (só membros)
+      operationId: findByProjectId
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Comunidade encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResponseDTO'
+        '403':
+          description: O usuário autenticado não participa desta comunidade
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResponseDTO'
+        '404':
+          description: Comunidade não encontrada para o projeto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResponseDTO'
+      security:
+      - bearerAuth: []
+  /messaging/communities/{id}:
+    get:
+      tags:
+      - Comunidades
+      summary: Busca uma comunidade pelo identificador (só membros)
+      operationId: findById_1
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Comunidade encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResponseDTO'
+        '403':
+          description: O usuário autenticado não participa desta comunidade
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResponseDTO'
+        '404':
+          description: Comunidade não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResponseDTO'
+      security:
+      - bearerAuth: []
+    patch:
+      tags:
+      - Comunidades
+      summary: Atualiza a comunidade
+      description: ' unico campo editável é o status | alterar para ARCHIVED exige OWNER'
+      operationId: updateCommunity
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommunityUpdateRequestDTO'
+        required: true
+      responses:
+        '200':
+          description: Comunidade atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResponseDTO'
+        '403':
+          description: Papel insuficiente na comunidade
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResponseDTO'
+        '404':
+          description: Comunidade não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResponseDTO'
+      security:
+      - bearerAuth: []
+  /messaging/communities/{id}/conversations:
+    get:
+      tags:
+      - Comunidades
+      summary: Lista as conversas em grupo de uma comunidade (só membros)
+      operationId: listConversations
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Lista retornada com sucesso
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConversationResponseDTO'
+        '403':
+          description: O usuário autenticado não participa desta comunidade
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConversationResponseDTO'
+        '404':
+          description: Comunidade não encontrada
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConversationResponseDTO'
+      security:
+      - bearerAuth: []
+    post:
+      tags:
+      - Comunidades
+      summary: Inicia uma conversa em grupo entre membros da comunidade
+      description: participantIds opcional -> sem ele, entram todos os membros | se informado apenas os IDs entram.
+        O criador entra sempre.
+      operationId: startConversation
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommunityConversationRequestDTO'
+        required: true
+      responses:
+        '201':
+          description: Conversa em grupo criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponseDTO'
+        '403':
+          description: O usuário autenticado não participa desta comunidade
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponseDTO'
+        '404':
+          description: Comunidade não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponseDTO'
+        '422':
+          description: Comunidade arquivada ou participante fora da comunidade
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponseDTO'
+      security:
+      - bearerAuth: []
+  /messaging/communities/{id}/members:
+    post:
+      tags:
+      - Comunidades
+      summary: Adiciona/altera papel de membros
+      description: Adicionar MEMBER exige ADMIN | conceder ADMIN exige OWNER
+      operationId: addMembers
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommunityMembersRequestDTO'
+        required: true
+      responses:
+        '200':
+          description: Membros adicionados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResponseDTO'
+        '403':
+          description: Papel insuficiente na comunidade
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResponseDTO'
+        '404':
+          description: Comunidade não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResponseDTO'
+        '422':
+          description: Comunidade arquivada ou papel OWNER solicitado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResponseDTO'
+      security:
+      - bearerAuth: []
+  /messaging/communities/{id}/members/{userId}:
+    delete:
+      tags:
+      - Comunidades
+      summary: Remove um membro | sair da comunidade
+      description: Cada um pode sair | remover outros exige OWNER/ADMIN | OWNER não pode ser removido nem sair
+      operationId: removeMember
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Membro removido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResponseDTO'
+        '403':
+          description: Sem permissão para remover esse membro
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResponseDTO'
+        '404':
+          description: Comunidade ou membro não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResponseDTO'
+        '422':
+          description: Tentativa de remover o OWNER
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResponseDTO'
+      security:
+      - bearerAuth: []
+  /messaging/conversations/chatbot-conversations:
+    post:
+      tags:
+      - Conversas
+      summary: Inicia uma conversa com o chatbot
+      description: ' o inciador da conversa é o id do JWT do usuario autenticado'
+      operationId: createChatbotConversation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatbotConversationRequestDTO'
+        required: true
+      responses:
+        '201':
+          description: Conversa criada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponseDTO'
+        '400':
+          description: Dados de entrada inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponseDTO'
+      security:
+      - bearerAuth: []
+  /messaging/conversations/direct:
+    post:
+      tags:
+      - Conversas
+      summary: Inicia  uma conversa entre duas pessoas/direta
+      description: O inciador da conversa é o id do JWT do usuario autenticado | se já existir uma conversa DIRECT
+        ativa entre os dois, ela é retornada.
+      operationId: createDirectConversation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DirectConversationRequestDTO'
+        required: true
+      responses:
+        '201':
+          description: Conversa criada ou reaproveitada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponseDTO'
+        '400':
+          description: Dados inválidos, incluindo conversa consigo mesmo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponseDTO'
+      security:
+      - bearerAuth: []
+  /messaging/conversations/group:
+    post:
+      tags:
+      - Conversas
+      summary: 'Inicia uma conversa em grupo '
+      description: O criador entra automaticamente nos participantes | é preciso ter pelo menos 2 participantes
+      operationId: createGroupConversation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GroupConversationRequestDTO'
+        required: true
+      responses:
+        '201':
+          description: Grupo criado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponseDTO'
+        '400':
+          description: Dados de entrada inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponseDTO'
+      security:
+      - bearerAuth: []
+  /messaging/conversations/me:
+    get:
+      tags:
+      - Conversas
+      summary: Lista as conversas (DIRECT, GROUP e CHAT_BOT) do usuário autenticado
+      operationId: findMine
+      responses:
+        '200':
+          description: Lista retornada com sucesso
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConversationResponseDTO'
+      security:
+      - bearerAuth: []
+  /messaging/conversations/{id}:
+    get:
+      tags:
+      - Conversas
+      summary: Busca uma conversa pelo identificador
+      description: Só participantes da conversa podem acessá-la
+      operationId: findById_2
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Conversa encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponseDTO'
+        '403':
+          description: O usuário autenticado não participa desta conversa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponseDTO'
+        '404':
+          description: Conversa não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponseDTO'
+      security:
+      - bearerAuth: []
+  /messaging/conversations/{id}/participants:
+    post:
+      tags:
+      - Conversas
+      summary: Adiciona participantes a uma conversa em grupo
+      description: Só participantes do grupo podem adicionar | Se o grupo pertence a uma comunidade, os novos participantes
+        precisam ser membros dela
+      operationId: addParticipants
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParticipantsRequestDTO'
+        required: true
+      responses:
+        '200':
+          description: Participantes adicionados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponseDTO'
+        '403':
+          description: O usuário autenticado não participa deste grupo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponseDTO'
+        '404':
+          description: Conversa não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponseDTO'
+        '422':
+          description: Conversa não é um grupo, está desativada, ou participante fora da comunidade
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponseDTO'
+      security:
+      - bearerAuth: []
+  /messaging/conversations/{id}/participants/{userId}:
+    delete:
+      tags:
+      - Conversas
+      summary: Remove um participante de um grupo ou sai do grupo
+      description: Cada um pode sair do próprio grupo | remover outros exige ser quem criou o grupo.
+      operationId: removeParticipant
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Participante removido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponseDTO'
+        '403':
+          description: Sem permissão para remover esse participante
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponseDTO'
+        '404':
+          description: Conversa não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponseDTO'
+      security:
+      - bearerAuth: []
+  /messaging/messages:
+    post:
+      tags:
+      - Mensagens
+      summary: Envia uma mensagem de uma pessoa numa conversa existente
+      description: 'O messageType precisa combinar com o tipo da conversa: DIRECT -> USER_TO_USER, GROUP -> USER_TO_GROUP,
+        CHAT_BOT -> USER_TO_CHATBOT. CHATBOT_TO_USER é recusado.'
+      operationId: sendMessage
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageRequestDTO'
+        required: true
+      responses:
+        '201':
+          description: Mensagem enviada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponseDTO'
+        '400':
+          description: 'Dados inválidos: messageType incompatível com a conversa ou CHATBOT_TO_USER'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponseDTO'
+        '403':
+          description: O usuário autenticado não participa desta conversa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponseDTO'
+        '404':
+          description: Conversa não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponseDTO'
+        '422':
+          description: A conversa está desativada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponseDTO'
+      security:
+      - bearerAuth: []
+  /messaging/messages/conversation/{conversationId}:
+    get:
+      tags:
+      - Mensagens
+      summary: Lista as mensagens de uma conversa
+      description: Lista as mensagens da conversa conforme o controller ativo nesta branch.
+      operationId: getMessagesByConversationId
+      parameters:
+      - name: conversationId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Lista de mensagens retornada com sucesso
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MessageResponseDTO'
+        '403':
+          description: O usuário autenticado não participa desta conversa
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MessageResponseDTO'
+        '404':
+          description: Conversa não encontrada
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MessageResponseDTO'
+      security:
+      - bearerAuth: []
+  /messaging/ratings:
+    post:
+      tags:
+      - Avaliações
+      summary: Cria uma nova avaliação
+      description: O avaliador (evaluatorId) é sempre o usuário autenticado da requisição. Status inicial é sempre
+        ACTIVE.
+      operationId: create
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RatingRequestDTO'
+        required: true
+      responses:
+        '201':
+          description: Avaliação criada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RatingResponseDTO'
+        '400':
+          description: Dados de entrada inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RatingResponseDTO'
+      security:
+      - bearerAuth: []
+  /messaging/ratings/evaluated/{evaluatedId}:
+    get:
+      tags:
+      - Avaliações
+      summary: Lista as avaliações de um usuário/produto
+      description: Reputação pública do avaliado(produto/profissional).
+      operationId: findByEvaluated
+      parameters:
+      - name: evaluatedId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Lista de avaliações retornada com sucesso
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RatingResponseDTO'
+      security:
+      - bearerAuth: []
+  /messaging/ratings/evaluator/{evaluatorId}:
+    get:
+      tags:
+      - Avaliações
+      summary: Lista as avaliações dadas por um usuário
+      description: só o próprio avaliador pode listar as avaliações que ele deu.
+      operationId: findByEvaluator
+      parameters:
+      - name: evaluatorId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Lista de avaliações retornada com sucesso
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RatingResponseDTO'
+        '403':
+          description: Usuário autenticado não é o avaliador informado
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RatingResponseDTO'
+      security:
+      - bearerAuth: []
+  /messaging/ratings/{id}:
+    get:
+      tags:
+      - Avaliações
+      summary: Busca uma avaliação pelo identificador
+      description: qualquer usuário pode ler uma avaliação.
+      operationId: findById
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Avaliação encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RatingResponseDTO'
+        '404':
+          description: Avaliação não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RatingResponseDTO'
+      security:
+      - bearerAuth: []
+    patch:
+      tags:
+      - Avaliações
+      summary: Edita o comentário e/ou a nota de uma avaliação
+      description: Somente o autor original pode editá-la.
+      operationId: update
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RatingUpdateRequestDTO'
+        required: true
+      responses:
+        '200':
+          description: Avaliação atualizada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RatingResponseDTO'
+        '400':
+          description: Dados de entrada inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RatingResponseDTO'
+        '403':
+          description: Usuário autenticado não é o autor da avaliação
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RatingResponseDTO'
+        '404':
+          description: Avaliação não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RatingResponseDTO'
+      security:
+      - bearerAuth: []
+  /messaging/ratings/{id}/status:
+    patch:
+      tags:
+      - Avaliações
+      summary: Altera o status de uma avaliação
+      description: Somente o dono da avalição pode alterar o status da avaliação
+      operationId: updateStatus
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RatingStatusUpdateRequestDTO'
+        required: true
+      responses:
+        '200':
+          description: Status atualizado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RatingResponseDTO'
+        '400':
+          description: Dados de entrada inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RatingResponseDTO'
+        '403':
+          description: Usuário autenticado não é o autor da avaliação
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RatingResponseDTO'
+        '404':
+          description: Avaliação não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RatingResponseDTO'
+      security:
+      - bearerAuth: []
+components:
+  schemas:
+    AuthLoginResponseDTO:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        accessTokenExpiresAt:
+          type: string
+        userId:
+          type: string
+        email:
+          type: string
+    ChatbotConversationRequestDTO:
+      type: object
+      properties:
+        environment:
+          type: string
+          enum:
+          - LOCAL
+          - QA
+          - PROD
+        userType:
+          type: string
+          minLength: 1
+        userDetails:
+          type: object
+          additionalProperties:
+            type: object
+      required:
+      - environment
+    ChatbotMessageRequestDTO:
+      type: object
+      properties:
+        conversationId:
+          type: string
+          minLength: 1
+        environment:
+          type: string
+          enum:
+          - LOCAL
+          - QA
+          - PROD
+        content:
+          type: string
+          minLength: 1
+        metadata:
+          $ref: '#/components/schemas/MessageMetadata'
+      required:
+      - environment
+    CommunityConversationRequestDTO:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 120
+          minLength: 0
+        participantIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          uniqueItems: true
+        environment:
+          type: string
+          enum:
+          - LOCAL
+          - QA
+          - PROD
+    CommunityMemberDTO:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum:
+          - OWNER
+          - ADMIN
+          - MEMBER
+        joinedAt:
+          type: string
+          format: date-time
+    CommunityMembersRequestDTO:
+      type: object
+      properties:
+        userIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          minItems: 1
+          uniqueItems: true
+        role:
+          type: string
+          enum:
+          - OWNER
+          - ADMIN
+          - MEMBER
+    CommunityRequestDTO:
+      type: object
+      properties:
+        projectId:
+          type: string
+          format: uuid
+        memberIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          uniqueItems: true
+      required:
+      - projectId
+    CommunityResponseDTO:
+      type: object
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+          format: uuid
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityMemberDTO'
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - ARCHIVED
+        createdBy:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CommunityUpdateRequestDTO:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - ARCHIVED
+    ConversationResponseDTO:
+      type: object
+      properties:
+        id:
+          type: string
+        conversationType:
+          type: string
+          enum:
+          - DIRECT
+          - GROUP
+          - CHAT_BOT
+        participantIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          uniqueItems: true
+        createdBy:
+          type: string
+          format: uuid
+        title:
+          type: string
+        communityId:
+          type: string
+        environment:
+          type: string
+          enum:
+          - LOCAL
+          - QA
+          - PROD
+        userType:
+          type: string
+        userDetails:
+          type: object
+          additionalProperties:
+            type: object
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - DEACTIVATED
+        startedAt:
+          type: string
+          format: date-time
+        lastInteractionAt:
+          type: string
+          format: date-time
+    DirectConversationRequestDTO:
+      type: object
+      properties:
+        recipientId:
+          type: string
+          format: uuid
+        environment:
+          type: string
+          enum:
+          - LOCAL
+          - QA
+          - PROD
+      required:
+      - recipientId
+    GroupConversationRequestDTO:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 120
+          minLength: 0
+        participantIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          minItems: 1
+          uniqueItems: true
+        environment:
+          type: string
+          enum:
+          - LOCAL
+          - QA
+          - PROD
+    LlmObservabilityRequestDTO:
+      type: object
+      properties:
+        node:
+          type: string
+          minLength: 1
+        stepOrder:
+          type: integer
+          format: int32
+        stepType:
+          type: string
+          enum:
+          - LLM_CALL
+          - TOOL_CALL
+        model:
+          type: string
+          minLength: 1
+        conversationId:
+          type: string
+          minLength: 1
+        tokensIn:
+          type: integer
+          format: int32
+        tokensOut:
+          type: integer
+          format: int32
+        tokensTotal:
+          type: integer
+          format: int32
+        latencyMs:
+          type: number
+          format: double
+        status:
+          type: string
+          minLength: 1
+        error:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        costUsd:
+          type: number
+          format: double
+      required:
+      - latencyMs
+      - stepOrder
+      - stepType
+      - tokensIn
+      - tokensOut
+      - tokensTotal
+    LlmObservabilityResponseDTO:
+      type: object
+      properties:
+        id:
+          type: string
+        node:
+          type: string
+        stepOrder:
+          type: integer
+          format: int32
+        stepType:
+          type: string
+          enum:
+          - LLM_CALL
+          - TOOL_CALL
+        model:
+          type: string
+        conversationId:
+          type: string
+        tokensIn:
+          type: integer
+          format: int32
+        tokensOut:
+          type: integer
+          format: int32
+        tokensTotal:
+          type: integer
+          format: int32
+        latencyMs:
+          type: number
+          format: double
+        status:
+          type: string
+        error:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        costUsd:
+          type: number
+          format: double
+    LoginRequestDTO:
+      type: object
+      properties:
+        email:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          minLength: 1
+    MessageMetadata:
+      type: object
+      properties:
+        turnId:
+          type: string
+        contentAnonymized:
+          type: boolean
+        specialistsUsed:
+          type: array
+          items:
+            type: string
+        workflowSteps:
+          type: array
+          items:
+            type: string
+    MessageRequestDTO:
+      type: object
+      properties:
+        conversationId:
+          type: string
+          minLength: 1
+        messageType:
+          type: string
+          enum:
+          - USER_TO_USER
+          - USER_TO_GROUP
+          - USER_TO_CHATBOT
+          - CHATBOT_TO_USER
+        role:
+          type: string
+          maxLength: 32
+          minLength: 0
+        environment:
+          type: string
+          enum:
+          - LOCAL
+          - QA
+          - PROD
+        content:
+          type: string
+          maxLength: 8000
+          minLength: 0
+        clientMessageId:
+          type: string
+      required:
+      - messageType
+    MessageResponseDTO:
+      type: object
+      properties:
+        id:
+          type: string
+        conversationId:
+          type: string
+        senderId:
+          type: string
+          format: uuid
+        role:
+          type: string
+        messageType:
+          type: string
+          enum:
+          - USER_TO_USER
+          - USER_TO_GROUP
+          - USER_TO_CHATBOT
+          - CHATBOT_TO_USER
+        environment:
+          type: string
+          enum:
+          - LOCAL
+          - QA
+          - PROD
+        content:
+          type: string
+        metadata:
+          $ref: '#/components/schemas/MessageMetadata'
+        timestamp:
+          type: string
+          format: date-time
+        clientMessageId:
+          type: string
+        sequence:
+          type: integer
+          format: int32
+    ParticipantsRequestDTO:
+      type: object
+      properties:
+        userIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          minItems: 1
+          uniqueItems: true
+    RatingRequestDTO:
+      type: object
+      properties:
+        evaluatedId:
+          type: string
+          format: uuid
+        typeRate:
+          type: string
+          enum:
+          - PROFISSIONAL
+          - PRODUTO
+        comment:
+          type: string
+          maxLength: 1000
+          minLength: 0
+        rating:
+          type: number
+          maximum: 5.0
+          minimum: 0.0
+      required:
+      - evaluatedId
+      - rating
+      - typeRate
+    RatingResponseDTO:
+      type: object
+      properties:
+        id:
+          type: string
+        evaluatorId:
+          type: string
+          format: uuid
+        evaluatedId:
+          type: string
+          format: uuid
+        typeRate:
+          type: string
+          enum:
+          - PROFISSIONAL
+          - PRODUTO
+        comment:
+          type: string
+        rating:
+          type: number
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - EXCLUDED
+          - DOWN
+        timestamp:
+          type: string
+          format: date-time
+    RatingStatusUpdateRequestDTO:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - EXCLUDED
+          - DOWN
+      required:
+      - status
+    RatingUpdateRequestDTO:
+      type: object
+      properties:
+        comment:
+          type: string
+          maxLength: 1000
+          minLength: 0
+        rating:
+          type: number
+          maximum: 5.0
+          minimum: 0.0
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token de usuário emitido pelo api-auth.
