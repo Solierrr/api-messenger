@@ -19,13 +19,14 @@ import com.solaria.messenger.dto.request.DirectConversationRequestDTO;
 import com.solaria.messenger.dto.request.GroupConversationRequestDTO;
 import com.solaria.messenger.dto.response.ConversationResponseDTO;
 import com.solaria.messenger.exception.BusinessRuleException;
+import com.solaria.messenger.exception.DuplicateResourceException;
 import com.solaria.messenger.exception.InvalidFieldException;
 import com.solaria.messenger.exception.ResourceNotFoundException;
 import com.solaria.messenger.model.Conversation;
 import com.solaria.messenger.model.ProjectCommunity;
+import com.solaria.messenger.model.enums.CommunityStatus;
 import com.solaria.messenger.model.enums.ConversationStatus;
 import com.solaria.messenger.model.enums.ConversationType;
-import com.solaria.messenger.model.enums.Environment;
 import com.solaria.messenger.repository.CommunityRepository;
 import com.solaria.messenger.repository.ConversationRepository;
 import com.solaria.messenger.security.rbac.RbacAuthorizationService;
@@ -57,15 +58,20 @@ public class ConversationService {
             throw new InvalidFieldException("Não é possível iniciar uma conversa consigo mesmo.");
         }
 
-        Set<UUID> participants = new LinkedHashSet<>(List.of(currentUserId, recipientId));
+        Query query = Query.query(Criteria.where("conversationType").is(ConversationType.DIRECT)
+                .and("status").is(ConversationStatus.ACTIVE)
+                .and("participantIds").all(currentUserId, recipientId).size(2)).limit(2);
+        List<Conversation> existing = mongoTemplate.find(query, Conversation.class);
+        if (existing.size() > 1) {
+            throw new DuplicateResourceException("Há múltiplas conversas diretas ativas para estes participantes.");
+        }
+        if (!existing.isEmpty()) {
+            return toResponse(existing.getFirst());
+        }
 
-        return findExistingDirect(currentUserId, participants)
-                .map(this::toResponse)
-                .orElseGet(() -> {
-                    Conversation conversation = newConversation(ConversationType.DIRECT, currentUserId,
-                            participants, dto.getEnvironment());
-                    return toResponse(conversationRepository.save(conversation));
-                });
+        Set<UUID> participants = new LinkedHashSet<>(List.of(currentUserId, recipientId));
+        Conversation conversation = newConversation(ConversationType.DIRECT, currentUserId, participants);
+        return toResponse(conversationRepository.save(conversation));
     }
 
     public ConversationResponseDTO createGroupConversation(GroupConversationRequestDTO dto) {
@@ -79,8 +85,7 @@ public class ConversationService {
             throw new InvalidFieldException("Um grupo precisa de ao menos 2 participantes distintos.");
         }
 
-        Conversation conversation = newConversation(ConversationType.GROUP, currentUserId,
-                participants, dto.getEnvironment());
+        Conversation conversation = newConversation(ConversationType.GROUP, currentUserId, participants);
         conversation.setTitle(dto.getTitle());
 
         return toResponse(conversationRepository.save(conversation));
@@ -90,7 +95,7 @@ public class ConversationService {
         UUID currentUserId = rbac.currentUserId();
 
         Conversation conversation = newConversation(ConversationType.CHAT_BOT, currentUserId,
-                new LinkedHashSet<>(List.of(currentUserId)), dto.getEnvironment());
+                new LinkedHashSet<>(List.of(currentUserId)));
         conversation.setUserType(dto.getUserType());
         conversation.setUserDetails(dto.getUserDetails());
 
@@ -103,14 +108,13 @@ public class ConversationService {
      */
     public ConversationResponseDTO createCommunityGroupConversation(String communityId,
             String title,
-            Environment environment,
             UUID creatorId,
             Set<UUID> participantIds) {
         Set<UUID> participants = new LinkedHashSet<>();
         participants.add(creatorId);
         participantIds.stream().filter(Objects::nonNull).forEach(participants::add);
 
-        Conversation conversation = newConversation(ConversationType.GROUP, creatorId, participants, environment);
+        Conversation conversation = newConversation(ConversationType.GROUP, creatorId, participants);
         conversation.setTitle(title);
         conversation.setCommunityId(communityId);
 
@@ -132,7 +136,9 @@ public class ConversationService {
     }
 
     public List<ConversationResponseDTO> findByCommunity(String communityId) {
-        return conversationRepository.findByCommunityIdOrderByLastInteractionAtDesc(communityId)
+        return conversationRepository
+                .findByCommunityIdAndParticipantIdsContainingOrderByLastInteractionAtDesc(
+                        communityId, rbac.currentUserId())
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -151,6 +157,9 @@ public class ConversationService {
             ProjectCommunity community = communityRepository.findById(conversation.getCommunityId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Comunidade não encontrada para a conversa: " + id));
+            if (community.getStatus() != CommunityStatus.ACTIVE) {
+                throw new BusinessRuleException("A comunidade está arquivada.");
+            }
             boolean allMembers = toAdd.stream().allMatch(community::isMember);
             if (!allMembers) {
                 throw new BusinessRuleException(
@@ -158,9 +167,17 @@ public class ConversationService {
             }
         }
 
-        conversation.getParticipantIds().addAll(toAdd);
-        conversation.setLastInteractionAt(Instant.now());
-        return toResponse(conversationRepository.save(conversation));
+        Conversation updated = mongoTemplate.findAndModify(
+                Query.query(Criteria.where("id").is(id)
+                        .and("status").is(ConversationStatus.ACTIVE)
+                        .and("conversationType").is(ConversationType.GROUP)),
+                new Update().addToSet("participantIds").each(toAdd.toArray())
+                        .max("lastInteractionAt", Instant.now()),
+                FindAndModifyOptions.options().returnNew(true), Conversation.class);
+        if (updated == null) {
+            throw new BusinessRuleException("A conversa foi desativada por outra operação concorrente.");
+        }
+        return toResponse(updated);
     }
 
     public ConversationResponseDTO removeParticipant(String id, UUID userId) {
@@ -176,12 +193,22 @@ public class ConversationService {
                     "Apenas quem criou o grupo pode remover outros participantes.");
         }
 
-        conversation.getParticipantIds().remove(userId);
-        if (conversation.getParticipantIds().isEmpty()) {
-            conversation.setStatus(ConversationStatus.DEACTIVATED);
+        Conversation updated = mongoTemplate.findAndModify(
+                Query.query(Criteria.where("id").is(id)),
+                new Update().pull("participantIds", userId).max("lastInteractionAt", Instant.now()),
+                FindAndModifyOptions.options().returnNew(true), Conversation.class);
+        if (updated == null) {
+            throw new ResourceNotFoundException("Conversa não encontrada com id: " + id);
         }
-        conversation.setLastInteractionAt(Instant.now());
-        return toResponse(conversationRepository.save(conversation));
+
+        if (updated.getParticipantIds().isEmpty()) {
+            mongoTemplate.updateFirst(
+                    Query.query(Criteria.where("id").is(id).and("participantIds").size(0)),
+                    Update.update("status", ConversationStatus.DEACTIVATED), Conversation.class);
+            updated.setStatus(ConversationStatus.DEACTIVATED);
+        }
+
+        return toResponse(updated);
     }
 
 
@@ -202,20 +229,16 @@ public class ConversationService {
 
     public void updateLastInteraction(Conversation conversation, Instant timestamp) {
         conversation.setLastInteractionAt(timestamp);
-        conversationRepository.save(conversation);
+        mongoTemplate.updateFirst(
+                Query.query(Criteria.where("id").is(conversation.getId())),
+                new Update().max("lastInteractionAt", timestamp), Conversation.class);
     }
 
-    /**
-     * Gera o próximo número de sequência de uma conversa via {@code findAndModify}
-     * ($inc em {@code lastSequence})
-     */
     public int nextSequence(String conversationId) {
-        Query query = new Query(Criteria.where("id").is(conversationId));
-        Update update = new Update().inc("lastSequence", 1);
-
-        Conversation updated = mongoTemplate.findAndModify(query, update,
+        Conversation updated = mongoTemplate.findAndModify(
+                Query.query(Criteria.where("id").is(conversationId)),
+                new Update().inc("lastSequence", 1),
                 FindAndModifyOptions.options().returnNew(true), Conversation.class);
-
         if (updated == null) {
             throw new ResourceNotFoundException("Conversa não encontrada com id: " + conversationId);
         }
@@ -228,22 +251,11 @@ public class ConversationService {
         }
     }
 
-    private java.util.Optional<Conversation> findExistingDirect(UUID currentUserId, Set<UUID> participants) {
-        return conversationRepository
-                .findByConversationTypeAndParticipantIdsContaining(ConversationType.DIRECT, currentUserId)
-                .stream()
-                .filter(c -> c.getStatus() == ConversationStatus.ACTIVE)
-                .filter(c -> participants.equals(c.getParticipantIds()))
-                .findFirst();
-    }
-
-    private Conversation newConversation(ConversationType type, UUID createdBy,
-            Set<UUID> participants, Environment environment) {
+    private Conversation newConversation(ConversationType type, UUID createdBy, Set<UUID> participants) {
         Conversation conversation = new Conversation();
         conversation.setConversationType(type);
         conversation.setParticipantIds(participants);
         conversation.setCreatedBy(createdBy);
-        conversation.setEnvironment(environment);
         conversation.setStatus(ConversationStatus.ACTIVE);
 
         Instant now = Instant.now();
@@ -260,7 +272,6 @@ public class ConversationService {
                 .createdBy(conversation.getCreatedBy())
                 .title(conversation.getTitle())
                 .communityId(conversation.getCommunityId())
-                .environment(conversation.getEnvironment())
                 .userType(conversation.getUserType())
                 .userDetails(conversation.getUserDetails())
                 .status(conversation.getStatus())
