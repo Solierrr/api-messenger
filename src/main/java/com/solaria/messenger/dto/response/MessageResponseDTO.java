@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import com.solaria.messenger.model.MessageMetadata;
+import com.solaria.messenger.model.enums.Environment;
 import com.solaria.messenger.model.enums.MessageType;
 
 import lombok.AllArgsConstructor;
@@ -24,7 +25,10 @@ public class MessageResponseDTO {
     private UUID senderId;
     private String role;
     private MessageType messageType;
+    private Environment environment;
     private String content;
     private MessageMetadata metadata;
     private Instant timestamp;
+    private String clientMessageId;
+    private int sequence;
 }

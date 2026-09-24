@@ -11,8 +11,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 @Tag(
-    name = "Mensagens do chatbot (M2M)",
-    description = "Publicação da resposta do bot numa conversa. Endpoint exclusivamente M2M, em /internal/messages, autenticado por token de serviço."
+    name = "Mensagens do chatbot (interno)",
+    description = "Publicação da resposta do bot numa conversa. Endpoint interno, em /internal/messages, alcançável apenas pela rede interna (nunca via Kong)."
 )
 public interface ChatbotMessageOpenApi {
 

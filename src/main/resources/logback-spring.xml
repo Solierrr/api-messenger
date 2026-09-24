@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Logging de api-messenger
+
+  2 destinos:
+
+    * CONSOLE -> dev/local 
+    * OTEL    -> exporta OTLP para o Collector
+-->
+<configuration>
+
+
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <appender name="OTEL" class="io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender">
+        <captureExperimentalAttributes>false</captureExperimentalAttributes>
+        <captureCodeAttributes>false</captureCodeAttributes>
+        <captureMarkerAttribute>false</captureMarkerAttribute>
+        <captureKeyValuePairAttributes>true</captureKeyValuePairAttributes>
+        <captureMdcAttributes>*</captureMdcAttributes>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="OTEL"/>
+    </root>
+
+</configuration>

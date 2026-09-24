@@ -25,6 +25,7 @@ import com.solaria.messenger.dto.response.ConversationResponseDTO;
 import com.solaria.messenger.exception.handler.ProblemDetailFactory;
 import com.solaria.messenger.model.enums.ConversationStatus;
 import com.solaria.messenger.model.enums.ConversationType;
+import com.solaria.messenger.model.enums.Environment;
 import com.solaria.messenger.service.ConversationService;
 
 @WebMvcTest(ConversationController.class)
@@ -53,18 +54,28 @@ class ConversationControllerTests {
     @Test
     void createsChatbotConversation() throws Exception {
         given(conversationService.createChatbotConversation(any(ChatbotConversationRequestDTO.class)))
-                .willReturn(conversationResponse());
+                .willReturn(chatbotConversationResponse());
 
         mockMvc.perform(post("/messaging/conversations/chatbot-conversations")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"userType\":\"guest\"}"))
+                        .content("{\"environment\":\"LOCAL\",\"userType\":\"guest\"}"))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value("conversation-1"));
+                .andExpect(jsonPath("$.id").value("conversation-1"))
+                .andExpect(jsonPath("$.environment").value("LOCAL"));
+    }
+
+    @Test
+    void rejectsInvalidEnvironment() throws Exception {
+        mockMvc.perform(post("/messaging/conversations/chatbot-conversations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"environment\":\"INVALID\",\"userType\":\"guest\"}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
     void getsConversationById() throws Exception {
-        given(conversationService.findById("conversation-1")).willReturn(conversationResponse());
+        given(conversationService.findById("conversation-1"))
+                .willReturn(conversationResponse());
 
         mockMvc.perform(get("/messaging/conversations/conversation-1"))
                 .andExpect(status().isOk())
@@ -73,7 +84,8 @@ class ConversationControllerTests {
 
     @Test
     void getsConversationsForCurrentUser() throws Exception {
-        given(conversationService.findMine()).willReturn(List.of(conversationResponse()));
+        given(conversationService.findMine())
+                .willReturn(List.of(conversationResponse()));
 
         mockMvc.perform(get("/messaging/conversations/me"))
                 .andExpect(status().isOk())
@@ -86,6 +98,19 @@ class ConversationControllerTests {
                 .senderId(UUID.randomUUID())
                 .receiverId(UUID.randomUUID())
                 .conversationType(ConversationType.USER_CONVERSATION)
+                .status(ConversationStatus.ACTIVE)
+                .startedAt(Instant.now())
+                .lastInteractionAt(Instant.now())
+                .build();
+    }
+
+    private ConversationResponseDTO chatbotConversationResponse() {
+        return ConversationResponseDTO.builder()
+                .id("conversation-1")
+                .receiverId(UUID.randomUUID())
+                .conversationType(ConversationType.CHAT_BOT)
+                .environment(Environment.LOCAL)
+                .userType("guest")
                 .status(ConversationStatus.ACTIVE)
                 .startedAt(Instant.now())
                 .lastInteractionAt(Instant.now())

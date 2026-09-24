@@ -3,5 +3,5 @@ package com.solaria.messenger.model.enums;
 
 public enum ConversationStatus {
     ACTIVE,
-    DESACTIVATED
+    DEACTIVATED
 }

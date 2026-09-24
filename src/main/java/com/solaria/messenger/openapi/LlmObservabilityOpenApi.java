@@ -16,7 +16,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @Tag(
     name = "Observabilidade de LLM",
 description = "Telemetria interna do pipeline de LLM -> roteador/nós do grafo reportam métricas de cada passo (chamada a modelo ou a ferramenta). "
-    + "Endpoints M2M, em /internal/observability, autenticados por token de serviço."
+    + "Endpoints internos, em /internal/observability, alcançáveis apenas pela rede interna (nunca via Kong)."
 )
 public interface LlmObservabilityOpenApi {
 
@@ -49,5 +49,5 @@ public interface LlmObservabilityOpenApi {
     ResponseEntity<List<LlmObservabilityResponseDTO>> search(
             @Parameter(description = "Filtra pelo identificador da conversa", required = false) String conversationId,
             @Parameter(description = "Filtra pelo nó do grafo que originou a chamada", required = false) String node,
-            @Parameter(description = "Filtra pelo status da chamada ( erro -> false / ok-> true)", required = false) String status);
+            @Parameter(description = "Filtra pelo status da chamada (valores possíveis: ok, error, rate_limited, timeout, connection_error)", required = false) String status);
 }

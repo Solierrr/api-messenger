@@ -2,6 +2,7 @@ package com.solaria.messenger.dto.request;
 
 import java.time.Instant;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.solaria.messenger.model.enums.ObservabilityStepType;
 
 import jakarta.validation.constraints.NotBlank;
@@ -12,6 +13,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class LlmObservabilityRequestDTO {
 
     @NotBlank(message = "node é obrigatório")
@@ -47,9 +49,12 @@ public class LlmObservabilityRequestDTO {
     private Double latencyMs;
 
     @NotBlank(message = "status é obrigatório")
-    private Boolean status;
+    private String status;
 
     private String error;
 
     private Instant timestamp;
+
+    @PositiveOrZero(message = "costUsd não pode ser negativo")
+    private Double costUsd;
 }
