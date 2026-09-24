@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 
+import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 
 import com.solaria.messenger.dto.request.ChatbotMessageRequestDTO;
@@ -49,7 +50,6 @@ public class MessageService {
         message.setSenderId(rbac.currentUserId());
         message.setRole(dto.getRole());
         message.setMessageType(dto.getMessageType());
-        message.setEnvironment(dto.getEnvironment());
         message.setContent(dto.getContent());
 
         Instant now = Instant.now();
@@ -68,7 +68,6 @@ public class MessageService {
         message.setConversationId(dto.getConversationId());
         message.setRole("assistant");
         message.setMessageType(MessageType.CHATBOT_TO_USER);
-        message.setEnvironment(dto.getEnvironment());
         message.setContent(dto.getContent());
         message.setMetadata(dto.getMetadata());
 
@@ -82,11 +81,19 @@ public class MessageService {
     }
 
     public List<MessageResponseDTO> getMessagesByConversationId(String conversationId) {
+        return getMessagesByConversationId(conversationId, null);
+    }
+
+    public List<MessageResponseDTO> getMessagesByConversationId(String conversationId, Integer sinceSequence) {
         Conversation conversation = conversationService.requireEntityById(conversationId);
         conversationService.requireParticipant(conversation);
 
-        return messageRepository.findByConversationIdOrderByTimestampAsc(conversationId)
-                .stream()
+        List<Message> messages = sinceSequence == null
+                ? messageRepository.findByConversationIdOrderBySequenceAscTimestampAsc(conversationId, Limit.unlimited())
+                : messageRepository.findByConversationIdAndSequenceGreaterThanOrderBySequenceAscTimestampAsc(
+                        conversationId, sinceSequence, Limit.unlimited());
+
+        return messages.stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -118,7 +125,6 @@ public class MessageService {
                 .senderId(message.getSenderId())
                 .role(message.getRole())
                 .messageType(message.getMessageType())
-                .environment(message.getEnvironment())
                 .content(message.getContent())
                 .metadata(message.getMetadata())
                 .timestamp(message.getTimestamp())
