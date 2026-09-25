@@ -82,10 +82,20 @@ public class MessageService {
     }
 
     public List<MessageResponseDTO> getMessagesByConversationId(String conversationId) {
+        return getMessagesByConversationId(conversationId, null);
+    }
+
+    public List<MessageResponseDTO> getMessagesByConversationId(String conversationId, Integer sinceSequence) {
         Conversation conversation = conversationService.requireEntityById(conversationId);
         conversationService.requireParticipant(conversation);
 
-        return messageRepository.findByConversationIdOrderByTimestampAsc(conversationId)
+        List<Message> messages = sinceSequence == null
+                ? messageRepository.findByConversationIdOrderBySequenceAsc(conversationId)
+                : messageRepository.findByConversationIdAndSequenceGreaterThanOrderBySequenceAsc(
+                        conversationId,
+                        sinceSequence);
+
+        return messages
                 .stream()
                 .map(this::toResponse)
                 .toList();

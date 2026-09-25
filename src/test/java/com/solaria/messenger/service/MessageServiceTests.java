@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -81,6 +82,7 @@ class MessageServiceTests {
     void sendsUserMessageWithEnvironment() {
         UUID senderId = UUID.randomUUID();
         Conversation conversation = conversation();
+        conversation.setConversationType(ConversationType.CHAT_BOT);
 
         MessageRequestDTO dto = messageRequest(MessageType.USER_TO_CHATBOT);
         dto.setEnvironment(Environment.QA);
@@ -162,7 +164,7 @@ class MessageServiceTests {
         given(conversationService.requireEntityById("conversation-1"))
                 .willReturn(conversation);
 
-        given(messageRepository.findByConversationIdOrderByTimestampAsc("conversation-1"))
+        given(messageRepository.findByConversationIdOrderBySequenceAsc("conversation-1"))
                 .willReturn(messages);
 
         List<MessageResponseDTO> foundMessages =
@@ -173,6 +175,25 @@ class MessageServiceTests {
                 .isEqualTo(messages.get(0).getId());
 
         verify(conversationService).requireParticipant(conversation);
+    }
+
+    @Test
+    void getsMessagesAfterSequence() {
+        Conversation conversation = conversation();
+        List<Message> messages = List.of(message());
+
+        given(conversationService.requireEntityById("conversation-1"))
+                .willReturn(conversation);
+        given(messageRepository.findByConversationIdAndSequenceGreaterThanOrderBySequenceAsc("conversation-1", 12))
+                .willReturn(messages);
+
+        List<MessageResponseDTO> foundMessages =
+                messageService.getMessagesByConversationId("conversation-1", 12);
+
+        assertThat(foundMessages).hasSize(1);
+        verify(conversationService).requireParticipant(conversation);
+        verify(messageRepository)
+                .findByConversationIdAndSequenceGreaterThanOrderBySequenceAsc("conversation-1", 12);
     }
 
     private MessageRequestDTO messageRequest(MessageType messageType) {
@@ -188,9 +209,9 @@ class MessageServiceTests {
     private Conversation conversation() {
         Conversation conversation = new Conversation();
         conversation.setId("conversation-1");
-        conversation.setSenderId(UUID.randomUUID());
-        conversation.setReceiverId(UUID.randomUUID());
-        conversation.setConversationType(ConversationType.USER_CONVERSATION);
+        conversation.setParticipantIds(Set.of(UUID.randomUUID(), UUID.randomUUID()));
+        conversation.setCreatedBy(UUID.randomUUID());
+        conversation.setConversationType(ConversationType.DIRECT);
         conversation.setStatus(ConversationStatus.ACTIVE);
         conversation.setStartedAt(Instant.now());
         conversation.setLastInteractionAt(Instant.now());

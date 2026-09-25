@@ -7,6 +7,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
 import java.time.Instant;
+import java.util.Set;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -16,16 +17,18 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.http.HttpStatus;
 
 import com.solaria.messenger.dto.request.ChatbotConversationRequestDTO;
-import com.solaria.messenger.dto.request.UserConversationRequestDTO;
+import com.solaria.messenger.dto.request.DirectConversationRequestDTO;
 import com.solaria.messenger.dto.response.ConversationResponseDTO;
 import com.solaria.messenger.exception.ResourceNotFoundException;
 import com.solaria.messenger.model.Conversation;
 import com.solaria.messenger.model.enums.ConversationStatus;
 import com.solaria.messenger.model.enums.ConversationType;
 import com.solaria.messenger.model.enums.Environment;
+import com.solaria.messenger.repository.CommunityRepository;
 import com.solaria.messenger.repository.ConversationRepository;
 import com.solaria.messenger.security.rbac.RbacAuthorizationService;
 
@@ -36,27 +39,35 @@ class ConversationServiceTests {
     private ConversationRepository conversationRepository;
 
     @Mock
+    private CommunityRepository communityRepository;
+
+    @Mock
+    private MongoTemplate mongoTemplate;
+
+    @Mock
     private RbacAuthorizationService rbac;
 
     @InjectMocks
     private ConversationService conversationService;
 
     @Test
-    void createsUserConversationWithActiveStatusAndTimestamps() {
+    void createsDirectConversationWithActiveStatusAndTimestamps() {
         UUID senderId = UUID.randomUUID();
-        UUID receiverId = UUID.randomUUID();
-        UserConversationRequestDTO dto = new UserConversationRequestDTO();
-        dto.setReceiverId(receiverId);
+        UUID recipientId = UUID.randomUUID();
+        DirectConversationRequestDTO dto = new DirectConversationRequestDTO();
+        dto.setRecipientId(recipientId);
 
         given(rbac.currentUserId()).willReturn(senderId);
+        given(conversationRepository.findByConversationTypeAndParticipantIdsContaining(
+                ConversationType.DIRECT, senderId)).willReturn(List.of());
         given(conversationRepository.save(any(Conversation.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
 
-        ConversationResponseDTO response = conversationService.createUserConversation(dto);
+        ConversationResponseDTO response = conversationService.createDirectConversation(dto);
 
-        assertThat(response.getSenderId()).isEqualTo(senderId);
-        assertThat(response.getReceiverId()).isEqualTo(receiverId);
-        assertThat(response.getConversationType()).isEqualTo(ConversationType.USER_CONVERSATION);
+        assertThat(response.getCreatedBy()).isEqualTo(senderId);
+        assertThat(response.getParticipantIds()).containsExactly(senderId, recipientId);
+        assertThat(response.getConversationType()).isEqualTo(ConversationType.DIRECT);
         assertThat(response.getStatus()).isEqualTo(ConversationStatus.ACTIVE);
         assertThat(response.getStartedAt()).isNotNull();
         assertThat(response.getLastInteractionAt()).isEqualTo(response.getStartedAt());
@@ -64,27 +75,28 @@ class ConversationServiceTests {
 
     @Test
     void createsChatbotConversationWithEnvironment() {
-    Environment environment = Environment.LOCAL;
+        Environment environment = Environment.LOCAL;
 
-    ChatbotConversationRequestDTO dto = new ChatbotConversationRequestDTO();
-    dto.setEnvironment(environment);
-    dto.setUserType("fornecedor");
+        ChatbotConversationRequestDTO dto = new ChatbotConversationRequestDTO();
+        dto.setEnvironment(environment);
+        dto.setUserType("fornecedor");
 
-    UUID receiverId = UUID.randomUUID();
-    given(rbac.currentUserId()).willReturn(receiverId);
-    given(conversationRepository.save(any(Conversation.class)))
-            .willAnswer(invocation -> invocation.getArgument(0));
+        UUID currentUserId = UUID.randomUUID();
+        given(rbac.currentUserId()).willReturn(currentUserId);
+        given(conversationRepository.save(any(Conversation.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
 
-    ConversationResponseDTO response = conversationService.createChatbotConversation(dto);
+        ConversationResponseDTO response = conversationService.createChatbotConversation(dto);
 
-    assertThat(response.getReceiverId()).isEqualTo(receiverId);
-    assertThat(response.getConversationType()).isEqualTo(ConversationType.CHAT_BOT);
-    assertThat(response.getEnvironment()).isEqualTo(Environment.LOCAL);
-    assertThat(response.getUserType()).isEqualTo("fornecedor");
-    assertThat(response.getStatus()).isEqualTo(ConversationStatus.ACTIVE);
-    assertThat(response.getStartedAt()).isNotNull();
-    assertThat(response.getLastInteractionAt()).isEqualTo(response.getStartedAt());
-}
+        assertThat(response.getCreatedBy()).isEqualTo(currentUserId);
+        assertThat(response.getParticipantIds()).containsExactly(currentUserId);
+        assertThat(response.getConversationType()).isEqualTo(ConversationType.CHAT_BOT);
+        assertThat(response.getEnvironment()).isEqualTo(Environment.LOCAL);
+        assertThat(response.getUserType()).isEqualTo("fornecedor");
+        assertThat(response.getStatus()).isEqualTo(ConversationStatus.ACTIVE);
+        assertThat(response.getStartedAt()).isNotNull();
+        assertThat(response.getLastInteractionAt()).isEqualTo(response.getStartedAt());
+    }
 
     @Test
     void getsConversationById() {
@@ -121,7 +133,7 @@ class ConversationServiceTests {
         UUID currentUserId = UUID.randomUUID();
         List<Conversation> conversations = List.of(conversation());
         given(rbac.currentUserId()).willReturn(currentUserId);
-        given(conversationRepository.findByReceiverIdOrSenderId(currentUserId, currentUserId))
+        given(conversationRepository.findByParticipantIdsContainingOrderByLastInteractionAtDesc(currentUserId))
                 .willReturn(conversations);
 
         List<ConversationResponseDTO> foundConversations = conversationService.findMine();
@@ -133,9 +145,9 @@ class ConversationServiceTests {
     private Conversation conversation() {
         Conversation conversation = new Conversation();
         conversation.setId("conversation-1");
-        conversation.setSenderId(UUID.randomUUID());
-        conversation.setReceiverId(UUID.randomUUID());
-        conversation.setConversationType(ConversationType.USER_CONVERSATION);
+        conversation.setParticipantIds(Set.of(UUID.randomUUID(), UUID.randomUUID()));
+        conversation.setCreatedBy(UUID.randomUUID());
+        conversation.setConversationType(ConversationType.DIRECT);
         conversation.setStatus(ConversationStatus.ACTIVE);
         conversation.setStartedAt(Instant.now());
         conversation.setLastInteractionAt(Instant.now());
