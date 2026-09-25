@@ -55,7 +55,6 @@ public class MessageBroadcastService {
                 .content(message.getContent())
                 .metadata(message.getMetadata())
                 .timestamp(message.getTimestamp())
-                .clientMessageId(message.getClientMessageId())
                 .sequence(message.getSequence())
                 .build();
     }
