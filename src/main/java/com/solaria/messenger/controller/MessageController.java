@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.solaria.messenger.dto.request.MessageRequestDTO;
@@ -37,7 +38,11 @@ public class MessageController implements MessageOpenApi {
 
     @Override
     @GetMapping("/conversation/{conversationId}")
-    public ResponseEntity<List<MessageResponseDTO>> getMessagesByConversationId(@PathVariable String conversationId) {
-        return ResponseEntity.ok(messageService.getMessagesByConversationId(conversationId));
+    public ResponseEntity<List<MessageResponseDTO>> getMessagesByConversationId(@PathVariable String conversationId,
+            @RequestParam(required = false) Integer sinceSequence) {
+        List<MessageResponseDTO> messages = sinceSequence == null
+                ? messageService.getMessagesByConversationId(conversationId)
+                : messageService.getMessagesByConversationId(conversationId, sinceSequence);
+        return ResponseEntity.ok(messages);
     }
 }

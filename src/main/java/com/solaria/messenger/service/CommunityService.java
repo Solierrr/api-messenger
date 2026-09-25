@@ -207,7 +207,7 @@ public class CommunityService {
         }
 
         return conversationService.createCommunityGroupConversation(
-                community.getId(), dto.getTitle(), dto.getEnvironment(), currentUserId, participants);
+                community.getId(), dto.getTitle(), currentUserId, participants);
     }
 
     public List<ConversationResponseDTO> listConversations(String id) {
