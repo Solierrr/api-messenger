@@ -20,7 +20,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.solaria.messenger.dto.request.ChatbotConversationRequestDTO;
-import com.solaria.messenger.dto.request.UserConversationRequestDTO;
+import com.solaria.messenger.dto.request.DirectConversationRequestDTO;
 import com.solaria.messenger.dto.response.ConversationResponseDTO;
 import com.solaria.messenger.exception.handler.ProblemDetailFactory;
 import com.solaria.messenger.model.enums.ConversationStatus;
@@ -39,13 +39,13 @@ class ConversationControllerTests {
     private ConversationService conversationService;
 
     @Test
-    void createsUserConversation() throws Exception {
-        given(conversationService.createUserConversation(any(UserConversationRequestDTO.class)))
+    void createsDirectConversation() throws Exception {
+        given(conversationService.createDirectConversation(any(DirectConversationRequestDTO.class)))
                 .willReturn(conversationResponse());
 
-        mockMvc.perform(post("/messaging/conversations/user-conversations")
+        mockMvc.perform(post("/messaging/conversations/direct")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"receiverId\":\"" + UUID.randomUUID() + "\"}"))
+                        .content("{\"recipientId\":\"" + UUID.randomUUID() + "\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value("conversation-1"))
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
@@ -95,9 +95,9 @@ class ConversationControllerTests {
     private ConversationResponseDTO conversationResponse() {
         return ConversationResponseDTO.builder()
                 .id("conversation-1")
-                .senderId(UUID.randomUUID())
-                .receiverId(UUID.randomUUID())
-                .conversationType(ConversationType.USER_CONVERSATION)
+                .createdBy(UUID.randomUUID())
+                .participantIds(java.util.Set.of(UUID.randomUUID(), UUID.randomUUID()))
+                .conversationType(ConversationType.DIRECT)
                 .status(ConversationStatus.ACTIVE)
                 .startedAt(Instant.now())
                 .lastInteractionAt(Instant.now())
@@ -107,7 +107,8 @@ class ConversationControllerTests {
     private ConversationResponseDTO chatbotConversationResponse() {
         return ConversationResponseDTO.builder()
                 .id("conversation-1")
-                .receiverId(UUID.randomUUID())
+                .createdBy(UUID.randomUUID())
+                .participantIds(java.util.Set.of(UUID.randomUUID()))
                 .conversationType(ConversationType.CHAT_BOT)
                 .environment(Environment.LOCAL)
                 .userType("guest")

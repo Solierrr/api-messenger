@@ -2,6 +2,7 @@ package com.solaria.messenger.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -70,10 +71,21 @@ class MessageControllerTests {
 
     @Test
     void getsMessagesByConversationId() throws Exception {
-        given(messageService.getMessagesByConversationId(eq("conversation-1")))
+        given(messageService.getMessagesByConversationId(eq("conversation-1"), isNull()))
                 .willReturn(List.of(messageResponse()));
 
         mockMvc.perform(get("/messaging/messages/conversation/conversation-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].conversationId").value("conversation-1"));
+    }
+
+    @Test
+    void getsMessagesByConversationIdAfterSequence() throws Exception {
+        given(messageService.getMessagesByConversationId("conversation-1", 12))
+                .willReturn(List.of(messageResponse()));
+
+        mockMvc.perform(get("/messaging/messages/conversation/conversation-1")
+                        .param("sinceSequence", "12"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].conversationId").value("conversation-1"));
     }
