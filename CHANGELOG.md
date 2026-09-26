@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.1](https://github.com/Solierrr/api-messenger/compare/v3.0.0...v3.0.1) (2026-09-26)
+
+
+### Bug Fixes
+
+* updating cloudsmith infisical CLI url ([#45](https://github.com/Solierrr/api-messenger/issues/45)) ([7581427](https://github.com/Solierrr/api-messenger/commit/758142703057fda4de8ace71c882d6788228b457))
+
 ## [3.0.0](https://github.com/Solierrr/api-messenger/compare/v0.1.0...v3.0.0) (2026-09-24)
 
 
