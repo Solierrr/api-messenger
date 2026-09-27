@@ -3,6 +3,7 @@ package com.solaria.messenger.dto.request;
 import java.time.Instant;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.solaria.messenger.model.enums.Environment;
 import com.solaria.messenger.model.enums.ObservabilityStepType;
 
 import jakarta.validation.constraints.NotBlank;
@@ -31,6 +32,8 @@ public class LlmObservabilityRequestDTO {
 
     @NotBlank(message = "conversationId é obrigatório")
     private String conversationId;
+
+    private Environment environment;
 
     @NotNull(message = "tokensIn é obrigatório")
     @PositiveOrZero(message = "tokensIn não pode ser negativo")

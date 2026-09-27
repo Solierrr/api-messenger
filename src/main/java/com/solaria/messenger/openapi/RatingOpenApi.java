@@ -20,11 +20,12 @@ public interface RatingOpenApi {
 
     @Operation(
         summary = "Cria uma nova avaliação",
-        description = "O avaliador (evaluatorId) é sempre o usuário autenticado da requisição. Status inicial é sempre ACTIVE."
+        description = "O avaliador (evaluatorId) é sempre o usuário autenticado da requisição. Status inicial é sempre ACTIVE. Não é permitido avaliar a si mesmo."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Avaliação criada com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Dados de entrada inválidos")
+            @ApiResponse(responseCode = "400", description = "Dados de entrada inválidos"),
+            @ApiResponse(responseCode = "422", description = "Autoavaliação não permitida")
     })
     ResponseEntity<RatingResponseDTO> create(RatingRequestDTO dto);
 
@@ -49,11 +50,10 @@ public interface RatingOpenApi {
 
     @Operation(
         summary = "Lista as avaliações dadas por um usuário",
-        description = "só o próprio avaliador pode listar as avaliações que ele deu."
+        description = "Listagem pública (F-17): qualquer usuário pode listar as avaliações dadas por outro."
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Lista de avaliações retornada com sucesso"),
-            @ApiResponse(responseCode = "403", description = "Usuário autenticado não é o avaliador informado")
+            @ApiResponse(responseCode = "200", description = "Lista de avaliações retornada com sucesso")
     })
     ResponseEntity<List<RatingResponseDTO>> findByEvaluator(UUID evaluatorId);
 

@@ -22,12 +22,16 @@ public interface CommunityOpenApi {
 
     @Operation(
         summary = "Cria a comunidade de um projeto",
-        description = "Quem cria vira OWNER | memberIds opcionais entram como MEMBER | Uma comunidade por projeto"
+        description = "Quem cria vira OWNER | memberIds opcionais entram como MEMBER | Uma comunidade por projeto. "
+        + "Só o demandante do projeto pode criar "
     )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Comunidade criada"),
             @ApiResponse(responseCode = "400", description = "Dados de entrada inválidos"),
-            @ApiResponse(responseCode = "409", description = "Já existe uma comunidade para o projeto")
+            @ApiResponse(responseCode = "403", description = "Usuário autenticado não é o demandante do projeto"),
+            @ApiResponse(responseCode = "404", description = "Projeto não encontrado na api-persistence"),
+            @ApiResponse(responseCode = "409", description = "Já existe uma comunidade para o projeto"),
+            @ApiResponse(responseCode = "503", description = "api-persistence indisponível para verificar o demandante")
     })
     ResponseEntity<CommunityResponseDTO> createCommunity(CommunityRequestDTO dto);
 
@@ -76,7 +80,10 @@ public interface CommunityOpenApi {
 
     @Operation(
         summary = "Remove um membro | sair da comunidade",
-        description = "Cada um pode sair | remover outros exige OWNER/ADMIN | OWNER não pode ser removido nem sair"
+        description = "Cada um pode sair | remover outros exige OWNER/ADMIN | OWNER não pode ser removido nem sair. "
+                + "A remoção não é retroativa (F-06): o usuário continua participante das conversas "
+                + "em que já estava (histórico e mensagens futuras nesses grupos não são afetados) - "
+                + "só deixa de poder listar os subgrupos da comunidade e de ser adicionado a novos."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Membro removido"),
