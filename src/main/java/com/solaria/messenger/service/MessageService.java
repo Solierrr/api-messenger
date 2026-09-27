@@ -21,16 +21,26 @@ import com.solaria.messenger.security.rbac.RbacAuthorizationService;
 @Service
 public class MessageService {
 
+
+    private static final String ROLE_USER = "user";
+    private static final String ROLE_ASSISTANT = "assistant";
+
+    private static final int DEFAULT_MESSAGE_PAGE_SIZE = 100;
+    private static final int MAX_MESSAGE_PAGE_SIZE = 500;
+
     private final MessageRepository messageRepository;
     private final ConversationService conversationService;
     private final RbacAuthorizationService rbac;
+    private final MessageBroadcastService messageBroadcastService;
 
     public MessageService(MessageRepository messageRepository,
             ConversationService conversationService,
-            RbacAuthorizationService rbac) {
+            RbacAuthorizationService rbac,
+            MessageBroadcastService messageBroadcastService) {
         this.messageRepository = messageRepository;
         this.conversationService = conversationService;
         this.rbac = rbac;
+        this.messageBroadcastService = messageBroadcastService;
     }
 
 
@@ -48,54 +58,77 @@ public class MessageService {
         Message message = new Message();
         message.setConversationId(dto.getConversationId());
         message.setSenderId(rbac.currentUserId());
-        message.setRole(dto.getRole());
+        message.setRole(ROLE_USER);
         message.setMessageType(dto.getMessageType());
         message.setContent(dto.getContent());
+        message.setSequence(conversationService.nextSequence(dto.getConversationId()));
 
         Instant now = Instant.now();
         message.setTimestamp(now);
 
         Message savedMessage = messageRepository.save(message);
+
         conversationService.updateLastInteraction(conversation, now);
+        messageBroadcastService.broadcastInline(savedMessage);
 
         return toResponse(savedMessage);
     }
 
     public MessageResponseDTO ingestChatbotMessage(ChatbotMessageRequestDTO dto) {
         Conversation conversation = conversationService.requireEntityById(dto.getConversationId());
+        if (conversation.getConversationType() != ConversationType.CHAT_BOT) {
+            throw new InvalidFieldException(
+                    "Mensagens do chatbot só podem ser publicadas em conversas do tipo CHAT_BOT.");
+        }
+        conversationService.requireActive(conversation);
 
         Message message = new Message();
         message.setConversationId(dto.getConversationId());
-        message.setRole("assistant");
+        message.setRole(ROLE_ASSISTANT);
         message.setMessageType(MessageType.CHATBOT_TO_USER);
         message.setContent(dto.getContent());
         message.setMetadata(dto.getMetadata());
+        message.setSequence(conversationService.nextSequence(dto.getConversationId()));
 
         Instant now = Instant.now();
         message.setTimestamp(now);
 
         Message savedMessage = messageRepository.save(message);
         conversationService.updateLastInteraction(conversation, now);
+        messageBroadcastService.broadcastInline(savedMessage);
 
         return toResponse(savedMessage);
     }
 
     public List<MessageResponseDTO> getMessagesByConversationId(String conversationId) {
-        return getMessagesByConversationId(conversationId, null);
+        return getMessagesByConversationId(conversationId, null, null);
     }
 
     public List<MessageResponseDTO> getMessagesByConversationId(String conversationId, Integer sinceSequence) {
+        return getMessagesByConversationId(conversationId, sinceSequence, null);
+    }
+
+
+    public List<MessageResponseDTO> getMessagesByConversationId(String conversationId, Integer sinceSequence, Integer limit) {
         Conversation conversation = conversationService.requireEntityById(conversationId);
         conversationService.requireParticipant(conversation);
 
+        Limit pageLimit = Limit.of(clampMessagePageSize(limit));
         List<Message> messages = sinceSequence == null
-                ? messageRepository.findByConversationIdOrderBySequenceAscTimestampAsc(conversationId, Limit.unlimited())
+                ? messageRepository.findByConversationIdOrderBySequenceAscTimestampAsc(conversationId, pageLimit)
                 : messageRepository.findByConversationIdAndSequenceGreaterThanOrderBySequenceAscTimestampAsc(
-                        conversationId, sinceSequence, Limit.unlimited());
+                        conversationId, sinceSequence, pageLimit);
 
         return messages.stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    private int clampMessagePageSize(Integer requested) {
+        if (requested == null) {
+            return DEFAULT_MESSAGE_PAGE_SIZE;
+        }
+        return Math.max(1, Math.min(requested, MAX_MESSAGE_PAGE_SIZE));
     }
 
     /**
@@ -128,6 +161,7 @@ public class MessageService {
                 .content(message.getContent())
                 .metadata(message.getMetadata())
                 .timestamp(message.getTimestamp())
+                .sequence(message.getSequence())
                 .build();
     }
 }
