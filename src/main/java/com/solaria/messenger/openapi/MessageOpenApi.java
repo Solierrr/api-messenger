@@ -19,7 +19,11 @@ public interface MessageOpenApi {
     @Operation(
         summary = "Envia uma mensagem de uma pessoa numa conversa existente",
         description = "O messageType precisa combinar com o tipo da conversa: DIRECT -> USER_TO_USER, "
-                + "GROUP -> USER_TO_GROUP, CHAT_BOT -> USER_TO_CHATBOT. CHATBOT_TO_USER é recusado."
+                + "GROUP -> USER_TO_GROUP, CHAT_BOT -> USER_TO_CHATBOT. CHATBOT_TO_USER é recusado. "
+                + "O evento WS MESSAGE_CREATED correspondente (tópico /topic/conversations/{id}) é "
+                + "best-effort: clientes conectados devem fazer resync via sinceSequence a cada "
+                + "(re)conexão/SUBSCRIBE e deduplicar eventos pelo id da mensagem, em vez de assumir "
+                + "entrega garantida ou exactly-once."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Mensagem enviada com sucesso"),
@@ -31,10 +35,13 @@ public interface MessageOpenApi {
     ResponseEntity<MessageResponseDTO> sendMessage(MessageRequestDTO dto);
 
     @Operation(
-        summary = "Lista as mensagens de uma conversa",
-        description = "Lista todas as mensagens de uma conversa do usuario, ordenadas por sequence. "
-                + "Se sinceSequence for informado, retorna apenas mensagens com sequence maior que o valor "
-                + "informado (sincronização incremental)."
+        summary = "Lista as mensagens de uma conversa (paginado, ordem crescente)",
+        description = "Lista até limit mensagens da conversa, em ordem crescente de sequence "
+                + "(desempate por timestamp). Sem sinceSequence, começa do início da conversa; com "
+                + "sinceSequence, retorna apenas mensagens com sequence maior que o valor informado. "
+                + "Para sincronizar o histórico inteiro, o cliente pagina em loop usando o maior "
+                + "sequence da página anterior como próximo sinceSequence, enquanto a página vier "
+                + "cheia (limit itens)."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lista de mensagens retornada com sucesso"),
@@ -42,6 +49,8 @@ public interface MessageOpenApi {
             @ApiResponse(responseCode = "404", description = "Conversa não encontrada")
     })
     ResponseEntity<List<MessageResponseDTO>> getMessagesByConversationId(String conversationId,
-            @Parameter(description = "Retorna apenas mensagens com sequence maior que este valor, para sincronização incremental. Se omitido, retorna todas as mensagens da conversa.")
-            Integer sinceSequence);
+            @Parameter(description = "Retorna apenas mensagens com sequence maior que este valor, para sincronização incremental. Se omitido, começa do início da conversa.")
+            Integer sinceSequence,
+            @Parameter(description = "Tamanho máximo da página. Padrão 100, máximo 500.")
+            Integer limit);
 }
