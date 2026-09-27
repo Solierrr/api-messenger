@@ -33,8 +33,6 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
  * resource server RS256/JWKS;
  * sem segredo compartilhado.
  *
- * Diferença em relação a api-persistence: não há RBAC por permissão, e sim por ownership(dono da entidade)
- * usando a claim de authId vindo do JWT
  */
 
 @Configuration
@@ -111,9 +109,10 @@ public class SecurityConfig {
                                                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**",
                                                                 "/swagger-ui.html")
                                                 .permitAll()
-                                                // Endpoint de conveniência para autenticar direto pelo Swagger
                                                 .requestMatchers(HttpMethod.POST, "/dev/login")
                                                 .permitAll()
+                                                // autentificação acontece antes, durante a conexão da sessão
+                                                .requestMatchers("/ws", "/messaging/ws").permitAll()
                                                 // todos os outros endpoints exigem um jwt de usuário válido
                                                 .anyRequest().authenticated())
                                 // Garante que exceptions usem o formato de ProblemDetail

@@ -21,9 +21,6 @@ public class WsErrorPayload {
 
     private String message;
 
-    /** Preenchido apenas quando o erro se origina de um envio com clientMessageId */
-    private String clientMessageId;
-
     /** nulo por enquanto*/
     private String traceId;
 }
