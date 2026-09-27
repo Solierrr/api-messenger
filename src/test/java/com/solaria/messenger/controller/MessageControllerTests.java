@@ -2,6 +2,7 @@ package com.solaria.messenger.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -70,7 +71,7 @@ class MessageControllerTests {
 
     @Test
     void getsMessagesByConversationId() throws Exception {
-        given(messageService.getMessagesByConversationId(eq("conversation-1")))
+        given(messageService.getMessagesByConversationId(eq("conversation-1"), isNull(), isNull()))
                 .willReturn(List.of(messageResponse()));
 
         mockMvc.perform(get("/messaging/messages/conversation/conversation-1"))
