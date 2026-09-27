@@ -1,7 +1,6 @@
 package com.solaria.messenger.controller;
 
-import java.net.URI;
-
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -29,6 +28,6 @@ public class ChatbotMessageController implements ChatbotMessageOpenApi {
     @PostMapping
     public ResponseEntity<MessageResponseDTO> ingestChatbotMessage(@Valid @RequestBody ChatbotMessageRequestDTO dto) {
         MessageResponseDTO response = messageService.ingestChatbotMessage(dto);
-        return ResponseEntity.created(URI.create("/internal/messages/" + response.getId())).body(response);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 }

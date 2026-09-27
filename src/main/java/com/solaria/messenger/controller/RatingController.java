@@ -36,7 +36,7 @@ public class RatingController implements RatingOpenApi {
     @PostMapping
     public ResponseEntity<RatingResponseDTO> create(@Valid @RequestBody RatingRequestDTO dto) {
         RatingResponseDTO response = ratingService.create(dto);
-        return ResponseEntity.created(URI.create("/api/v1/ratings/" + response.getId())).body(response);
+        return ResponseEntity.created(URI.create("/messaging/ratings/" + response.getId())).body(response);
     }
 
     @Override

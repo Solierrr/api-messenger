@@ -10,6 +10,7 @@ import com.solaria.messenger.dto.request.RatingRequestDTO;
 import com.solaria.messenger.dto.request.RatingStatusUpdateRequestDTO;
 import com.solaria.messenger.dto.request.RatingUpdateRequestDTO;
 import com.solaria.messenger.dto.response.RatingResponseDTO;
+import com.solaria.messenger.exception.BusinessRuleException;
 import com.solaria.messenger.exception.ResourceNotFoundException;
 import com.solaria.messenger.model.Rating;
 import com.solaria.messenger.model.enums.RatingStatus;
@@ -28,8 +29,13 @@ public class RatingService {
     }
 
     public RatingResponseDTO create(RatingRequestDTO dto) {
+        UUID evaluatorId = rbac.currentUserId();
+        if (evaluatorId.equals(dto.getEvaluatedId())) {
+            throw new BusinessRuleException("Não é permitido avaliar a si mesmo.");
+        }
+
         Rating rating = new Rating();
-        rating.setEvaluatorId(rbac.currentUserId());
+        rating.setEvaluatorId(evaluatorId);
         rating.setEvaluatedId(dto.getEvaluatedId());
         rating.setTypeRate(dto.getTypeRate());
         rating.setComment(dto.getComment());
