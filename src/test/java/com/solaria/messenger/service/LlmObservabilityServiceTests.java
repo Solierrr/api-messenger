@@ -3,9 +3,14 @@ package com.solaria.messenger.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -13,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.solaria.messenger.dto.request.LlmObservabilityRequestDTO;
 import com.solaria.messenger.dto.response.LlmObservabilityResponseDTO;
 import com.solaria.messenger.model.LlmObservability;
+import com.solaria.messenger.model.enums.Environment;
 import com.solaria.messenger.model.enums.ObservabilityStepType;
 import com.solaria.messenger.repository.LlmObservabilityRepository;
 
@@ -51,6 +57,46 @@ class LlmObservabilityServiceTests {
         LlmObservabilityResponseDTO response = llmObservabilityService.ingest(dto);
 
         assertThat(response.getCostUsd()).isEqualTo(0.0042);
+    }
+
+    @Test
+    void persistsAndReturnsInformedEnvironment() {
+        LlmObservabilityRequestDTO dto = requestDto();
+        dto.setEnvironment(Environment.QA);
+        given(llmObservabilityRepository.save(any(LlmObservability.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        LlmObservabilityResponseDTO response = llmObservabilityService.ingest(dto);
+
+        ArgumentCaptor<LlmObservability> saved = ArgumentCaptor.forClass(LlmObservability.class);
+        verify(llmObservabilityRepository).save(saved.capture());
+        assertThat(saved.getValue().getEnvironment()).isEqualTo(Environment.QA);
+        assertThat(response.getEnvironment()).isEqualTo(Environment.QA);
+    }
+
+    @Test
+    void acceptsAndReturnsAbsentEnvironment() {
+        LlmObservabilityRequestDTO dto = requestDto();
+        given(llmObservabilityRepository.save(any(LlmObservability.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        LlmObservabilityResponseDTO response = llmObservabilityService.ingest(dto);
+
+        ArgumentCaptor<LlmObservability> saved = ArgumentCaptor.forClass(LlmObservability.class);
+        verify(llmObservabilityRepository).save(saved.capture());
+        assertThat(saved.getValue().getEnvironment()).isNull();
+        assertThat(response.getEnvironment()).isNull();
+    }
+
+    @Test
+    void searchWithoutFilterUsesTop100InsteadOfFindAll() {
+        // F-14: findAll() materializaria a coleção inteira; sem filtro, só as 100 mais recentes.
+        given(llmObservabilityRepository.findTop100ByOrderByTimestampDesc()).willReturn(List.of());
+
+        llmObservabilityService.search(null, null, null);
+
+        verify(llmObservabilityRepository).findTop100ByOrderByTimestampDesc();
+        verify(llmObservabilityRepository, never()).findAll();
     }
 
     private LlmObservabilityRequestDTO requestDto() {

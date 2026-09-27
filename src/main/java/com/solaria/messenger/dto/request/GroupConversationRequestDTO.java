@@ -3,8 +3,6 @@ package com.solaria.messenger.dto.request;
 import java.util.Set;
 import java.util.UUID;
 
-import com.solaria.messenger.model.enums.Environment;
-
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
@@ -26,5 +24,4 @@ public class GroupConversationRequestDTO {
     @NotEmpty(message = "Informe ao menos um outro participante")
     private Set<@jakarta.validation.constraints.NotNull(message = "participantId inválido") UUID> participantIds;
 
-    private Environment environment;
 }

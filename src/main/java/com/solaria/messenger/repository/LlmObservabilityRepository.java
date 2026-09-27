@@ -13,4 +13,6 @@ public interface LlmObservabilityRepository extends MongoRepository<LlmObservabi
     List<LlmObservability> findByNode(String node);
 
     List<LlmObservability> findByStatus(String status);
+
+    List<LlmObservability> findTop100ByOrderByTimestampDesc();
 }

@@ -20,13 +20,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public interface ConversationOpenApi {
 
     @Operation(
-        summary = "Inicia  uma conversa entre duas pessoas/direta",
-        description = "O inciador da conversa é o id do JWT do usuario autenticado |"
-                + " se já existir uma conversa DIRECT ativa entre os dois, ela é retornada."
+        summary = "Inicia uma conversa direta entre duas pessoas",
+        description = "O iniciador é o usuário autenticado. Uma conversa DIRECT ativa com exatamente "
+                + "os dois participantes é reutilizada; se houver mais de uma, retorna 409."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Conversa criada ou reaproveitada"),
-            @ApiResponse(responseCode = "400", description = "Dados inválidos, incluindo conversa consigo mesmo")
+            @ApiResponse(responseCode = "400", description = "Dados inválidos, incluindo conversa consigo mesmo"),
+            @ApiResponse(responseCode = "409", description = "Mais de uma conversa DIRECT ativa para o mesmo par")
     })
     ResponseEntity<ConversationResponseDTO> createDirectConversation(DirectConversationRequestDTO dto);
 

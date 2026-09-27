@@ -28,6 +28,7 @@ public class LlmObservabilityService {
         observability.setStepType(dto.getStepType());
         observability.setModel(dto.getModel());
         observability.setConversationId(dto.getConversationId());
+        observability.setEnvironment(dto.getEnvironment());
         observability.setTokensIn(dto.getTokensIn());
         observability.setTokensOut(dto.getTokensOut());
         observability.setTokensTotal(dto.getTokensTotal());
@@ -63,7 +64,7 @@ public class LlmObservabilityService {
         } else if (isInformed(status)) {
             results = llmObservabilityRepository.findByStatus(status);
         } else {
-            results = llmObservabilityRepository.findAll();
+            results = llmObservabilityRepository.findTop100ByOrderByTimestampDesc();
         }
 
         return results.stream()
@@ -97,6 +98,7 @@ public class LlmObservabilityService {
                 .stepType(observability.getStepType())
                 .model(observability.getModel())
                 .conversationId(observability.getConversationId())
+                .environment(observability.getEnvironment())
                 .tokensIn(observability.getTokensIn())
                 .tokensOut(observability.getTokensOut())
                 .tokensTotal(observability.getTokensTotal())

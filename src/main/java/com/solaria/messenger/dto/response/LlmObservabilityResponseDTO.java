@@ -2,6 +2,7 @@ package com.solaria.messenger.dto.response;
 
 import java.time.Instant;
 
+import com.solaria.messenger.model.enums.Environment;
 import com.solaria.messenger.model.enums.ObservabilityStepType;
 
 import lombok.AllArgsConstructor;
@@ -23,6 +24,7 @@ public class LlmObservabilityResponseDTO {
     private ObservabilityStepType stepType;
     private String model;
     private String conversationId;
+    private Environment environment;
     private Integer tokensIn;
     private Integer tokensOut;
     private Integer tokensTotal;
