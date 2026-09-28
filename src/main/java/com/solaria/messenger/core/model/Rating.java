@@ -1,4 +1,4 @@
-package com.solaria.messenger.model;
+package com.solaria.messenger.core.model;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -9,14 +9,18 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
-import com.solaria.messenger.model.enums.RatingStatus;
-import com.solaria.messenger.model.enums.RatingType;
+import com.solaria.messenger.core.model.enums.RatingStatus;
+import com.solaria.messenger.core.model.enums.RatingType;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 
+/**
+ * avaliação feita por um usuário sobre um avaliado(profissional|produto)
+ *
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

@@ -1,4 +1,4 @@
-package com.solaria.messenger.model;
+package com.solaria.messenger.core.model;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -9,13 +9,14 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
-import com.solaria.messenger.model.enums.CommunityRole;
-import com.solaria.messenger.model.enums.CommunityStatus;
+import com.solaria.messenger.core.model.enums.CommunityRole;
+import com.solaria.messenger.core.model.enums.CommunityStatus;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -23,7 +24,7 @@ import lombok.NoArgsConstructor;
 
 /**
  * comunidade de um projeto | tipo slack para troca de mensagens entre membros de um projeto
- * Referencia um projeto de {@code api-persistence} pelo campo {@link #projectId}
+ * Referencia um projeto de {@code api-core} pelo campo {@link #projectId}
  * 
  * <p>
  * Os membros ficam embutidos ({@link CommunityMember})
@@ -39,6 +40,9 @@ public class ProjectCommunity {
 
     @Id
     private String id;
+
+    @Version
+    private Long version;
 
     /** Projeto técnico do api-core
      *  uma comunidade por projeto */
@@ -59,6 +63,7 @@ public class ProjectCommunity {
     @Field("updated_at")
     private Instant updatedAt;
 
+    /** Membro da comunidade com o ID informado, se existir. */
     public Optional<CommunityMember> member(UUID userId) {
         return members == null ? Optional.empty()
                 : members
@@ -67,10 +72,12 @@ public class ProjectCommunity {
                  m.getUserId().equals(userId)).findFirst();
     }
 
+    /** Indica se o usuário é membro da comunidade. */
     public boolean isMember(UUID userId) {
         return member(userId).isPresent();
     }
 
+    /** Indica se o usuário é membro com exatamente o papel informado. */
     public boolean hasRole(UUID userId, CommunityRole role) {
         return member(userId)
         .map(m ->
@@ -85,13 +92,16 @@ public class ProjectCommunity {
                 .orElse(false);
     }
 
+    /** Indica se o usuário é o dono da comunidade. */
     public boolean isOwner(UUID userId) {
         return hasRole(userId, CommunityRole.OWNER);
     }
 
+    /** IDs de todos os membros da comunidade. */
     public Set<UUID> memberIds() {
         return members == null ? Set.of()
                 : members.stream()
                 .map(CommunityMember::getUserId).collect(Collectors.toSet());
     }
+
 }

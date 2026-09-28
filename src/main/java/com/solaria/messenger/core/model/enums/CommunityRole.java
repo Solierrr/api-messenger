@@ -1,4 +1,4 @@
-package com.solaria.messenger.model.enums;
+package com.solaria.messenger.core.model.enums;
 
 /**
  * cargo de um membro de uma comunidade
