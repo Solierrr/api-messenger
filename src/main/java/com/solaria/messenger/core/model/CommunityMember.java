@@ -1,11 +1,11 @@
-package com.solaria.messenger.model;
+package com.solaria.messenger.core.model;
 
 import java.time.Instant;
 import java.util.UUID;
 
 import org.springframework.data.mongodb.core.mapping.Field;
 
-import com.solaria.messenger.model.enums.CommunityRole;
+import com.solaria.messenger.core.model.enums.CommunityRole;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -28,6 +28,7 @@ public class CommunityMember {
     @Field("joined_at")
     private Instant joinedAt;
 
+    /** Cria um membro com papel e data de entrada */
     public static CommunityMember of(UUID userId, CommunityRole role, Instant joinedAt) {
         return new CommunityMember(userId, role, joinedAt);
     }

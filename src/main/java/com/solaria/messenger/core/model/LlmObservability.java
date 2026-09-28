@@ -1,4 +1,4 @@
-package com.solaria.messenger.model;
+package com.solaria.messenger.core.model;
 
 import java.time.Instant;
 
@@ -7,13 +7,17 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
-import com.solaria.messenger.model.enums.Environment;
-import com.solaria.messenger.model.enums.ObservabilityStepType;
+import com.solaria.messenger.core.model.enums.Environment;
+import com.solaria.messenger.core.model.enums.ObservabilityStepType;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * evento de telemetria de um passo do pipeline de LLM (chamada a modelo ou a tool).
+ *
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

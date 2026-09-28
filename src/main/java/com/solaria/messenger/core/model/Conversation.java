@@ -1,4 +1,4 @@
-package com.solaria.messenger.model;
+package com.solaria.messenger.core.model;
 
 import java.time.Instant;
 import java.util.LinkedHashSet;
@@ -7,12 +7,14 @@ import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Version;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
-import com.solaria.messenger.model.enums.ConversationStatus;
-import com.solaria.messenger.model.enums.ConversationType;
+import com.solaria.messenger.core.model.enums.ConversationStatus;
+import com.solaria.messenger.core.model.enums.ConversationType;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -33,6 +35,11 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "conversations")
+@CompoundIndex(
+        name = "uq_direct_pair",
+        def = "{'direct_key': 1}",
+        unique = true,
+        partialFilter = "{'conversation_type': 'DIRECT'}")
 public class Conversation {
 
     @Id
@@ -48,6 +55,12 @@ public class Conversation {
     @Field("created_by")
     private UUID createdBy;
 
+    @Field(value = "manager_user_id", write = Field.Write.ALWAYS)
+    private UUID managerUserId;
+
+    @Version
+    private Long version;
+
     /**  prenchido apenas para {@code GROUP} */
     private String title;
 
@@ -61,6 +74,13 @@ public class Conversation {
     @Field("user_details")
     private Map<String, Object> userDetails;
 
+    /** Par canônico permanente de uma DIRECT, inclusive quando desativada
+     * 
+     * Representa 2 IDs de user para a conversa
+     */
+    @Field("direct_key")
+    private String directKey;
+
     private ConversationStatus status;
 
     @Field("started_at")
@@ -69,10 +89,9 @@ public class Conversation {
     @Field("last_interaction_at")
     private Instant lastInteractionAt;
 
-    @Field("last_sequence")
-    private int lastSequence;
-
+    /** Indica se o usuário está no roster atual da conversa.= */
     public boolean hasParticipant(UUID userId) {
         return participantIds != null && participantIds.contains(userId);
     }
+
 }
