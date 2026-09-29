@@ -1,4 +1,4 @@
-package com.solaria.messenger.model.enums;
+package com.solaria.messenger.core.model.enums;
 
 /**
  * Tipos de mensagem, a partir da origem e destino da mesma
