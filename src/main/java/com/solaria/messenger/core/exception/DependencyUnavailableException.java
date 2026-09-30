@@ -1,8 +1,11 @@
-package com.solaria.messenger.exception;
+package com.solaria.messenger.core.exception;
 
 import org.springframework.http.HttpStatus;
 
 
+/**
+ * Lançada quando uma dependência externa ou técnica está indisponível ou responde de forma inválida
+ */
 public class DependencyUnavailableException extends BusinessException {
 
     public DependencyUnavailableException(String message) {

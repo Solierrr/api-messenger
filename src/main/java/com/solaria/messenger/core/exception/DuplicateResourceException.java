@@ -1,9 +1,13 @@
-package com.solaria.messenger.exception;
+package com.solaria.messenger.core.exception;
 
 import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 
+/**
+ * Lançada ao tentar criar um recurso que já existe
+ *
+ */
 public class DuplicateResourceException extends BusinessException {
 
     public DuplicateResourceException(String message) {

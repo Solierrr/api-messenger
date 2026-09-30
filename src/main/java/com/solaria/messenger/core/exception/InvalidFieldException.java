@@ -1,9 +1,13 @@
-package com.solaria.messenger.exception;
+package com.solaria.messenger.core.exception;
 
 import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 
+/**
+ * Lançada quando um campo informado não atende às regras de validação de negócio.
+ *
+ */
 public class InvalidFieldException extends BusinessException {
 
     public InvalidFieldException(String message) {

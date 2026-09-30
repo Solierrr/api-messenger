@@ -1,9 +1,12 @@
-package com.solaria.messenger.exception;
+package com.solaria.messenger.core.exception;
 
 import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 
+/**
+ * Lançada quando uma regra de negócio é violada
+ */
 public class BusinessRuleException extends BusinessException {
 
     public BusinessRuleException(String message) {

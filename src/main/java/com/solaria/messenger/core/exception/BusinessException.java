@@ -1,11 +1,11 @@
-package com.solaria.messenger.exception;
+package com.solaria.messenger.core.exception;
 
 import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 
 /**
- * Superclasse abstrata de todas as exceções criadas.
+ * Superclasse abstrata de todas as exceções criadas
  */
 
 public abstract class BusinessException extends RuntimeException {
@@ -26,14 +26,17 @@ public abstract class BusinessException extends RuntimeException {
         this.properties = (properties == null) ? Map.of() : Map.copyOf(properties);
     }
 
+    /** Status HTTP correspondente ao erro */
     public HttpStatus getStatus() {
         return status;
     }
 
+    /** Código estável do erro, usado pelos clientes REST e STOMP */
     public String getErrorCode() {
         return errorCode;
     }
 
+    /** Propriedades extras do erro, como a correlação {@code clientMessageId} */
     public Map<String, Object> getProperties() {
         return properties;
     }
