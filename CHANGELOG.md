@@ -1,5 +1,21 @@
 # Changelog
 
+## [3.1.0](https://github.com/Solierrr/api-messenger/compare/v3.0.0...v3.1.0) (2026-09-30)
+
+
+### Features
+
+* message websocket ([#50](https://github.com/Solierrr/api-messenger/issues/50)) ([5e8efee](https://github.com/Solierrr/api-messenger/commit/5e8efee158d171c102c865e2eea057699b4770c2))
+
+
+### Bug Fixes
+
+* grant pull-requests write permission to release workflow ([281bd48](https://github.com/Solierrr/api-messenger/commit/281bd48da0f3b7a9d223190dd41d8abe13203f52))
+* pass vault arguments correctly in PowerShell ([967477e](https://github.com/Solierrr/api-messenger/commit/967477e94378c8bf38b8331c2f41c4c1f1459019))
+* support powershell secret extraction ([d41913a](https://github.com/Solierrr/api-messenger/commit/d41913ab3d3758e6ca8d96135b06a3d185c5a780))
+* update response creation for chatbot and rating endpoints ([#51](https://github.com/Solierrr/api-messenger/issues/51)) ([86828eb](https://github.com/Solierrr/api-messenger/commit/86828ebd85b66721b5442cac0f9e92b598c2294c))
+* updating cloudsmith infisical CLI url ([#45](https://github.com/Solierrr/api-messenger/issues/45)) ([7581427](https://github.com/Solierrr/api-messenger/commit/758142703057fda4de8ace71c882d6788228b457))
+
 ## [3.0.0](https://github.com/Solierrr/api-messenger/compare/v0.1.0...v3.0.0) (2026-09-24)
 
 
