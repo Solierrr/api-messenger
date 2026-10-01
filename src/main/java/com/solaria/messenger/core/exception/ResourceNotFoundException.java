@@ -1,9 +1,13 @@
-package com.solaria.messenger.exception;
+package com.solaria.messenger.core.exception;
 
 import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 
+/**
+ * Lançada quando um recurso consultado ou alterado não existe.
+ *
+ */
 public class ResourceNotFoundException extends BusinessException {
 
     public ResourceNotFoundException(String message) {
