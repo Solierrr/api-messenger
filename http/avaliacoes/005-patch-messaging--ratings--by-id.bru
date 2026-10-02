@@ -1,0 +1,28 @@
+meta {
+  name: [mutates] PATCH /messaging/ratings/{id}
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/messaging/ratings/{{id}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+body:json {
+  {
+    "comment": "example",
+    "rating": 1
+  }
+}
+
+docs {
+  Edita o comentário e/ou a nota de uma avaliação
+  Somente o autor original pode editá-la.
+  This operation may change server state.
+}

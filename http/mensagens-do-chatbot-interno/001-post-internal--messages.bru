@@ -1,0 +1,24 @@
+meta {
+  name: [mutates] POST /internal/messages
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/internal/messages
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "conversationId": "{{conversationId}}",
+    "content": "Olá! Esta é uma mensagem de exemplo do chatbot."
+  }
+}
+
+docs {
+  Publica a resposta do bot numa conversa existente
+  messageType é sempre CHATBOT_TO_USER e role sempre "assistant" Rota interna: a aplicação não exige Bearer; restrinja o acesso pela rede.
+  This operation may change server state.
+}

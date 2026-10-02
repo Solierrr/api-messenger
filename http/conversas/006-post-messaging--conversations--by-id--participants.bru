@@ -1,0 +1,29 @@
+meta {
+  name: [mutates] POST /messaging/conversations/{id}/participants
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/messaging/conversations/{{id}}/participants
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+body:json {
+  {
+    "userIds": [
+      "{{sampleUuid}}"
+    ]
+  }
+}
+
+docs {
+  Adiciona participantes a uma conversa em grupo
+  Só participantes do grupo podem adicionar | Se o grupo pertence a uma comunidade, os novos participantes precisam ser membros dela
+  This operation may change server state.
+}

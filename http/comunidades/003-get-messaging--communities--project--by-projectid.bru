@@ -1,0 +1,19 @@
+meta {
+  name: GET /messaging/communities/project/{projectId}
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/messaging/communities/project/{{projectId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+docs {
+  Busca a comunidade de um projeto (só membros)
+}

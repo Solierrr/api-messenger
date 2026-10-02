@@ -1,0 +1,31 @@
+meta {
+  name: [mutates] POST /messaging/conversations/group
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/messaging/conversations/group
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+body:json {
+  {
+    "title": "example",
+    "participantIds": [
+      "{{sampleUuid}}"
+    ],
+    "environment": "LOCAL"
+  }
+}
+
+docs {
+  Inicia uma conversa em grupo
+  O criador entra automaticamente nos participantes | é preciso ter pelo menos 2 participantes
+  This operation may change server state.
+}

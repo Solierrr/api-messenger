@@ -1,0 +1,19 @@
+meta {
+  name: GET /messaging/communities/{id}/conversations
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/messaging/communities/{{id}}/conversations
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+docs {
+  Lista as conversas em grupo de uma comunidade (só membros)
+}
