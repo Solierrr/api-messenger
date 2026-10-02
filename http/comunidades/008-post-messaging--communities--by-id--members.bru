@@ -1,0 +1,30 @@
+meta {
+  name: [mutates] POST /messaging/communities/{id}/members
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/messaging/communities/{{id}}/members
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+body:json {
+  {
+    "userIds": [
+      "{{sampleUuid}}"
+    ],
+    "role": "OWNER"
+  }
+}
+
+docs {
+  Adiciona/altera papel de membros
+  Adicionar MEMBER exige ADMIN | conceder ADMIN exige OWNER
+  This operation may change server state.
+}

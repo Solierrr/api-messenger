@@ -1,0 +1,31 @@
+meta {
+  name: [mutates] POST /internal/observability
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/internal/observability
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "node": "recommendation",
+    "model": "local-example",
+    "conversationId": "{{conversationId}}",
+    "stepType": "LLM_CALL",
+    "tokensIn": 1,
+    "tokensOut": 2,
+    "tokensTotal": 3,
+    "status": "SUCCESS",
+    "latencyMs": 1.0
+  }
+}
+
+docs {
+  Registra um evento de telemetria de um passo do pipeline de LLM
+  Log de auditoria imutável -> não há update/delete. Se timestamp não for informado o horário de ingestão (Instant.now()) é usado. Rota interna: a aplicação não exige Bearer; restrinja o acesso pela rede.
+  This operation may change server state.
+}

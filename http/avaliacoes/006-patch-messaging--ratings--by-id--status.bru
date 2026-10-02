@@ -1,0 +1,27 @@
+meta {
+  name: [mutates] PATCH /messaging/ratings/{id}/status
+  type: http
+  seq: 6
+}
+
+patch {
+  url: {{baseUrl}}/messaging/ratings/{{id}}/status
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+body:json {
+  {
+    "status": "ACTIVE"
+  }
+}
+
+docs {
+  Altera o status de uma avaliação
+  Somente o dono da avalição pode alterar o status da avaliação
+  This operation may change server state.
+}

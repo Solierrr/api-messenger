@@ -1,0 +1,20 @@
+meta {
+  name: GET /messaging/ratings/{id}
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/messaging/ratings/{{id}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+docs {
+  Busca uma avaliação pelo identificador
+  qualquer usuário pode ler uma avaliação.
+}

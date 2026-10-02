@@ -1,0 +1,27 @@
+meta {
+  name: [mutates] POST /messaging/conversations/direct
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/messaging/conversations/direct
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+body:json {
+  {
+    "recipientId": "{{sampleUuid}}"
+  }
+}
+
+docs {
+  Inicia  uma conversa entre duas pessoas/direta
+  O inciador da conversa é o id do JWT do usuario autenticado | se já existir uma conversa DIRECT ativa entre os dois, ela é retornada.
+  This operation may change server state.
+}

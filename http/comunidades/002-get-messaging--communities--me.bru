@@ -1,0 +1,19 @@
+meta {
+  name: GET /messaging/communities/me
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/messaging/communities/me
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+docs {
+  Lista as comunidades das quais o usuário autenticado é membro
+}
