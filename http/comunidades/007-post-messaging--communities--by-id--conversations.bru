@@ -1,0 +1,31 @@
+meta {
+  name: [mutates] POST /messaging/communities/{id}/conversations
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/messaging/communities/{{id}}/conversations
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+body:json {
+  {
+    "title": "example",
+    "participantIds": [
+      "{{sampleUuid}}"
+    ],
+    "environment": "LOCAL"
+  }
+}
+
+docs {
+  Inicia uma conversa em grupo entre membros da comunidade
+  participantIds opcional -> sem ele, entram todos os membros | se informado apenas os IDs entram. O criador entra sempre.
+  This operation may change server state.
+}

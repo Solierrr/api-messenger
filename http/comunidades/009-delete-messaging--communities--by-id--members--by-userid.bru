@@ -1,0 +1,21 @@
+meta {
+  name: [mutates] DELETE /messaging/communities/{id}/members/{userId}
+  type: http
+  seq: 9
+}
+
+delete {
+  url: {{baseUrl}}/messaging/communities/{{id}}/members/{{userId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+docs {
+  Remove um membro | sair da comunidade
+  Cada um pode sair | remover outros exige OWNER/ADMIN | OWNER não pode ser removido nem sair
+  This operation may change server state.
+}

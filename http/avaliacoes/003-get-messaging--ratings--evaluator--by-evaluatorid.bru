@@ -1,0 +1,20 @@
+meta {
+  name: GET /messaging/ratings/evaluator/{evaluatorId}
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/messaging/ratings/evaluator/{{evaluatorId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+docs {
+  Lista as avaliações dadas por um usuário
+  só o próprio avaliador pode listar as avaliações que ele deu.
+}

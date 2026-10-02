@@ -1,0 +1,20 @@
+meta {
+  name: GET /messaging/messages/conversation/{conversationId}
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/messaging/messages/conversation/{{conversationId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+docs {
+  Lista as mensagens de uma conversa
+  Lista as mensagens da conversa conforme o controller ativo nesta branch.
+}

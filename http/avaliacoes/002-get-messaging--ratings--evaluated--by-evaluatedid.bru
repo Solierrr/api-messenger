@@ -1,0 +1,20 @@
+meta {
+  name: GET /messaging/ratings/evaluated/{evaluatedId}
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/messaging/ratings/evaluated/{{evaluatedId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+docs {
+  Lista as avaliações de um usuário/produto
+  Reputação pública do avaliado(produto/profissional).
+}

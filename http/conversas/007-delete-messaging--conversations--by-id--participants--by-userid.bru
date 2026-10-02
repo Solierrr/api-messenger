@@ -1,0 +1,21 @@
+meta {
+  name: [mutates] DELETE /messaging/conversations/{id}/participants/{userId}
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/messaging/conversations/{{id}}/participants/{{userId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+docs {
+  Remove um participante de um grupo ou sai do grupo
+  Cada um pode sair do próprio grupo | remover outros exige ser quem criou o grupo.
+  This operation may change server state.
+}

@@ -1,0 +1,27 @@
+meta {
+  name: [mutates] PATCH /messaging/communities/{id}
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/messaging/communities/{{id}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+body:json {
+  {
+    "status": "ACTIVE"
+  }
+}
+
+docs {
+  Atualiza a comunidade
+  unico campo editável é o status | alterar para ARCHIVED exige OWNER
+  This operation may change server state.
+}

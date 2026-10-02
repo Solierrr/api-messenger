@@ -1,0 +1,20 @@
+meta {
+  name: GET /internal/observability
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/internal/observability
+  body: none
+  auth: none
+}
+
+params:query {
+  conversationId: {{conversationId}}
+}
+
+docs {
+  Lista/filtra eventos de telemetria
+  No máximo um filtro (conversationId, node ou status) pode ser informado por chamada nesta versão; nenhum filtro informado devolve todos os eventos. Rota interna: a aplicação não exige Bearer; restrinja o acesso pela rede.
+}

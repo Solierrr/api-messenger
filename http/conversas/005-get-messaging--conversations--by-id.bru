@@ -1,0 +1,20 @@
+meta {
+  name: GET /messaging/conversations/{id}
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/messaging/conversations/{{id}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+docs {
+  Busca uma conversa pelo identificador
+  Só participantes da conversa podem acessá-la
+}

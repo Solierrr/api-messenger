@@ -1,0 +1,30 @@
+meta {
+  name: [mutates] POST /messaging/messages
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/messaging/messages
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+body:json {
+  {
+    "conversationId": "{{conversationId}}",
+    "messageType": "USER_TO_USER",
+    "role": "user",
+    "content": "Mensagem de exemplo para teste local."
+  }
+}
+
+docs {
+  Envia uma mensagem de uma pessoa numa conversa existente
+  O messageType precisa combinar com o tipo da conversa: DIRECT -> USER_TO_USER, GROUP -> USER_TO_GROUP, CHAT_BOT -> USER_TO_CHATBOT. CHATBOT_TO_USER é recusado.
+  This operation may change server state.
+}

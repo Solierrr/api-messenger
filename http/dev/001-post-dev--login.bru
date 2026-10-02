@@ -1,0 +1,23 @@
+meta {
+  name: [mutates] POST /dev/login
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/dev/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "{{userEmail}}",
+    "password": "{{userPassword}}"
+  }
+}
+
+docs {
+  Autentica em api-auth e devolve o JWT, para colar no botão Authorize deste Swagger
+  This operation may change server state.
+}
