@@ -1,4 +1,4 @@
-package com.solaria.messenger.dto.request;
+package com.solaria.messenger.core.contract.request;
 
 import java.util.Set;
 import java.util.UUID;

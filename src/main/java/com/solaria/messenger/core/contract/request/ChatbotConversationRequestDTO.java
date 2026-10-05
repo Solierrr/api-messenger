@@ -1,4 +1,4 @@
-package com.solaria.messenger.dto.request;
+package com.solaria.messenger.core.contract.request;
 
 import java.util.Map;
 
@@ -7,6 +7,10 @@ import lombok.Getter;
 import lombok.Setter;
 
 
+/**
+ * DTO de requisição para criação de uma conversa com o chatbot.
+ *
+ */
 @Getter
 @Setter
 public class ChatbotConversationRequestDTO {

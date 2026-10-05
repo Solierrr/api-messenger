@@ -1,9 +1,9 @@
-package com.solaria.messenger.dto.request;
+package com.solaria.messenger.core.contract.request;
 
 import java.util.Set;
 import java.util.UUID;
 
-import com.solaria.messenger.model.enums.CommunityRole;
+import com.solaria.messenger.core.model.enums.CommunityRole;
 
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
