@@ -1,10 +1,10 @@
-package com.solaria.messenger.dto.request;
+package com.solaria.messenger.core.contract.request;
 
 import java.time.Instant;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.solaria.messenger.model.enums.Environment;
-import com.solaria.messenger.model.enums.ObservabilityStepType;
+import com.solaria.messenger.core.model.enums.Environment;
+import com.solaria.messenger.core.model.enums.ObservabilityStepType;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -12,6 +12,10 @@ import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * DTO de requisição para registro de um evento de telemetria de um passo do pipeline de LLM
+ *
+ */
 @Getter
 @Setter
 @JsonIgnoreProperties(ignoreUnknown = true)
