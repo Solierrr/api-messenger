@@ -1,9 +1,9 @@
-package com.solaria.messenger.dto.request;
+package com.solaria.messenger.core.contract.request;
 
 import java.math.BigDecimal;
 import java.util.UUID;
 
-import com.solaria.messenger.model.enums.RatingType;
+import com.solaria.messenger.core.model.enums.RatingType;
 
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -12,6 +12,12 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * DTO de requisição para criação de uma avaliação.
+ *
+ * <p>Usado no endpoint {@code POST /messaging/ratings}. Carrega o avaliado, o tipo de avaliação, a
+ * nota de 0.0 a 5.0 e um comentário opcional de até 1000 caracteres.</p>
+ */
 @Setter
 @Getter
 public class RatingRequestDTO {

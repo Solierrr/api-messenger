@@ -1,4 +1,4 @@
-package com.solaria.messenger.dto.request;
+package com.solaria.messenger.core.contract.request;
 
 import java.math.BigDecimal;
 
@@ -9,6 +9,12 @@ import lombok.Getter;
 import lombok.Setter;
 
 
+/**
+ * DTO de requisição para atualização de uma avaliação existente.
+ *
+ * <p>Usado no endpoint {@code PATCH /messaging/ratings/{id}}. Carrega a nota (0.0 a 5.0) e o
+ * comentário (até 1000 caracteres), ambos opcionais na atualização.</p>
+ */
 @Setter
 @Getter
 public class RatingUpdateRequestDTO {
