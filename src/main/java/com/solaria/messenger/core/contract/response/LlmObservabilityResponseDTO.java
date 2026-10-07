@@ -1,9 +1,9 @@
-package com.solaria.messenger.dto.response;
+package com.solaria.messenger.core.contract.response;
 
 import java.time.Instant;
 
-import com.solaria.messenger.model.enums.Environment;
-import com.solaria.messenger.model.enums.ObservabilityStepType;
+import com.solaria.messenger.core.model.enums.Environment;
+import com.solaria.messenger.core.model.enums.ObservabilityStepType;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -11,6 +11,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * DTO de resposta com um evento de telemetria de passo do pipeline de LLM.
+ *
+ */
 @Getter
 @Setter
 @Builder
