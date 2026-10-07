@@ -1,12 +1,12 @@
-package com.solaria.messenger.dto.response;
+package com.solaria.messenger.core.contract.response;
 
 import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import com.solaria.messenger.model.enums.ConversationStatus;
-import com.solaria.messenger.model.enums.ConversationType;
+import com.solaria.messenger.core.model.enums.ConversationStatus;
+import com.solaria.messenger.core.model.enums.ConversationType;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -14,6 +14,12 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * DTO de resposta com os dados de uma conversa.
+ *
+ * <p>Retornado pelos endpoints de criação e consulta de {@code /messaging/conversations}. Inclui
+ * participantes, gestor, status e as datas de início e da última interação.</p>
+ */
 @Getter
 @Setter
 @Builder
@@ -25,6 +31,7 @@ public class ConversationResponseDTO {
     private ConversationType conversationType;
     private Set<UUID> participantIds;
     private UUID createdBy;
+    private UUID managerUserId;
     private String title;
     private String communityId;
     private String userType;
