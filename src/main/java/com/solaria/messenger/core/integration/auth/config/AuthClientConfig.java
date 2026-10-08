@@ -1,4 +1,4 @@
-package com.solaria.messenger.integration.auth;
+package com.solaria.messenger.core.integration.auth.config;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -8,11 +8,19 @@ import org.springframework.web.client.RestClient;
 
 import java.net.http.HttpClient;
 
-// factory responsável por criar as chamadas http a api-auth
+/**
+ * Configuração do cliente HTTP da integração com a api-auth
+ *
+ * <p>Principais beans disponibilizados:</p>
+ * <ul>
+ *     <li>{@link #authRestClient(AuthClientProperties)} -> cliente HTTP apontando para a api-auth.</li>
+ * </ul>
+ */
 @Configuration
 @EnableConfigurationProperties(AuthClientProperties.class)
 public class AuthClientConfig {
 
+    /** Cliente HTTP da api-auth com os timeouts de conexão e leitura configurados. */
     @Bean
     public RestClient authRestClient(AuthClientProperties properties) {
         HttpClient httpClient = HttpClient.newBuilder()

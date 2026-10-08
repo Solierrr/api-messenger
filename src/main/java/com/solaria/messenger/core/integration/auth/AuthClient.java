@@ -1,11 +1,21 @@
-package com.solaria.messenger.integration.auth;
+package com.solaria.messenger.core.integration.auth;
 
-import com.solaria.messenger.dto.request.LoginRequestDTO;
-import com.solaria.messenger.dto.response.AuthLoginResponseDTO;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
+import com.solaria.messenger.core.integration.auth.dto.AuthLoginResponseDTO;
+import com.solaria.messenger.core.integration.auth.dto.LoginRequestDTO;
+import com.solaria.messenger.core.integration.auth.exception.AuthIntegrationException;
 
+/**
+ * Cliente HTTP do endpoint {@code POST /auth/login} da api-auth
+ *
+ *
+ * <p>Principais operações disponibilizadas:</p>
+ * <ul>
+ *     <li>{@link #login(String, String)} -> autentica o usuário na api-auth e devolve os tokens</li>
+ * </ul>
+ */
 // Cliente do endpoint POST /auth/login em api-auth
 @Component
 public class AuthClient {
@@ -16,6 +26,7 @@ public class AuthClient {
         this.restClient = authRestClient;
     }
 
+    /** Autentica na api-auth e devolve os tokens | falha HTTP vira {@link AuthIntegrationException} */
     public AuthLoginResponseDTO login(String email, String password) {
         LoginRequestDTO request = new LoginRequestDTO();
         request.setEmail(email);
