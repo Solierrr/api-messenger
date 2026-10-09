@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.2.0](https://github.com/Solierrr/api-messenger/compare/v3.1.0...v3.2.0) (2026-10-09)
+
+
+### Features
+
+* add bruno api collection ([3867e01](https://github.com/Solierrr/api-messenger/commit/3867e01b0ed3934f1a5a8c4ab45e1458961e7324))
+* add the local run commands ([d42ec53](https://github.com/Solierrr/api-messenger/commit/d42ec53c7f38bdd0408b49bb0442bd28df2dc480))
+
+
+### Bug Fixes
+
+* complete bruno observability example ([99e26a0](https://github.com/Solierrr/api-messenger/commit/99e26a05db52f07404d1d841157217a0141fdba2))
+
 ## [3.1.0](https://github.com/Solierrr/api-messenger/compare/v3.0.0...v3.1.0) (2026-09-30)
 
 
