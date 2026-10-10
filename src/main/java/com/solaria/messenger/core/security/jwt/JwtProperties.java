@@ -1,4 +1,4 @@
-package com.solaria.messenger.security;
+package com.solaria.messenger.core.security.jwt;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -16,18 +16,22 @@ public class JwtProperties {
     // Issuer esperado no token de usuário
     private String issuer;
 
+    /** URL do JWKS usada para validar a assinatura RS256. */
     public String getJwkSetUri() {
         return jwkSetUri;
     }
 
+    /** Define a URL do JWKS. */
     public void setJwkSetUri(String jwkSetUri) {
         this.jwkSetUri = jwkSetUri;
     }
 
+    /** Issuer esperado no JWT. */
     public String getIssuer() {
         return issuer;
     }
 
+    /** Define o issuer esperado no JWT. */
     public void setIssuer(String issuer) {
         this.issuer = issuer;
     }

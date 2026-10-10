@@ -1,4 +1,4 @@
-package com.solaria.messenger.security;
+package com.solaria.messenger.core.security.jwt;
 
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
