@@ -1,13 +1,10 @@
-package com.solaria.messenger.observability;
+package com.solaria.messenger.rest.observability;
 
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
-import org.springframework.core.task.TaskDecorator;
-import org.springframework.core.task.support.ContextPropagatingTaskDecorator;
 import org.springframework.http.server.observation.ServerRequestObservationContext;
 
 import io.micrometer.observation.ObservationPredicate;
@@ -15,11 +12,7 @@ import io.micrometer.tracing.Tracer;
 import jakarta.servlet.DispatcherType;
 
 /**
- * Configuração central de observabilidade
- *
- * <p>Concentra na camada de infra os beans que ajustam o comportamento de
- * Micrometer / Micrometer Tracing / OpenTelemetry, sem misturar observabilidade com negócio</p>
- *
+ * Observabilidade das requisições HTTP
  *
  * <ul>
  *     <li>{@link #traceIdResponseFilterRegistration(ObjectProvider)} -> registra o
@@ -29,11 +22,11 @@ import jakarta.servlet.DispatcherType;
  * </ul>
  */
 @Configuration
-public class ObservabilityConfig {
+public class HttpObservabilityConfig {
 
     /**
      * Registra o {@link TraceIdResponseFilter} dentro do {@code ServerHttpObservationFilter}
-     * 
+     *
      * @param tracerProvider fornece o tracer quando o tracing está habilitado
      */
     @Bean
@@ -48,7 +41,7 @@ public class ObservabilityConfig {
     }
 
     /**
-     * Evita gerar métricas e traces para as requisições do Actuator 
+     * Evita gerar métricas e traces para as requisições do Actuator
      */
     @Bean
     public ObservationPredicate noActuatorObservations() {
@@ -59,14 +52,5 @@ public class ObservabilityConfig {
             }
             return true;
         };
-    }
-
-    /**
-     * Mantém o contexto de observabilidade quando outra thread executa a tarefa
-     */
-    @Bean
-    @ConditionalOnClass(name = "io.micrometer.context.ContextSnapshot")
-    public TaskDecorator contextPropagatingTaskDecorator() {
-        return new ContextPropagatingTaskDecorator();
     }
 }

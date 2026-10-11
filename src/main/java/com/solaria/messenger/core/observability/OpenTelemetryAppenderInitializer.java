@@ -1,4 +1,4 @@
-package com.solaria.messenger.observability;
+package com.solaria.messenger.core.observability;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -25,6 +25,7 @@ public class OpenTelemetryAppenderInitializer implements ApplicationListener<App
         this.openTelemetryProvider = openTelemetryProvider;
     }
 
+    /** Liga o appender de logs ao OpenTelemetry quando ele está disponível, após a aplicação subir */
     @Override
     public void onApplicationEvent(ApplicationReadyEvent event) {
         OpenTelemetry openTelemetry = openTelemetryProvider.getIfAvailable();

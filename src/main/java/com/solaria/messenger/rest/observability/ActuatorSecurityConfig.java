@@ -1,4 +1,4 @@
-package com.solaria.messenger.observability;
+package com.solaria.messenger.rest.observability;
 
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;

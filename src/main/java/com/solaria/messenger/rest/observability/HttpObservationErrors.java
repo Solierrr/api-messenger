@@ -1,4 +1,4 @@
-package com.solaria.messenger.observability;
+package com.solaria.messenger.rest.observability;
 
 import io.micrometer.observation.Observation;
 
