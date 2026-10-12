@@ -1,17 +1,21 @@
-package com.solaria.messenger.service;
+package com.solaria.messenger.core.service;
 
 import java.time.Instant;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
 
-import com.solaria.messenger.dto.request.LlmObservabilityRequestDTO;
-import com.solaria.messenger.dto.response.LlmObservabilityResponseDTO;
-import com.solaria.messenger.exception.InvalidFieldException;
-import com.solaria.messenger.exception.ResourceNotFoundException;
-import com.solaria.messenger.model.LlmObservability;
-import com.solaria.messenger.repository.LlmObservabilityRepository;
+import com.solaria.messenger.core.contract.request.LlmObservabilityRequestDTO;
+import com.solaria.messenger.core.contract.response.LlmObservabilityResponseDTO;
+import com.solaria.messenger.core.exception.InvalidFieldException;
+import com.solaria.messenger.core.exception.ResourceNotFoundException;
+import com.solaria.messenger.core.model.LlmObservability;
+import com.solaria.messenger.core.repository.LlmObservabilityRepository;
+import com.solaria.messenger.core.mapper.LlmObservabilityMapper;
 
+import static com.solaria.messenger.core.mapper.LlmObservabilityMapper.toResponse;
+
+/** Mantém a telemetria do pipeline LLM isolada da mensageria, sem recalcular custos ou tokens recebidos */
 @Service
 public class LlmObservabilityService {
 
@@ -21,6 +25,7 @@ public class LlmObservabilityService {
         this.llmObservabilityRepository = llmObservabilityRepository;
     }
 
+    /** Persiste uma nova etapa e preserva os defaults de timestamp e custo quando omitidos. */
     public LlmObservabilityResponseDTO ingest(LlmObservabilityRequestDTO dto) {
         LlmObservability observability = new LlmObservability();
         observability.setNode(dto.getNode());
@@ -41,6 +46,7 @@ public class LlmObservabilityService {
         return toResponse(llmObservabilityRepository.save(observability));
     }
 
+    /** Consulta a etapa por ID usando o Repository da coleção de telemetria */
     public LlmObservabilityResponseDTO findById(String id) {
         LlmObservability observability = llmObservabilityRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -48,7 +54,7 @@ public class LlmObservabilityService {
         return toResponse(observability);
     }
 
-
+    /** Aplica no máximo um filtro | sem filtro retorna os cem eventos mais recentes */
     public List<LlmObservabilityResponseDTO> search(String conversationId, String node, String status) {
         int informedFilterCount = countInformedFilters(conversationId, node, status);
         if (informedFilterCount > 1) {
@@ -68,10 +74,11 @@ public class LlmObservabilityService {
         }
 
         return results.stream()
-            .map(this::toResponse)
+            .map(LlmObservabilityMapper::toResponse)
             .toList();
     }
 
+    /** Conta quantos filtros de busca foram preenchido */
     private int countInformedFilters(String conversationId, String node, String status) {
         int count = 0;
         if (isInformed(conversationId)) {
@@ -86,27 +93,8 @@ public class LlmObservabilityService {
         return count;
     }
 
+    /** Filtro preenchido é não nulo e não vazio */
     private boolean isInformed(String value) {
         return value != null && !value.isBlank();
-    }
-
-    private LlmObservabilityResponseDTO toResponse(LlmObservability observability) {
-        return LlmObservabilityResponseDTO.builder()
-                .id(observability.getId())
-                .node(observability.getNode())
-                .stepOrder(observability.getStepOrder())
-                .stepType(observability.getStepType())
-                .model(observability.getModel())
-                .conversationId(observability.getConversationId())
-                .environment(observability.getEnvironment())
-                .tokensIn(observability.getTokensIn())
-                .tokensOut(observability.getTokensOut())
-                .tokensTotal(observability.getTokensTotal())
-                .latencyMs(observability.getLatencyMs())
-                .status(observability.getStatus())
-                .error(observability.getError())
-                .timestamp(observability.getTimestamp())
-                .costUsd(observability.getCostUsd())
-                .build();
     }
 }
