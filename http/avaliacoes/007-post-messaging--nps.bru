@@ -1,0 +1,29 @@
+meta {
+  name: [mutates] POST /messaging/nps
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/messaging/nps
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+body:json {
+  {
+    "conversationId": "{{conversationId}}",
+    "score": 9,
+    "environment": "LOCAL"
+  }
+}
+
+docs {
+  Registra a nota NPS (0 a 10) de uma conversa com o chatbot.
+  Uma resposta por conversa; o usuário precisa participar da conversa.
+  This operation may change server state.
+}
