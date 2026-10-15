@@ -1,4 +1,4 @@
-package com.solaria.messenger.model.enums;
+package com.solaria.messenger.core.model.enums;
 
 /**
  * Classificação NPS a partir da nota de 0 a 10.
@@ -17,6 +17,7 @@ public enum NpsClassification {
     public static final int MIN_SCORE = 0;
     public static final int MAX_SCORE = 10;
 
+    /** Classifica a nota NPS: 9–10 promotor, 7–8 neutro e 0–6 detrator. */
     public static NpsClassification fromScore(int score) {
         if (score < MIN_SCORE || score > MAX_SCORE) {
             throw new IllegalArgumentException("A nota NPS deve estar entre 0 e 10.");

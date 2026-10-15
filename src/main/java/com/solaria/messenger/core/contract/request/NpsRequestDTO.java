@@ -1,6 +1,6 @@
-package com.solaria.messenger.dto.request;
+package com.solaria.messenger.core.contract.request;
 
-import com.solaria.messenger.model.enums.Environment;
+import com.solaria.messenger.core.model.enums.Environment;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -9,6 +9,12 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * DTO de requisição para registro de uma resposta de NPS (Net Promoter Score).
+ *
+ * <p>Usado no endpoint {@code POST /messaging/nps}. Carrega a conversa avaliada, a nota de 0 a 10 e
+ * o ambiente de origem da resposta.</p>
+ */
 @Setter
 @Getter
 public class NpsRequestDTO {
