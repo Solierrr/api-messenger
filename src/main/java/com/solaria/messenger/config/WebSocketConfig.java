@@ -31,9 +31,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private static final long[] HEARTBEAT_MS = {10_000, 10_000};
 
     private final StompAuthChannelInterceptor stompAuthChannelInterceptor;
+    private final com.solaria.messenger.security.ProjectOutboundInterceptor projectOutbound;
 
-    public WebSocketConfig(StompAuthChannelInterceptor stompAuthChannelInterceptor) {
+    public WebSocketConfig(StompAuthChannelInterceptor stompAuthChannelInterceptor,com.solaria.messenger.security.ProjectOutboundInterceptor projectOutbound) {
         this.stompAuthChannelInterceptor = stompAuthChannelInterceptor;
+        this.projectOutbound=projectOutbound;
     }
 
     @Override
@@ -55,6 +57,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void configureClientInboundChannel(ChannelRegistration registration) {
         registration.interceptors(stompAuthChannelInterceptor);
     }
+
+    @Override public void configureClientOutboundChannel(ChannelRegistration registration){registration.interceptors(projectOutbound);}
 
     @Override
     public void configureWebSocketTransport(WebSocketTransportRegistration registration) {
