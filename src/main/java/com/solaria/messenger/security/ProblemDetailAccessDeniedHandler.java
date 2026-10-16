@@ -44,7 +44,7 @@ public class ProblemDetailAccessDeniedHandler implements AccessDeniedHandler {
                         AccessDeniedException accessDeniedException) throws IOException {
 
         HttpObservationErrors.mark(request, accessDeniedException);
-        log.warn("403 em {} {}: {}", request.getMethod(), request.getRequestURI(),
+        log.atWarn().addKeyValue("errorCode", "ACCESS_DENIED").log("403 em {} {}: {}", request.getMethod(), request.getRequestURI(),
                 accessDeniedException.getMessage());
 
         // cria corpo do json a partir da classe ProblemDetail
