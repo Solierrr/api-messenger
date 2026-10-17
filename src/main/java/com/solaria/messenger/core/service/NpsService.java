@@ -1,4 +1,4 @@
-package com.solaria.messenger.service;
+package com.solaria.messenger.core.service;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -6,19 +6,39 @@ import java.util.UUID;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
-import com.solaria.messenger.dto.request.NpsRequestDTO;
-import com.solaria.messenger.dto.response.NpsResponseDTO;
-import com.solaria.messenger.exception.BusinessRuleException;
-import com.solaria.messenger.exception.DuplicateResourceException;
-import com.solaria.messenger.exception.ResourceNotFoundException;
-import com.solaria.messenger.model.Conversation;
-import com.solaria.messenger.model.Nps;
-import com.solaria.messenger.model.enums.ConversationType;
-import com.solaria.messenger.model.enums.NpsClassification;
-import com.solaria.messenger.repository.ConversationRepository;
-import com.solaria.messenger.repository.NpsRepository;
-import com.solaria.messenger.security.rbac.RbacAuthorizationService;
+import com.solaria.messenger.core.contract.request.NpsRequestDTO;
+import com.solaria.messenger.core.contract.response.NpsResponseDTO;
+import com.solaria.messenger.core.exception.BusinessRuleException;
+import com.solaria.messenger.core.exception.DuplicateResourceException;
+import com.solaria.messenger.core.exception.ResourceNotFoundException;
+import com.solaria.messenger.core.model.Conversation;
+import com.solaria.messenger.core.model.Nps;
+import com.solaria.messenger.core.model.enums.ConversationType;
+import com.solaria.messenger.core.model.enums.NpsClassification;
+import com.solaria.messenger.core.repository.ConversationRepository;
+import com.solaria.messenger.core.repository.NpsRepository;
+import com.solaria.messenger.core.security.rbac.RbacAuthorizationService;
 
+import static com.solaria.messenger.core.mapper.NpsMapper.toResponse;
+
+/**
+ * Serviço de registro de NPS (Net Promoter Score) das conversas com o chatbot.
+ *
+ * <p>Garante que a conversa existe, que o usuário autenticado participa dela, que é do tipo
+ * {@code CHAT_BOT} e que ainda não recebeu NPS. A classificação é derivada da nota.</p>
+ *
+ * <p><b>Depende de:</b></p>
+ * <ul>
+ *     <li>{@link NpsRepository} - persistência das respostas de NPS.</li>
+ *     <li>{@link ConversationRepository} - leitura da conversa avaliada.</li>
+ *     <li>{@link RbacAuthorizationService} - identificação do usuário e checagem de participação.</li>
+ * </ul>
+ *
+ * <p>Principais operações disponibilizadas:</p>
+ * <ul>
+ *     <li>{@link #create(NpsRequestDTO)} - registra o NPS único de uma conversa com o chatbot.</li>
+ * </ul>
+ */
 @Service
 public class NpsService {
 
@@ -34,6 +54,7 @@ public class NpsService {
         this.rbac = rbac;
     }
 
+    /** Registra o NPS único de uma conversa CHAT_BOT da qual o usuário participa. */
     public NpsResponseDTO create(NpsRequestDTO dto) {
         UUID userId = rbac.currentUserId();
 
@@ -63,17 +84,5 @@ public class NpsService {
             // Duas requisições simultâneas passam pelo existsBy; o índice único barra a segunda.
             throw new DuplicateResourceException("Esta conversa já foi avaliada.");
         }
-    }
-
-    private NpsResponseDTO toResponse(Nps nps) {
-        return NpsResponseDTO.builder()
-                .id(nps.getId())
-                .conversationId(nps.getConversationId())
-                .userId(nps.getUserId())
-                .score(nps.getScore())
-                .classification(nps.getClassification())
-                .environment(nps.getEnvironment())
-                .timestamp(nps.getTimestamp())
-                .build();
     }
 }
