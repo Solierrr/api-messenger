@@ -1,4 +1,4 @@
-package com.solaria.messenger.exception.handler;
+package com.solaria.messenger.rest.error;
 
 import java.net.URI;
 import java.time.Instant;
@@ -16,17 +16,14 @@ import jakarta.servlet.http.HttpServletRequest;
 @Component
 public class ProblemDetailFactory {
 
-    private static final String TYPE_BASE = "https://solier.com/errors/";
-
     // cria corpo do json a partir da classe ProblemDetail
     public ProblemDetail create(HttpStatusCode status,
-                                String detail,
-                                String errorCode,
-                                Map<String, Object> properties,
-                                HttpServletRequest request) {
+            String detail,
+            String errorCode,
+            Map<String, Object> properties,
+            HttpServletRequest request) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
         problem.setTitle(errorCode);
-        problem.setType(URI.create(TYPE_BASE + toKebabCase(errorCode)));
         if (request != null) {
             problem.setInstance(URI.create(request.getRequestURI()));
         }
@@ -38,8 +35,9 @@ public class ProblemDetailFactory {
         return problem;
     }
 
-    // Método de apoio para transformar ERROR_CODE em URL
-
+    /**
+     * Converte ERROR_CODE em sufixo kebab-case para a URL do campo {@code type}.
+     */
     private static String toKebabCase(String errorCode) {
         if (errorCode == null || errorCode.isBlank()) {
             return "unknown";

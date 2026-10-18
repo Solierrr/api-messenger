@@ -1,4 +1,4 @@
-package com.solaria.messenger.security;
+package com.solaria.messenger.rest.security;
 
 import java.io.IOException;
 
@@ -10,8 +10,8 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
 
-import com.solaria.messenger.exception.handler.ProblemDetailFactory;
-import com.solaria.messenger.observability.HttpObservationErrors;
+import com.solaria.messenger.rest.error.ProblemDetailFactory;
+import com.solaria.messenger.rest.observability.HttpObservationErrors;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

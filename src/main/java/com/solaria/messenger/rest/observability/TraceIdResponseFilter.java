@@ -1,4 +1,4 @@
-package com.solaria.messenger.observability;
+package com.solaria.messenger.rest.observability;
 
 import java.io.IOException;
 
@@ -35,6 +35,7 @@ public class TraceIdResponseFilter extends OncePerRequestFilter {
         this.tracerProvider = tracerProvider;
     }
 
+    /** Expõe o traceId do span atual no cabeçalho de resposta antes de a resposta ser confirmada. */
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {

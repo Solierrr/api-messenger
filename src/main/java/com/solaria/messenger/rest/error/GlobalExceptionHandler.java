@@ -1,4 +1,4 @@
-package com.solaria.messenger.exception.handler;
+package com.solaria.messenger.rest.error;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,8 +21,8 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
-import com.solaria.messenger.exception.BusinessException;
-import com.solaria.messenger.observability.HttpObservationErrors;
+import com.solaria.messenger.core.exception.BusinessException;
+import com.solaria.messenger.rest.observability.HttpObservationErrors;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -63,8 +63,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         }
     }
 
-    // Handler responsável por BusinessException e todas as subclasses.
-
+    /** Converte {@link BusinessException} e subclasses no ProblemDetail com o status e o código da exceção. */
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ProblemDetail> handleBusinessException(BusinessException ex,
                                                                  HttpServletRequest request) {
@@ -79,8 +78,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(ex.getStatus()).body(body);
     }
 
-    // Handler responsável por violação de índice único no MongoDB.
-
+    /** Violação de índice único no Mongo vira 409 DATA_INTEGRITY_VIOLATION. */
     @ExceptionHandler(DuplicateKeyException.class)
     public ResponseEntity<ProblemDetail> handleDuplicateKey(DuplicateKeyException ex,
                                                              HttpServletRequest request) {
@@ -94,6 +92,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
     }
 
+    /** Conflito de versão que escapou dos serviços vira 409 CONCURRENT_MODIFICATION. */
     @ExceptionHandler(OptimisticLockingFailureException.class)
     public ResponseEntity<ProblemDetail> handleOptimisticLock(OptimisticLockingFailureException ex,
                                                               HttpServletRequest request) {
@@ -107,9 +106,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
     }
 
-    // Handler para negação de autorização vinda do próprio Spring Security
-    // sem handler explícito, o catch-all de Exception abaixo capturaria primeiro e devolveria 500 em vez de 403
-
+    /** Negação do Spring Security vira 403; sem este handler o catch-all devolveria 500. */
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ProblemDetail> handleAccessDenied(AccessDeniedException ex,
                                                              HttpServletRequest request) {
@@ -123,8 +120,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
     }
 
-    // Handler para erros inesperados
-
+    /** Erro inesperado vira 500 INTERNAL_ERROR, registrado com stack trace. */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemDetail> handleUnexpected(Exception ex, HttpServletRequest request) {
         // registra no span (status ERROR + evento de excecao) com stack trace
@@ -138,8 +134,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }
 
-    // Sobrescrita de handler responsável por BEAN validation / corpo da requisição.
-
+    /** Falha de Bean Validation no corpo vira 400 VALIDATION_ERROR com a lista de campos. */
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
                                                                   HttpHeaders headers,
@@ -165,8 +160,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
     }
 
-    // Sobrescrita de handler responsável por BEAN validation / parâmetros dos métodos.
-
+    /** Falha de Bean Validation em parâmetros do método vira 400 VALIDATION_ERROR. */
     @Override
     protected ResponseEntity<Object> handleHandlerMethodValidationException(HandlerMethodValidationException ex,
                                                                             HttpHeaders headers,
@@ -189,8 +183,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
     }
 
-    // Sobrescrita de Handler responsável por JSONS inválidos.
-
+    /** JSON inválido ou ilegível vira 400 MALFORMED_REQUEST. */
     @Override
     protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException ex,
                                                                   HttpHeaders headers,
@@ -206,6 +199,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
     }
 
+    /** Extrai a requisição servlet do {@link WebRequest}, quando houver. */
     private HttpServletRequest servletRequest(WebRequest request) {
         return (request instanceof ServletWebRequest swr) ? swr.getRequest() : null;
     }

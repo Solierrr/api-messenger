@@ -1,4 +1,4 @@
-package com.solaria.messenger.security;
+package com.solaria.messenger.rest.security;
 
 import java.io.IOException;
 
@@ -10,8 +10,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
 
-import com.solaria.messenger.exception.handler.ProblemDetailFactory;
-import com.solaria.messenger.observability.HttpObservationErrors;
+import com.solaria.messenger.rest.error.ProblemDetailFactory;
+import com.solaria.messenger.rest.observability.HttpObservationErrors;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -20,7 +20,7 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Classe responsável por montar corpos de Jsons de erro, especificos para RBAC.
  *
- * <p>O 403 é produzido na cadeia de filtros ]
+ * <p>O 403 é produzido na cadeia de filtros 
  *  marca a observação do servidor como erro e loga correlacionado ao trace
  * </p>
  */
@@ -39,6 +39,7 @@ public class ProblemDetailAccessDeniedHandler implements AccessDeniedHandler {
     }
 
 
+    /** Responde 403 ACCESS_DENIED como ProblemDetail, direto na resposta, na camada de filtros. */
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response,
                         AccessDeniedException accessDeniedException) throws IOException {
