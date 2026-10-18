@@ -1,48 +1,41 @@
-package com.solaria.messenger.security;
+package com.solaria.messenger.rest.security;
 
 import java.util.Arrays;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Profile;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.JwtValidators;
-import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import tools.jackson.databind.ObjectMapper;
+
+import com.solaria.messenger.rest.error.ProblemDetailFactory;
+import com.solaria.messenger.core.service.UserAccessService;
 
 /**
- * Duas SecurityFilterChain, estruturalmente independentes e segregadas
- * por @Order. Mesmo padrão usado em api-persistence
- *
- * @Order(1): rotas -> /internal/**; rotas internas de rede;
- * nunca expostas via Kong; só alcançáveis de dentro do cluster
- *
- * @Order(2): rotas -> JWT de usuário emitido pelo api-auth;
- * resource server RS256/JWKS;
- * sem segredo compartilhado.
- *
+ * Fronteiras de segurança HTTP do Messenger
+ * Actuator é restrito em sua configuração própria;
+ * /internal/** usa isolamento de rede e a chain de usuário valida o JWT com o decoder comum de
+ * {@link com.solaria.messenger.core.security.jwt.JwtDecoderConfig}. 
+ * O proxy /dev/login e sua chain só existem no perfil dev.
  */
 
 @Configuration
 
 // ativa a integração do Spring Security com Spring MVC
 @EnableWebSecurity
-
-// Liga as classes com @ConfigurationProperties como Beans
-@EnableConfigurationProperties(JwtProperties.class)
 public class SecurityConfig {
-
-        private final JwtProperties jwtProperties;
 
         // Handlers 401/403 usados pela chain @Order(2)
         private final ProblemDetailAuthenticationEntryPoint problemDetailAuthenticationEntryPoint;
@@ -52,12 +45,36 @@ public class SecurityConfig {
         @Value("${app.cors.allowed-origins}")
         private String allowedOrigins;
 
-        public SecurityConfig(JwtProperties jwtProperties,
-                        ProblemDetailAuthenticationEntryPoint problemDetailAuthenticationEntryPoint,
+        public SecurityConfig(ProblemDetailAuthenticationEntryPoint problemDetailAuthenticationEntryPoint,
                         ProblemDetailAccessDeniedHandler problemDetailAccessDeniedHandler) {
-                this.jwtProperties = jwtProperties;
                 this.problemDetailAuthenticationEntryPoint = problemDetailAuthenticationEntryPoint;
                 this.problemDetailAccessDeniedHandler = problemDetailAccessDeniedHandler;
+        }
+
+        /** Cria o filtro de usuário ativo com o registro servlet desabilitado, para que ele rode só dentro da chain de segurança. */
+        @Bean
+        public FilterRegistrationBean<ActiveUserFilter> activeUserFilterRegistration(
+                        UserAccessService userAccessService,
+                        ProblemDetailFactory problemDetailFactory,
+                        ObjectMapper objectMapper) {
+                FilterRegistrationBean<ActiveUserFilter> registration = new FilterRegistrationBean<>(
+                                new ActiveUserFilter(userAccessService, problemDetailAuthenticationEntryPoint,
+                                                problemDetailFactory, objectMapper));
+                registration.setEnabled(false);
+                return registration;
+        }
+
+        /** O proxy de login só existe em dev e não exige um token anterior para obter o primeiro JWT. */
+        @Bean
+        @Profile("dev")
+        @Order(1)
+        public SecurityFilterChain devLoginSecurityFilterChain(HttpSecurity http) throws Exception {
+                return http.securityMatcher("/dev/login")
+                                .csrf(csrf -> csrf.disable())
+                                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                                .build();
         }
 
         // Registra o objeto retornado como um Bean
@@ -85,7 +102,9 @@ public class SecurityConfig {
         // @Order(2)-> avaliada depois da chain de /internal/**
         // qualquer requisição que não bateu com /internal/** cai aqui.
         @Order(2)
-        public SecurityFilterChain resourceServerSecurityFilterChain(HttpSecurity http) throws Exception {
+        public SecurityFilterChain resourceServerSecurityFilterChain(HttpSecurity http,
+                        FilterRegistrationBean<ActiveUserFilter> activeUserFilterRegistration,
+                        JwtDecoder userJwtDecoder) throws Exception {
                 http
                                 // CSRF desabilitado
                                 .csrf(csrf -> csrf.disable())
@@ -96,10 +115,12 @@ public class SecurityConfig {
                                 // define que a aplicação é um Resource Server OAuth2 e receberá tokens Bearer (JWT) nas requisições.
                                 .oauth2ResourceServer(oauth2 -> oauth2
                                                 // decoder personalizado para validar jwt (JWKS + validador de issuer + token_type)
-                                                .jwt(jwt -> jwt.decoder(userJwtDecoder()))
+                                                .jwt(jwt -> jwt.decoder(userJwtDecoder))
                                                 // Duplicação de exception pois oauth2ResourceServer() tem prioridade sobre exceptionHandling
                                                 .authenticationEntryPoint(problemDetailAuthenticationEntryPoint)
                                                 .accessDeniedHandler(problemDetailAccessDeniedHandler))
+                                .addFilterAfter(activeUserFilterRegistration.getFilter(),
+                                                BearerTokenAuthenticationFilter.class)
                                 .authorizeHttpRequests(auth -> auth
                                                 // Docs OpenAPI/Swagger ficam públicas
                                                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**",
@@ -112,26 +133,10 @@ public class SecurityConfig {
                                 // Garante que exceptions usem o formato de ProblemDetail
                                 .exceptionHandling(e -> e
                                                 .authenticationEntryPoint(problemDetailAuthenticationEntryPoint)
-                                                .accessDeniedHandler(problemDetailAccessDeniedHandler));
+                                                .accessDeniedHandler(problemDetailAccessDeniedHandler)) ;
                 // Constrói e devolve a SecurityFilterChain configurada acima como o bean deste método.
                 return http.build();
         }
-        // Registra o objeto retornado como um Bean
-        @Bean
-        public JwtDecoder userJwtDecoder() {
-
-                // Define URL JWKS onde o decoder busca uma chave pública para verificar a assinatura RS256
-                NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwtProperties.getJwkSetUri()).build();
-
-                // Substitui o validador padrão do decoder, por 2 validadores
-                // createDefaultWithIssuer -> valida emissor
-                // AccessTokenTypeValidator -> valida tipo de token
-                decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-                                JwtValidators.createDefaultWithIssuer(jwtProperties.getIssuer()),
-                                new AccessTokenTypeValidator()));
-                return decoder;
-        }
-
         // Bean único de configuração CORS, compartilhado pelas duas SecurityFilterChain
         @Bean
         public CorsConfigurationSource corsConfigurationSource() {
@@ -150,7 +155,7 @@ public class SecurityConfig {
                 // headers permitidos
                 configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "apikey"));
                 // expoe o X-Trace-Id para poder ler o traceId 
-                configuration.setExposedHeaders(List.of("X-Trace-Id"));
+                configuration.setExposedHeaders(List.of("X-Trace-Id", "X-Conversation-Sync-Epoch", "X-Conversation-Sync-Version"));
                 // Aplica esta CorsConfiguration a todos os paths ("/**")
                 UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
                 source.registerCorsConfiguration("/**", configuration);
