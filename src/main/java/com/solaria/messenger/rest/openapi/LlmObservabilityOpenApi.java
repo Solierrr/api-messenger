@@ -1,11 +1,11 @@
-package com.solaria.messenger.openapi;
+package com.solaria.messenger.rest.openapi;
 
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
 
-import com.solaria.messenger.dto.request.LlmObservabilityRequestDTO;
-import com.solaria.messenger.dto.response.LlmObservabilityResponseDTO;
+import com.solaria.messenger.core.contract.request.LlmObservabilityRequestDTO;
+import com.solaria.messenger.core.contract.response.LlmObservabilityResponseDTO;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -13,10 +13,13 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
+/**
+ * Contrato Swagger/OpenAPI da telemetria de LLM, exposta em {@code /internal/observability}
+ */
 @Tag(
     name = "Observabilidade de LLM",
 description = "Telemetria interna do pipeline de LLM -> roteador/nós do grafo reportam métricas de cada passo (chamada a modelo ou a ferramenta). "
-    + "Endpoints internos, em /internal/observability, alcançáveis apenas pela rede interna (nunca via Kong)."
+    + "Endpoints internos, em /internal/observability, cujo acesso deve ser restrito pela rede de implantação."
 )
 public interface LlmObservabilityOpenApi {
 
@@ -40,7 +43,7 @@ public interface LlmObservabilityOpenApi {
     @Operation(
         summary = "Lista/filtra eventos de telemetria",
         description = "No máximo um filtro (conversationId, node ou status) pode ser informado por chamada "
-                + "nesta versão; nenhum filtro informado devolve todos os eventos."
+                + "nesta versão; nenhum filtro informado devolve até 100 eventos por timestamp decrescente."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lista de eventos retornada com sucesso"),
