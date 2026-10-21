@@ -1,4 +1,4 @@
-package com.solaria.messenger.security;
+package com.solaria.messenger.websocket.exception;
 
 /**
  * Excecao usada para falhas de autenticacao em frames STOMP
