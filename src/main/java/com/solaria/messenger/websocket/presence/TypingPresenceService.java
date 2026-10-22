@@ -1,4 +1,4 @@
-package com.solaria.messenger.service;
+package com.solaria.messenger.websocket.presence;
 
 import java.time.Instant;
 import java.util.Map;
@@ -9,8 +9,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 /**
- * Rastreamento  de "quem esta digitando em qual conversa"
- * usado para permitir que o {@code WebSocketSessionEventListener} emita {@code TYPING_STOPPED}
+ * rastramento de digitação em uma conversa
+ * usado para permitir que o {@code TypingService} emita {@code TYPING_STOPPED}
  * automaticamente quando uma sessao cai no meio de uma digitacao
  */
 @Service
@@ -44,7 +44,6 @@ public class TypingPresenceService {
         Instant last = lastStartedAt.get(entryKey(conversationId, userId));
         return last != null && last.isAfter(Instant.now().minusSeconds(TYPING_DEDUP_SECONDS));
     }
-
     /**
      * encerra e retorna todas as conversas em que o usuario estava digitando 
      * no momento em que a sessao caiu para que o chamador emita
@@ -84,6 +83,7 @@ public class TypingPresenceService {
         }
     }
 
+    /** Retira o usuário da digitação nos dois índices e descarta conjuntos vazios. */
     private void removeEntry(String conversationId, String userId) {
         Set<String> typingUsers = typingByConversation.get(conversationId);
         if (typingUsers != null) {
@@ -104,10 +104,12 @@ public class TypingPresenceService {
         lastStartedAt.remove(entryKey(conversationId, userId));
     }
 
+    /** Chave composta conversa|usuário do instante de início. */
     private String entryKey(String conversationId, String userId) {
         return conversationId + "|" + userId;
     }
 
+    /** Separa a chave composta em conversa e usuário. */
     private String[] splitEntryKey(String key) {
         int separatorIndex = key.indexOf('|');
         return new String[] { key.substring(0, separatorIndex), key.substring(separatorIndex + 1) };
