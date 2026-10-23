@@ -1,4 +1,4 @@
-package com.solaria.messenger.dto.ws;
+package com.solaria.messenger.websocket.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
