@@ -52,29 +52,18 @@ O `api-messenger` segue uma arquitetura em camadas típica de um serviço Spring
 │   ├── main/
 │   │   ├── java/com/solaria/messenger/
 │   │   │   ├── MessagerApplication.java
-│   │   │   ├── config/
-│   │   │   │   ├── MongoConfig.java
-│   │   │   │   └── OpenApiConfig.java
-│   │   │   ├── controller/
-│   │   │   │   ├── ChatbotMessageController.java
-│   │   │   │   ├── ConversationController.java
-│   │   │   │   ├── LlmObservabilityController.java
-│   │   │   │   ├── MessageController.java
-│   │   │   │   ├── RatingController.java
-│   │   │   │   └── ServiceAuthController.java
-│   │   │   ├── dto/
-│   │   │   │   ├── request/
-│   │   │   │   └── response/
-│   │   │   ├── exception/
-│   │   │   │   └── handler/
-│   │   │   ├── model/
-│   │   │   │   └── enums/
-│   │   │   ├── openapi/
-│   │   │   ├── repository/
-│   │   │   ├── security/
-│   │   │   │   ├── rbac/
-│   │   │   │   └── service/
-│   │   │   └── service/
+│   │   │   ├── core/                      # regra de negócio, sem dependência de rest/ ou websocket/
+│   │   │   │   ├── contract/              # DTOs de entrada/saída (request, response)
+│   │   │   │   ├── exception/
+│   │   │   │   ├── integration/           # clientes: auth/, core/ (api-core), user/
+│   │   │   │   ├── mapper/
+│   │   │   │   ├── model/                 # documents Mongo (+ enums)
+│   │   │   │   ├── observability/
+│   │   │   │   ├── repository/
+│   │   │   │   ├── security/              # jwt/, rbac/
+│   │   │   │   └── service/               # casos de uso; service/port = portas de saída
+│   │   │   ├── rest/                      # adaptador HTTP (controller, openapi, error, security, dto)
+│   │   │   └── websocket/                 # adaptador STOMP (config, controller, presence, publish, session, security)
 │   │   └── resources/
 │   │       └── application.properties
 │   └── test/
@@ -93,3 +82,13 @@ O `api-messenger` segue uma arquitetura em camadas típica de um serviço Spring
 ├── pom.xml
 └── sonar-project.properties
 ```
+
+## Divisão em `core`, `rest` e `websocket`
+
+O código segue o estilo de portas e adaptadores: `core/` concentra modelo, repositórios e casos de uso e **não importa** `rest/` nem `websocket/`. `rest/` e `websocket/` são adaptadores de entrada que chamam os serviços de `core/`; o `websocket/` implementa as portas de saída em `core/service/port` (publicação de eventos e revogação de sessão).
+
+Referências consultadas:
+- [Hexagonal architecture: ports and adapters (Netguru)](https://www.netguru.com/blog/hexagonal-architecture-ports-adapters-guide)
+- [Designing Hexagonal Architecture with Java Spring Boot](https://github.com/educostadev/Designing-Hexagonal-Architecture-with-Java-SpringBoot)
+- [Spring Modulith — fundamentals](https://docs.spring.io/spring-modulith/reference/2.2-SNAPSHOT/fundamentals.html)
+- [Spring WebSocket messaging architectures](https://spring.io/blog/2013/07/24/spring-framework-4-0-m2-websocket-messaging-architectures)
