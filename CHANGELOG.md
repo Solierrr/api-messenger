@@ -1,5 +1,23 @@
 # Changelog
 
+## [3.2.0](https://github.com/Solierrr/api-messenger/compare/v3.1.0...v3.2.0) (2026-10-24)
+
+
+### Features
+
+* add bruno api collection ([3867e01](https://github.com/Solierrr/api-messenger/commit/3867e01b0ed3934f1a5a8c4ab45e1458961e7324))
+* add new images for documentation enhancement ([#58](https://github.com/Solierrr/api-messenger/issues/58)) ([7618b68](https://github.com/Solierrr/api-messenger/commit/7618b6867cf0c260e024fa4c59ee13d6e0c07c93))
+* add the local run commands ([d42ec53](https://github.com/Solierrr/api-messenger/commit/d42ec53c7f38bdd0408b49bb0442bd28df2dc480))
+* authenticate internal routes with the service key ([#62](https://github.com/Solierrr/api-messenger/issues/62)) ([5f1a5b8](https://github.com/Solierrr/api-messenger/commit/5f1a5b8f3434fe8e9b4fc924f9c7090f53689d28))
+* bring project communities and query the project authority with the service key ([#61](https://github.com/Solierrr/api-messenger/issues/61)) ([3c0e1c0](https://github.com/Solierrr/api-messenger/commit/3c0e1c0efb1e145539936a5822d0c4b5e6db1218))
+* **nps:** add POST /messaging/nps for chatbot conversations ([#59](https://github.com/Solierrr/api-messenger/issues/59)) ([95aaac3](https://github.com/Solierrr/api-messenger/commit/95aaac3acaa80982df920913acd124ba3f63bd85))
+
+
+### Bug Fixes
+
+* complete bruno observability example ([99e26a0](https://github.com/Solierrr/api-messenger/commit/99e26a05db52f07404d1d841157217a0141fdba2))
+* fall back to the own service key name ([#63](https://github.com/Solierrr/api-messenger/issues/63)) ([640488b](https://github.com/Solierrr/api-messenger/commit/640488b4298275909fb216bf9163a67f4aca8bf3))
+
 ## [3.1.0](https://github.com/Solierrr/api-messenger/compare/v3.0.0...v3.1.0) (2026-09-30)
 
 
