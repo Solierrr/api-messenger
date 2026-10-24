@@ -12,7 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 @Tag(
     name = "Mensagens do chatbot (interno)",
-    description = "Publicação da resposta do bot numa conversa. Endpoint interno, em /internal/messages, protegido por X-Service-Key (ai-assistant, ai-operational ou ai-geographic)."
+    description = "Publicação da resposta do bot numa conversa. Endpoint interno, em /internal/messages, alcançável apenas pela rede interna (nunca via Kong)."
 )
 public interface ChatbotMessageOpenApi {
 

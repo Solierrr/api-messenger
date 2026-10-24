@@ -10,10 +10,6 @@ post {
   auth: none
 }
 
-headers {
-  X-Service-Key: {{serviceKey}}
-}
-
 body:json {
   {
     "conversationId": "{{conversationId}}",
@@ -23,6 +19,6 @@ body:json {
 
 docs {
   Publica a resposta do bot numa conversa existente
-  messageType é sempre CHATBOT_TO_USER e role sempre "assistant" Rota interna: exige X-Service-Key de um agente de IA (ai-assistant, ai-operational ou ai-geographic).
+  messageType é sempre CHATBOT_TO_USER e role sempre "assistant" Rota interna: a aplicação não exige Bearer; restrinja o acesso pela rede.
   This operation may change server state.
 }

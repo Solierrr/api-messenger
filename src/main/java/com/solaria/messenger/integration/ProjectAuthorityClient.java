@@ -1,66 +1,59 @@
 package com.solaria.messenger.integration;
 
-import com.solaria.messenger.exception.*;
+import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.*;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
-import java.util.*;
+import com.solaria.messenger.exception.DependencyUnavailableException;
+import com.solaria.messenger.exception.ResourceNotFoundException;
+import com.solaria.messenger.exception.UnauthorizedAccessException;
 
+/**
+ * consulta a api-persistence para saber se um usuário é demandante do
+ * projeto técnico, antes de deixá-lo criar a comunidade desse projeto
+ *
+ * <p>
+ * Chamada síncrona, sem retry
+ * qualquer coisa além de 204/403/404 vira {@link DependencyUnavailableException} (503)
+ * </p>
+ */
 @Component
 public class ProjectAuthorityClient {
-    private final RestClient client;
-    private final String key;
 
-    public ProjectAuthorityClient(
-            RestClient persistenceRestClient,
-            @Value("${app.integration.persistence.service-key:}") String key) {
-        this.client = persistenceRestClient;
-        this.key = key;
+    private final RestClient persistenceRestClient;
+
+    public ProjectAuthorityClient(RestClient persistenceRestClient) {
+        this.persistenceRestClient = persistenceRestClient;
     }
 
-    public record Access(String role, boolean readOnly, Map<UUID, String> members, String name) {}
-
-    public Access access(UUID projectId, UUID authId) {
-        if (key.length() < 32)
-            throw new DependencyUnavailableException(
-                    "Project authority is not configured",
-                    new IllegalStateException("Missing service key"));
-        try {
-            var result =
-                    client.get()
-                            .uri("/internal/projects/{id}/access/{authId}", projectId, authId)
-                            .header("X-Service-Key", key)
-                            .retrieve()
-                            .body(Access.class);
-            if (result == null
-                    || result.role() == null
-                    || !Set.of("OWNER", "MANAGER", "MEMBER", "VIEWER").contains(result.role())
-                    || result.members() == null
-                    || !result.role().equals(result.members().get(authId)))
-                throw new UnauthorizedAccessException("Você não participa do projeto");
-            return result;
-        } catch (RestClientResponseException e) {
-            if (e.getStatusCode().value() == 403 || e.getStatusCode().value() == 404)
-                throw new UnauthorizedAccessException("Projeto indisponível");
-            throw new DependencyUnavailableException("Project authority unavailable", e);
-        } catch (ResourceAccessException e) {
-            throw new DependencyUnavailableException("Project authority unavailable", e);
-        }
-    }
-
+    /**
+     * @throws ResourceNotFoundException projeto ou usuário (authId) inexistente na api-persistence
+     * @throws UnauthorizedAccessException usuário não pertence à empresa demandante do projeto
+     * @throws DependencyUnavailableException timeout, erro de rede ou resposta 5xx/inesperada
+     */
     public void requireRequester(UUID projectId, UUID authId) {
-        var a = access(projectId, authId);
-        if (!"OWNER".equals(a.role()) && !"MANAGER".equals(a.role()))
-            throw new UnauthorizedAccessException(
-                    "Apenas responsáveis podem gerenciar a comunidade");
-    }
-
-    public Access write(UUID projectId, UUID authId) {
-        var a = access(projectId, authId);
-        if (a.readOnly() || "VIEWER".equals(a.role()))
-            throw new UnauthorizedAccessException("Projeto disponível apenas para consulta");
-        return a;
+        try {
+            persistenceRestClient.get()
+                    .uri("/internal/technical-projects/{projectId}/requester-access/{authId}", projectId, authId)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RestClientResponseException ex) {
+            switch (ex.getStatusCode().value()) {
+                case 403 -> throw new UnauthorizedAccessException(
+                        "Apenas o demandante do projeto pode criar a comunidade.");
+                case 404 -> throw new ResourceNotFoundException(
+                        "Projeto ou usuário não encontrado na api-persistence: " + projectId);
+                default -> throw new DependencyUnavailableException(
+                        "api-persistence respondeu " + ex.getStatusCode().value()
+                                + " ao verificar o demandante do projeto " + projectId, ex);
+            }
+        } catch (ResourceAccessException ex) {
+            // timeout de conexão/leitura ou erro de rede /  api-persistence não respondeu a tempo
+            throw new DependencyUnavailableException(
+                    "api-persistence indisponível ao verificar o demandante do projeto " + projectId, ex);
+        }
     }
 }

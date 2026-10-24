@@ -1,5 +1,10 @@
 package com.solaria.messenger.openapi;
 
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.http.ResponseEntity;
+
 import com.solaria.messenger.dto.request.CommunityConversationRequestDTO;
 import com.solaria.messenger.dto.request.CommunityMembersRequestDTO;
 import com.solaria.messenger.dto.request.CommunityRequestDTO;
@@ -12,25 +17,21 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
-import org.springframework.http.ResponseEntity;
-
-import java.util.List;
-import java.util.UUID;
-
 @Tag(name = "Comunidades", description = "Comunidade do projeto, espaço tipo slack")
 public interface CommunityOpenApi {
 
     @Operation(
-            summary = "Cria a comunidade de um projeto",
-            description =
-                    "Inicializa ou retorna a comunidade privada do projeto. Participantes e papéis"
-                        + " vêm da API Core; o criador não recebe privilégios adicionais. Exige"
-                        + " participação atual no projeto.")
+        summary = "Cria a comunidade de um projeto",
+        description = "Quem cria vira OWNER | memberIds opcionais entram como MEMBER | Uma comunidade por projeto. "
+        + "Só o demandante do projeto pode criar "
+    )
     @ApiResponses({
-        @ApiResponse(responseCode = "201", description = "Comunidade criada"),
-        @ApiResponse(responseCode = "400", description = "Dados de entrada inválidos"),
-        @ApiResponse(responseCode = "403", description = "Usuário não participa do projeto"),
-        @ApiResponse(responseCode = "503", description = "Autoridade da API Core indisponível")
+            @ApiResponse(responseCode = "201", description = "Comunidade criada"),
+            @ApiResponse(responseCode = "400", description = "Dados de entrada inválidos"),
+            @ApiResponse(responseCode = "403", description = "Usuário autenticado não é o demandante do projeto"),
+            @ApiResponse(responseCode = "404", description = "Projeto não encontrado na api-persistence"),
+            @ApiResponse(responseCode = "409", description = "Já existe uma comunidade para o projeto"),
+            @ApiResponse(responseCode = "503", description = "api-persistence indisponível para verificar o demandante")
     })
     ResponseEntity<CommunityResponseDTO> createCommunity(CommunityRequestDTO dto);
 
@@ -40,83 +41,76 @@ public interface CommunityOpenApi {
 
     @Operation(summary = "Busca uma comunidade pelo identificador (só membros)")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Comunidade encontrada"),
-        @ApiResponse(
-                responseCode = "403",
-                description = "O usuário autenticado não participa desta comunidade"),
-        @ApiResponse(responseCode = "404", description = "Comunidade não encontrada")
+            @ApiResponse(responseCode = "200", description = "Comunidade encontrada"),
+            @ApiResponse(responseCode = "403", description = "O usuário autenticado não participa desta comunidade"),
+            @ApiResponse(responseCode = "404", description = "Comunidade não encontrada")
     })
     ResponseEntity<CommunityResponseDTO> findById(String id);
 
     @Operation(summary = "Busca a comunidade de um projeto (só membros)")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Comunidade encontrada"),
-        @ApiResponse(
-                responseCode = "403",
-                description = "O usuário autenticado não participa desta comunidade"),
-        @ApiResponse(responseCode = "404", description = "Comunidade não encontrada para o projeto")
+            @ApiResponse(responseCode = "200", description = "Comunidade encontrada"),
+            @ApiResponse(responseCode = "403", description = "O usuário autenticado não participa desta comunidade"),
+            @ApiResponse(responseCode = "404", description = "Comunidade não encontrada para o projeto")
     })
     ResponseEntity<CommunityResponseDTO> findByProjectId(UUID projectId);
 
     @Operation(
-            summary = "Atualiza a comunidade",
-            description =
-                    "Contrato legado: gerencie a situação pela API Core. Alterações diretas"
-                        + " retornam 422.")
-    @ApiResponses(
-            @ApiResponse(
-                    responseCode = "422",
-                    description = "Use a API Core para gerenciar a situação"))
+        summary = "Atualiza a comunidade",
+        description = " unico campo editável é o status | alterar para ARCHIVED exige OWNER"
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Comunidade atualizada"),
+            @ApiResponse(responseCode = "403", description = "Papel insuficiente na comunidade"),
+            @ApiResponse(responseCode = "404", description = "Comunidade não encontrada")
+    })
     ResponseEntity<CommunityResponseDTO> updateCommunity(String id, CommunityUpdateRequestDTO dto);
 
     @Operation(
-            summary = "Adiciona/altera papel de membros",
-            description =
-                    "Contrato legado: gerencie participantes e papéis pela API Core. Alterações"
-                        + " diretas retornam 422.")
-    @ApiResponses(
-            @ApiResponse(
-                    responseCode = "422",
-                    description = "Use a API Core para gerenciar participantes"))
+        summary = "Adiciona/altera papel de membros",
+        description = "Adicionar MEMBER exige ADMIN | conceder ADMIN exige OWNER"
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Membros adicionados"),
+            @ApiResponse(responseCode = "403", description = "Papel insuficiente na comunidade"),
+            @ApiResponse(responseCode = "404", description = "Comunidade não encontrada"),
+            @ApiResponse(responseCode = "422", description = "Comunidade arquivada ou papel OWNER solicitado")
+    })
     ResponseEntity<CommunityResponseDTO> addMembers(String id, CommunityMembersRequestDTO dto);
 
     @Operation(
-            summary = "Remove um membro | sair da comunidade",
-            description =
-                    "Contrato legado: remova a participação pela API Core. Alterações diretas"
-                        + " retornam 422. A remoção bloqueia novas leituras, envios e entregas"
-                        + " WebSocket; o histórico permanece para os demais participantes.")
-    @ApiResponses(
-            @ApiResponse(
-                    responseCode = "422",
-                    description = "Use a API Core para remover participantes"))
+        summary = "Remove um membro | sair da comunidade",
+        description = "Cada um pode sair | remover outros exige OWNER/ADMIN | OWNER não pode ser removido nem sair. "
+                + "A remoção não é retroativa (F-06): o usuário continua participante das conversas "
+                + "em que já estava (histórico e mensagens futuras nesses grupos não são afetados) - "
+                + "só deixa de poder listar os subgrupos da comunidade e de ser adicionado a novos."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Membro removido"),
+            @ApiResponse(responseCode = "403", description = "Sem permissão para remover esse membro"),
+            @ApiResponse(responseCode = "404", description = "Comunidade ou membro não encontrado"),
+            @ApiResponse(responseCode = "422", description = "Tentativa de remover o OWNER")
+    })
     ResponseEntity<CommunityResponseDTO> removeMember(String id, UUID userId);
 
     @Operation(
-            summary = "Inicia uma conversa em grupo entre membros da comunidade",
-            description =
-                    "participantIds opcional -> sem ele, entram todos os membros | se informado"
-                        + " apenas os IDs entram. O criador entra sempre.")
+        summary = "Inicia uma conversa em grupo entre membros da comunidade",
+        description = "participantIds opcional -> sem ele, entram todos os membros | se informado apenas os IDs entram. "
+                + "O criador entra sempre."
+    )
     @ApiResponses({
-        @ApiResponse(responseCode = "201", description = "Conversa em grupo criada"),
-        @ApiResponse(
-                responseCode = "403",
-                description = "O usuário autenticado não participa desta comunidade"),
-        @ApiResponse(responseCode = "404", description = "Comunidade não encontrada"),
-        @ApiResponse(
-                responseCode = "422",
-                description = "Comunidade arquivada ou participante fora da comunidade")
+            @ApiResponse(responseCode = "201", description = "Conversa em grupo criada"),
+            @ApiResponse(responseCode = "403", description = "O usuário autenticado não participa desta comunidade"),
+            @ApiResponse(responseCode = "404", description = "Comunidade não encontrada"),
+            @ApiResponse(responseCode = "422", description = "Comunidade arquivada ou participante fora da comunidade")
     })
-    ResponseEntity<ConversationResponseDTO> startConversation(
-            String id, CommunityConversationRequestDTO dto);
+    ResponseEntity<ConversationResponseDTO> startConversation(String id, CommunityConversationRequestDTO dto);
 
     @Operation(summary = "Lista as conversas em grupo de uma comunidade (só membros)")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso"),
-        @ApiResponse(
-                responseCode = "403",
-                description = "O usuário autenticado não participa desta comunidade"),
-        @ApiResponse(responseCode = "404", description = "Comunidade não encontrada")
+            @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso"),
+            @ApiResponse(responseCode = "403", description = "O usuário autenticado não participa desta comunidade"),
+            @ApiResponse(responseCode = "404", description = "Comunidade não encontrada")
     })
     ResponseEntity<List<ConversationResponseDTO>> listConversations(String id);
 }

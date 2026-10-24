@@ -5,11 +5,9 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
-import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -18,7 +16,6 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -42,7 +39,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @EnableWebSecurity
 
 // Liga as classes com @ConfigurationProperties como Beans
-@EnableConfigurationProperties({ JwtProperties.class, ServiceKeyProperties.class })
+@EnableConfigurationProperties(JwtProperties.class)
 public class SecurityConfig {
 
         private final JwtProperties jwtProperties;
@@ -67,12 +64,7 @@ public class SecurityConfig {
         @Bean
         // @Order(1)-> esta chain é avaliada ANTES da chain @Order(2), por path mais específico
         @Order(1)
-        public SecurityFilterChain internalSecurityFilterChain(HttpSecurity http,
-                        ServiceKeyAuthFilter serviceKeyAuthFilter) throws Exception {
-                String[] agents = {
-                                ServiceKeyAuthFilter.authorityOf("ai-assistant"),
-                                ServiceKeyAuthFilter.authorityOf("ai-operational"),
-                                ServiceKeyAuthFilter.authorityOf("ai-geographic") };
+        public SecurityFilterChain internalSecurityFilterChain(HttpSecurity http) throws Exception {
                 http
                                 // Restringe essa chain apenas para /internal/**
                                 .securityMatcher("/internal/**")
@@ -82,17 +74,8 @@ public class SecurityConfig {
                                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                                 // CorsConfigurationSource é a mesma para as duas chains
                                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                                .addFilterBefore(serviceKeyAuthFilter, AnonymousAuthenticationFilter.class)
-                                .authorizeHttpRequests(auth -> auth
-                                                .requestMatchers("/internal/messages", "/internal/messages/**",
-                                                                "/internal/observability", "/internal/observability/**")
-                                                .hasAnyAuthority(agents)
-                                                .anyRequest().denyAll())
-                                .exceptionHandling(e -> e
-                                                .authenticationEntryPoint(problemDetailAuthenticationEntryPoint)
-                                                .accessDeniedHandler((request, response, ex) -> problemDetailAuthenticationEntryPoint
-                                                                .commence(request, response, new InsufficientAuthenticationException(
-                                                                                "Chave de serviço ausente ou inválida", ex))));
+                                // Rotas internas de rede-> sem autenticação de aplicação
+                                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
                 // Constrói e devolve a SecurityFilterChain configurada acima como o bean deste método
                 return http.build();
         }
@@ -133,20 +116,6 @@ public class SecurityConfig {
                 // Constrói e devolve a SecurityFilterChain configurada acima como o bean deste método.
                 return http.build();
         }
-
-        @Bean
-        public ServiceKeyAuthFilter serviceKeyAuthFilter(ServiceKeyProperties serviceKeyProperties) {
-                return new ServiceKeyAuthFilter(serviceKeyProperties);
-        }
-
-        @Bean
-        public FilterRegistrationBean<ServiceKeyAuthFilter> serviceKeyAuthFilterRegistration(
-                        ServiceKeyAuthFilter filter) {
-                FilterRegistrationBean<ServiceKeyAuthFilter> registration = new FilterRegistrationBean<>(filter);
-                registration.setEnabled(false);
-                return registration;
-        }
-
         // Registra o objeto retornado como um Bean
         @Bean
         public JwtDecoder userJwtDecoder() {

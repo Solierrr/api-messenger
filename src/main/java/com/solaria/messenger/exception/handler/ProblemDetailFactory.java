@@ -16,6 +16,8 @@ import jakarta.servlet.http.HttpServletRequest;
 @Component
 public class ProblemDetailFactory {
 
+    private static final String TYPE_BASE = "https://solier.com/errors/";
+
     // cria corpo do json a partir da classe ProblemDetail
     public ProblemDetail create(HttpStatusCode status,
                                 String detail,
@@ -24,6 +26,7 @@ public class ProblemDetailFactory {
                                 HttpServletRequest request) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
         problem.setTitle(errorCode);
+        problem.setType(URI.create(TYPE_BASE + toKebabCase(errorCode)));
         if (request != null) {
             problem.setInstance(URI.create(request.getRequestURI()));
         }
@@ -35,4 +38,12 @@ public class ProblemDetailFactory {
         return problem;
     }
 
+    // Método de apoio para transformar ERROR_CODE em URL
+
+    private static String toKebabCase(String errorCode) {
+        if (errorCode == null || errorCode.isBlank()) {
+            return "unknown";
+        }
+        return errorCode.toLowerCase().replace('_', '-');
+    }
 }
