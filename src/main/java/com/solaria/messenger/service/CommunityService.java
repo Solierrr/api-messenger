@@ -1,15 +1,5 @@
 package com.solaria.messenger.service;
 
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
-
-import org.springframework.stereotype.Service;
-
 import com.solaria.messenger.dto.request.CommunityConversationRequestDTO;
 import com.solaria.messenger.dto.request.CommunityMembersRequestDTO;
 import com.solaria.messenger.dto.request.CommunityRequestDTO;
@@ -18,7 +8,6 @@ import com.solaria.messenger.dto.response.CommunityMemberDTO;
 import com.solaria.messenger.dto.response.CommunityResponseDTO;
 import com.solaria.messenger.dto.response.ConversationResponseDTO;
 import com.solaria.messenger.exception.BusinessRuleException;
-import com.solaria.messenger.exception.DuplicateResourceException;
 import com.solaria.messenger.exception.InvalidFieldException;
 import com.solaria.messenger.exception.ResourceNotFoundException;
 import com.solaria.messenger.exception.UnauthorizedAccessException;
@@ -30,9 +19,18 @@ import com.solaria.messenger.model.enums.CommunityStatus;
 import com.solaria.messenger.repository.CommunityRepository;
 import com.solaria.messenger.security.rbac.RbacAuthorizationService;
 
+import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
 /**
- * service da comunidade do projeto
- * Toda operação é autorizada pelo papel ({@link CommunityRole}) do usuário
+ * service da comunidade do projeto Toda operação é autorizada pelo papel ({@link CommunityRole}) do
+ * usuário
  */
 @Service
 public class CommunityService {
@@ -42,7 +40,8 @@ public class CommunityService {
     private final RbacAuthorizationService rbac;
     private final ProjectAuthorityClient projectAuthorityClient;
 
-    public CommunityService(CommunityRepository communityRepository,
+    public CommunityService(
+            CommunityRepository communityRepository,
             ConversationService conversationService,
             RbacAuthorizationService rbac,
             ProjectAuthorityClient projectAuthorityClient) {
@@ -52,29 +51,20 @@ public class CommunityService {
         this.projectAuthorityClient = projectAuthorityClient;
     }
 
-
     public CommunityResponseDTO createCommunity(CommunityRequestDTO dto) {
         UUID currentUserId = rbac.currentUserId();
 
-        projectAuthorityClient.requireRequester(dto.getProjectId(), currentUserId);
-
-        if (communityRepository.existsByProjectId(dto.getProjectId())) {
-            throw new DuplicateResourceException(
-                    "Já existe uma comunidade para o projeto: " + dto.getProjectId());
+        var authority = projectAuthorityClient.access(dto.getProjectId(), currentUserId);
+        var existing = communityRepository.findByProjectId(dto.getProjectId());
+        if (existing.isPresent()) {
+            sync(existing.get(), authority);
+            return toResponse(existing.get());
         }
-
         Instant now = Instant.now();
-
-        List<CommunityMember> members = new ArrayList<>();
-        members.add(CommunityMember.of(currentUserId, CommunityRole.OWNER, now));
-        if (dto.getMemberIds() != null) {
-            dto.getMemberIds().stream()
-                    .filter(Objects::nonNull)
-                    .filter(id -> !id.equals(currentUserId))
-                    .distinct()
-                    .forEach(id -> members.add(CommunityMember.of(id, CommunityRole.MEMBER, now)));
-        }
-
+        List<CommunityMember> members =
+                authority.members().entrySet().stream()
+                        .map(e -> CommunityMember.of(e.getKey(), mappedRole(e.getValue()), now))
+                        .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
         ProjectCommunity community = new ProjectCommunity();
         community.setProjectId(dto.getProjectId());
         community.setMembers(members);
@@ -83,7 +73,9 @@ public class CommunityService {
         community.setCreatedAt(now);
         community.setUpdatedAt(now);
 
-        return toResponse(communityRepository.save(community));
+        communityRepository.save(community);
+        sync(community, authority);
+        return toResponse(community);
     }
 
     public CommunityResponseDTO findById(String id) {
@@ -93,94 +85,53 @@ public class CommunityService {
     }
 
     public CommunityResponseDTO findByProjectId(UUID projectId) {
-        ProjectCommunity community = communityRepository.findByProjectId(projectId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Comunidade não encontrada para o projeto: " + projectId));
+        ProjectCommunity community =
+                communityRepository
+                        .findByProjectId(projectId)
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Comunidade não encontrada para o projeto: "
+                                                        + projectId));
         requireMember(community);
         return toResponse(community);
     }
 
     public List<CommunityResponseDTO> findMine() {
-        return communityRepository.findAllByMemberId(rbac.currentUserId())
-                .stream()
+        return communityRepository.findAllByMemberId(rbac.currentUserId()).stream()
+                .filter(
+                        c -> {
+                            try {
+                                requireMember(c);
+                                return true;
+                            } catch (com.solaria.messenger.exception.BusinessException e) {
+                                return false;
+                            }
+                        })
                 .map(this::toResponse)
                 .toList();
     }
 
     public CommunityResponseDTO updateCommunity(String id, CommunityUpdateRequestDTO dto) {
-        ProjectCommunity community = requireEntityById(id);
-        requireMember(community);
-
-        if (dto.getStatus() != null) {
-            requireOwner(community);
-            community.setStatus(dto.getStatus());
-        }
-
-        community.setUpdatedAt(Instant.now());
-        return toResponse(communityRepository.save(community));
+        throw new BusinessRuleException("Gerencie participantes e situação pela página do projeto");
     }
 
-
     public CommunityResponseDTO addMembers(String id, CommunityMembersRequestDTO dto) {
-        ProjectCommunity community = requireEntityById(id);
-
-        CommunityRole role = dto.getRole() != null ? dto.getRole() : CommunityRole.MEMBER;
-        if (role == CommunityRole.OWNER) {
-            throw new InvalidFieldException("Não é possível atribuir o papel OWNER.");
-        }
-        if (role == CommunityRole.ADMIN) {
-            requireOwner(community);
-        } else {
-            requireAdmin(community);
-        }
-        requireActive(community);
-
-        Instant now = Instant.now();
-        for (UUID userId : dto.getUserIds()) {
-            if (userId == null) {
-                continue;
-            }
-            community.member(userId).ifPresentOrElse(existing -> {
-                if (existing.getRole() != CommunityRole.OWNER) {
-                    existing.setRole(role);
-                }
-            }, () -> community.getMembers().add(CommunityMember.of(userId, role, now)));
-        }
-
-        community.setUpdatedAt(now);
-        return toResponse(communityRepository.save(community));
+        throw new BusinessRuleException("Gerencie participantes e situação pela página do projeto");
     }
 
     public CommunityResponseDTO removeMember(String id, UUID userId) {
-        ProjectCommunity community = requireEntityById(id);
-        UUID currentUserId = rbac.currentUserId();
-
-        CommunityMember target = community.member(userId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Usuário não é membro da comunidade: " + userId));
-
-        if (target.getRole() == CommunityRole.OWNER) {
-            throw new BusinessRuleException(
-                    "O dono da comunidade não pode ser removido. Arquive a comunidade ou transfira a posse antes.");
-        }
-
-        boolean leavingSelf = currentUserId.equals(userId);
-        if (!leavingSelf && !community.isAdmin(currentUserId)) {
-            throw new UnauthorizedAccessException(
-                    "Apenas OWNER/ADMIN podem remover outros membros da comunidade.");
-        }
-
-        community.getMembers().removeIf(m -> m.getUserId().equals(userId));
-        community.setUpdatedAt(Instant.now());
-        return toResponse(communityRepository.save(community));
+        throw new BusinessRuleException("Gerencie participantes e situação pela página do projeto");
     }
 
     // conversas da comunidade
 
-    public ConversationResponseDTO startConversation(String id, CommunityConversationRequestDTO dto) {
+    public ConversationResponseDTO startConversation(
+            String id, CommunityConversationRequestDTO dto) {
         ProjectCommunity community = requireEntityById(id);
         requireMember(community);
         requireActive(community);
+        projectAuthorityClient.write(community.getProjectId(), rbac.currentUserId());
 
         UUID currentUserId = rbac.currentUserId();
         Set<UUID> memberIds = community.memberIds();
@@ -196,14 +147,16 @@ public class CommunityService {
                 }
                 if (!memberIds.contains(participantId)) {
                     throw new BusinessRuleException(
-                            "Todos os participantes precisam ser membros da comunidade: " + participantId);
+                            "Todos os participantes precisam ser membros da comunidade: "
+                                    + participantId);
                 }
                 participants.add(participantId);
             }
         }
 
         if (participants.size() < 2) {
-            throw new InvalidFieldException("Um grupo precisa de ao menos 2 participantes distintos.");
+            throw new InvalidFieldException(
+                    "Um grupo precisa de ao menos 2 participantes distintos.");
         }
 
         return conversationService.createCommunityGroupConversation(
@@ -216,21 +169,47 @@ public class CommunityService {
         return conversationService.findByCommunity(community.getId());
     }
 
-
     public ProjectCommunity requireEntityById(String id) {
-        return communityRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Comunidade não encontrada com id: " + id));
+        return communityRepository
+                .findById(id)
+                .orElseThrow(
+                        () ->
+                                new ResourceNotFoundException(
+                                        "Comunidade não encontrada com id: " + id));
     }
 
     private void requireMember(ProjectCommunity community) {
-        if (!community.isMember(rbac.currentUserId())) {
-            throw new UnauthorizedAccessException("O usuário autenticado não participa desta comunidade.");
-        }
+        sync(
+                community,
+                projectAuthorityClient.access(community.getProjectId(), rbac.currentUserId()));
+    }
+
+    private CommunityRole mappedRole(String role) {
+        return switch (role) {
+            case "OWNER" -> CommunityRole.OWNER;
+            case "MANAGER" -> CommunityRole.ADMIN;
+            case "VIEWER" -> CommunityRole.VIEWER;
+            default -> CommunityRole.MEMBER;
+        };
+    }
+
+    private void sync(ProjectCommunity c, ProjectAuthorityClient.Access a) {
+        var now = Instant.now();
+        c.setMembers(
+                a.members().entrySet().stream()
+                        .map(e -> CommunityMember.of(e.getKey(), mappedRole(e.getValue()), now))
+                        .collect(java.util.stream.Collectors.toCollection(ArrayList::new)));
+        c.setStatus(a.readOnly() ? CommunityStatus.ARCHIVED : CommunityStatus.ACTIVE);
+        c.setUpdatedAt(now);
+        communityRepository.save(c);
+        conversationService.ensureGeneral(
+                c.getId(), a.name(), c.getCreatedBy(), a.members().keySet());
     }
 
     private void requireAdmin(ProjectCommunity community) {
         if (!community.isAdmin(rbac.currentUserId())) {
-            throw new UnauthorizedAccessException("Esta ação exige papel OWNER ou ADMIN na comunidade.");
+            throw new UnauthorizedAccessException(
+                    "Esta ação exige papel OWNER ou ADMIN na comunidade.");
         }
     }
 
@@ -247,14 +226,18 @@ public class CommunityService {
     }
 
     private CommunityResponseDTO toResponse(ProjectCommunity community) {
-        List<CommunityMemberDTO> members = community.getMembers() == null ? List.of()
-                : community.getMembers().stream()
-                        .map(m -> CommunityMemberDTO.builder()
-                                .userId(m.getUserId())
-                                .role(m.getRole())
-                                .joinedAt(m.getJoinedAt())
-                                .build())
-                        .toList();
+        List<CommunityMemberDTO> members =
+                community.getMembers() == null
+                        ? List.of()
+                        : community.getMembers().stream()
+                                .map(
+                                        m ->
+                                                CommunityMemberDTO.builder()
+                                                        .userId(m.getUserId())
+                                                        .role(m.getRole())
+                                                        .joinedAt(m.getJoinedAt())
+                                                        .build())
+                                .toList();
 
         return CommunityResponseDTO.builder()
                 .id(community.getId())

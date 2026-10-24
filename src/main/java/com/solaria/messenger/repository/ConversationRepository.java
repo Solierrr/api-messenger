@@ -14,4 +14,6 @@ public interface ConversationRepository extends MongoRepository<Conversation, St
 
     List<Conversation> findByCommunityIdAndParticipantIdsContainingOrderByLastInteractionAtDesc(
             String communityId, UUID userId);
+
+    java.util.Optional<Conversation> findByCommunityIdAndProjectGeneralTrue(String communityId);
 }

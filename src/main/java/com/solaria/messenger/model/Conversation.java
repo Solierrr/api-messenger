@@ -54,6 +54,7 @@ public class Conversation {
     @Indexed
     @Field("community_id")
     private String communityId;
+    private boolean projectGeneral;
 
     @Field("user_type")
     private String userType;
