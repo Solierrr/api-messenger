@@ -44,7 +44,7 @@ public class ProblemDetailAuthenticationEntryPoint implements AuthenticationEntr
     public void commence(HttpServletRequest request, HttpServletResponse response,
             AuthenticationException authException) throws IOException {
         HttpObservationErrors.mark(request, authException);
-        log.atWarn().addKeyValue("errorCode", "UNAUTHENTICATED").log("401 em {} {}: {}", request.getMethod(), request.getRequestURI(), authException.getMessage());
+        log.warn("401 em {} {}: {}", request.getMethod(), request.getRequestURI(), authException.getMessage());
 
         // cria corpo do json a partir da classe ProblemDetail
         ProblemDetail problem = problemDetailFactory.create(

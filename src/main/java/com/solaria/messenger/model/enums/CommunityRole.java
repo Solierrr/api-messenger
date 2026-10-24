@@ -15,6 +15,5 @@ package com.solaria.messenger.model.enums;
 public enum CommunityRole {
     OWNER,
     ADMIN,
-    MEMBER,
-    VIEWER
+    MEMBER
 }

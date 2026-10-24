@@ -88,8 +88,6 @@ public class SessionRegistryService {
         });
     }
 
-    public String userForSession(String sessionId){return sessionsByUser.entrySet().stream().filter(e->e.getValue().containsKey(sessionId)).map(Map.Entry::getKey).findFirst().orElse(null);}
-
     /** Existe alguma sessao ativa deste usuario. */
     public boolean isOnline(String userId) {
         return sessionCount(userId) > 0;
