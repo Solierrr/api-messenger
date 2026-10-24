@@ -15,7 +15,7 @@ public class ProjectAuthorityClient {
 
     public ProjectAuthorityClient(
             RestClient persistenceRestClient,
-            @Value("${app.integration.persistence.project-key:}") String key) {
+            @Value("${app.integration.persistence.service-key:}") String key) {
         this.client = persistenceRestClient;
         this.key = key;
     }
@@ -31,7 +31,7 @@ public class ProjectAuthorityClient {
             var result =
                     client.get()
                             .uri("/internal/projects/{id}/access/{authId}", projectId, authId)
-                            .header("X-Project-Service-Key", key)
+                            .header("X-Service-Key", key)
                             .retrieve()
                             .body(Access.class);
             if (result == null

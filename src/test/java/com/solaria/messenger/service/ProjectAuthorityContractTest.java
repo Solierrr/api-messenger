@@ -29,7 +29,7 @@ class ProjectAuthorityContractTest {
                                         + project
                                         + "/access/"
                                         + user))
-                .andExpect(header("X-Project-Service-Key", key))
+                .andExpect(header("X-Service-Key", key))
                 .andRespond(
                         withSuccess(
                                 "{\"role\":\"MEMBER\",\"readOnly\":false,\"members\":{\""
