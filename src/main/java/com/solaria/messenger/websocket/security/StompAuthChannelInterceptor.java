@@ -35,7 +35,7 @@ import com.solaria.messenger.websocket.exception.StompAuthenticationException;
  * <p>
  * A autenticação acontece no primeiro frame ({@code CONNECT}), pelo header {@code Authorization}, com o mesmo
  * {@link JwtDecoder} do HTTP. O {@link Jwt} fica guardado na sessão STOMP e os frames seguintes não decodificam
- * o token de novo. A expiração é conferida em todo frame; user ativo na Auth só no CONNECT;
+ * o token de novo. A expiração é conferida em cada frame; user ativo na Auth só no CONNECT;
  * participação na conversa em SEND/SUBSCRIBE.
  * </p>
  * <ul>

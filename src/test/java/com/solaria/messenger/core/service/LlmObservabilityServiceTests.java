@@ -1,4 +1,4 @@
-package com.solaria.messenger.service;
+package com.solaria.messenger.core.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -15,12 +15,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.solaria.messenger.dto.request.LlmObservabilityRequestDTO;
-import com.solaria.messenger.dto.response.LlmObservabilityResponseDTO;
-import com.solaria.messenger.model.LlmObservability;
-import com.solaria.messenger.model.enums.Environment;
-import com.solaria.messenger.model.enums.ObservabilityStepType;
-import com.solaria.messenger.repository.LlmObservabilityRepository;
+import com.solaria.messenger.core.contract.request.LlmObservabilityRequestDTO;
+import com.solaria.messenger.core.contract.response.LlmObservabilityResponseDTO;
+import com.solaria.messenger.core.model.LlmObservability;
+import com.solaria.messenger.core.model.enums.Environment;
+import com.solaria.messenger.core.model.enums.ObservabilityStepType;
+import com.solaria.messenger.core.repository.LlmObservabilityRepository;
 
 @ExtendWith(MockitoExtension.class)
 class LlmObservabilityServiceTests {

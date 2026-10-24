@@ -79,7 +79,7 @@ public class MessageWebSocketController {
         // valida regra de negócios e insere no MongoDB
         MessageResponseDTO response = messageService.sendUserMessage(dto);
 
-        // tenta enviar ACK para {@code /user/queue/acks}
+        // tenta enviar o ACK na fila de acks do remetente
         WsEventEnvelope ack = WsEventEnvelope.builder()
                 .type("MESSAGE_ACK")
                 .conversationId(response.getConversationId())

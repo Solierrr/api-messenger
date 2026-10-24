@@ -73,6 +73,6 @@ public class MessageQueryService {
         if (requested == null) {
             return DEFAULT_MESSAGE_PAGE_SIZE;
         }
-        return Math.max(1, Math.min(requested, MAX_MESSAGE_PAGE_SIZE));
+        return Math.clamp(requested, 1, MAX_MESSAGE_PAGE_SIZE);
     }
 }

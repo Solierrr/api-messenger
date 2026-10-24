@@ -28,7 +28,7 @@ import com.solaria.messenger.websocket.event.SessionPresenceChanged;
  * <p>
  * Guarda cada conexão física, controla a admissão (até 4 sessões por user) e calcula a presença online/offline.
  * A identidade é gravada antes da consulta à Auth, para que uma remoção alcance também conexões com CONNECT em andamento.
- * Todo acesso ao mapa acontece sob o monitor ({@code synchronized}) do próprio registro.
+ * Cada acesso ao mapa acontece sob o monitor ({@code synchronized}) do próprio registro.
  * </p>
  * <ul>
  *     <li>{@link #capture(WebSocketSession)} -> registra a conexão física.</li>
@@ -48,7 +48,7 @@ public class LocalWebSocketSessionRegistry {
     private final ApplicationEventPublisher events;
     private final String presenceEpoch = UUID.randomUUID().toString();
     private long presenceVersion;
-    private final ExecutorService closes = Executors.newVirtualThreadPerTaskExecutor();
+    private final ExecutorService closes = Executors.newCachedThreadPool();
 
     public LocalWebSocketSessionRegistry(ApplicationEventPublisher events) {
         this.events = events;
@@ -188,7 +188,7 @@ public class LocalWebSocketSessionRegistry {
         return session.admitted && !session.revoked;
     }
 
-    /** Fecha o socket numa thread virtual e limpa o registro se ele de fato fechou */
+    /** Fecha o socket numa thread separada e limpa o registro se ele de fato fechou */
     private void close(LocalSession session) {
         closes.execute(() -> {
             try {

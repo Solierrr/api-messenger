@@ -33,6 +33,9 @@ import com.solaria.messenger.core.model.ConversationUserState;
 @Repository
 public class ConversationUserStateRepository {
 
+    private static final String CONVERSATION_ID = "conversationId";
+    private static final String USER_ID = "userId";
+
     private final MongoTemplate mongoTemplate;
 
     public ConversationUserStateRepository(MongoTemplate mongoTemplate) {
@@ -41,8 +44,8 @@ public class ConversationUserStateRepository {
 
     /** Estado pessoal de um participante numa conversa. */
     public Optional<ConversationUserState> findByConversationIdAndUserId(String conversationId, UUID userId) {
-        Query query = Query.query(Criteria.where("conversationId").is(conversationId)
-                .and("userId").is(userId));
+        Query query = Query.query(Criteria.where(CONVERSATION_ID).is(conversationId)
+                .and(USER_ID).is(userId));
         return Optional.ofNullable(mongoTemplate.findOne(query, ConversationUserState.class));
     }
 
@@ -51,16 +54,16 @@ public class ConversationUserStateRepository {
         if (conversationIds == null || conversationIds.isEmpty()) {
             return List.of();
         }
-        Query query = Query.query(Criteria.where("userId").is(userId)
-                .and("conversationId").in(conversationIds));
+        Query query = Query.query(Criteria.where(USER_ID).is(userId)
+                .and(CONVERSATION_ID).in(conversationIds));
         return mongoTemplate.find(query, ConversationUserState.class);
     }
 
     /** Carrega os estados de um lote de projeções sem uma consulta por destinatário. */
     public List<ConversationUserState> findByUsersAndConversations(Set<UUID> users, Set<String> conversations) {
         if (users.isEmpty() || conversations.isEmpty()) return List.of();
-        return mongoTemplate.find(Query.query(Criteria.where("userId").in(users)
-                .and("conversationId").in(conversations)), ConversationUserState.class);
+        return mongoTemplate.find(Query.query(Criteria.where(USER_ID).in(users)
+                .and(CONVERSATION_ID).in(conversations)), ConversationUserState.class);
     }
 
     /** Grava o estado inicial de uma admissão; dentro de transação participa do mesmo commit. */
@@ -86,8 +89,8 @@ public class ConversationUserStateRepository {
         }
 
         Criteria identity = new Criteria().andOperator(
-                Criteria.where("conversationId").is(conversationId),
-                Criteria.where("userId").is(userId));
+                Criteria.where(CONVERSATION_ID).is(conversationId),
+                Criteria.where(USER_ID).is(userId));
         Criteria hasChangedField = new Criteria().orOperator(changedFields.toArray(Criteria[]::new));
         Query query = Query.query(new Criteria().andOperator(identity, hasChangedField));
         Update update = new Update();

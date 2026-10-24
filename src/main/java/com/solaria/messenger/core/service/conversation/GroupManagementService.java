@@ -151,8 +151,9 @@ public class GroupManagementService {
                     // tira o user; se ele era o gestor, o sucessor assume; grupo vazio fica sem gestor
                     Set<UUID> survivors = new LinkedHashSet<>(latest.getParticipantIds());
                     survivors.remove(userId);
-                    UUID manager = survivors.isEmpty() ? null
-                            : userId.equals(latest.getManagerUserId()) ? successor : latest.getManagerUserId();
+                    UUID manager = latest.getManagerUserId();
+                    if (survivors.isEmpty()) manager = null;
+                    else if (userId.equals(manager)) manager = successor;
                     return groups.writeParticipants(latest, survivors, manager);
                 });
 

@@ -34,14 +34,4 @@ public class ProblemDetailFactory {
         }
         return problem;
     }
-
-    /**
-     * Converte ERROR_CODE em sufixo kebab-case para a URL do campo {@code type}.
-     */
-    private static String toKebabCase(String errorCode) {
-        if (errorCode == null || errorCode.isBlank()) {
-            return "unknown";
-        }
-        return errorCode.toLowerCase().replace('_', '-');
-    }
 }

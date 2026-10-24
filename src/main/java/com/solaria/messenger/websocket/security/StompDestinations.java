@@ -7,6 +7,7 @@ import java.util.regex.Pattern;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.solaria.messenger.websocket.dto.response.WsEventEnvelope;
 
@@ -36,8 +37,9 @@ final class StompDestinations {
         Object payload = message.getPayload();
         if (payload instanceof WsEventEnvelope envelope) return envelope.getConversationId();
         try {
-            var body = payload instanceof byte[] bytes ? json.readTree(bytes)
-                    : payload instanceof String text ? json.readTree(text) : null;
+            JsonNode body = null;
+            if (payload instanceof byte[] bytes) body = json.readTree(bytes);
+            else if (payload instanceof String text) body = json.readTree(text);
             if (body != null && body.path("conversationId").isTextual()) return body.path("conversationId").asText();
         } catch (IOException notAnEnvelope) {
             // Feedback de fila do usuário sem conversa continua permitido.

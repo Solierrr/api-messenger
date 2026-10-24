@@ -68,7 +68,7 @@ public class SecurityConfig {
         @Bean
         @Profile("dev")
         @Order(1)
-        public SecurityFilterChain devLoginSecurityFilterChain(HttpSecurity http) throws Exception {
+        public SecurityFilterChain devLoginSecurityFilterChain(HttpSecurity http) {
                 return http.securityMatcher("/dev/login")
                                 .csrf(csrf -> csrf.disable())
                                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -81,7 +81,7 @@ public class SecurityConfig {
         @Bean
         // @Order(1)-> esta chain é avaliada ANTES da chain @Order(2), por path mais específico
         @Order(1)
-        public SecurityFilterChain internalSecurityFilterChain(HttpSecurity http) throws Exception {
+        public SecurityFilterChain internalSecurityFilterChain(HttpSecurity http) {
                 http
                                 // Restringe essa chain apenas para /internal/**
                                 .securityMatcher("/internal/**")
@@ -104,7 +104,7 @@ public class SecurityConfig {
         @Order(2)
         public SecurityFilterChain resourceServerSecurityFilterChain(HttpSecurity http,
                         FilterRegistrationBean<ActiveUserFilter> activeUserFilterRegistration,
-                        JwtDecoder userJwtDecoder) throws Exception {
+                        JwtDecoder userJwtDecoder) {
                 http
                                 // CSRF desabilitado
                                 .csrf(csrf -> csrf.disable())

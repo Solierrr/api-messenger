@@ -1,4 +1,4 @@
-package com.solaria.messenger.service;
+package com.solaria.messenger.core.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -23,19 +23,19 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DuplicateKeyException;
 
-import com.solaria.messenger.dto.request.NpsRequestDTO;
-import com.solaria.messenger.dto.response.NpsResponseDTO;
-import com.solaria.messenger.exception.BusinessRuleException;
-import com.solaria.messenger.exception.DuplicateResourceException;
-import com.solaria.messenger.exception.ResourceNotFoundException;
-import com.solaria.messenger.exception.UnauthorizedAccessException;
-import com.solaria.messenger.model.Conversation;
-import com.solaria.messenger.model.Nps;
-import com.solaria.messenger.model.enums.ConversationType;
-import com.solaria.messenger.model.enums.NpsClassification;
-import com.solaria.messenger.repository.ConversationRepository;
-import com.solaria.messenger.repository.NpsRepository;
-import com.solaria.messenger.security.rbac.RbacAuthorizationService;
+import com.solaria.messenger.core.contract.request.NpsRequestDTO;
+import com.solaria.messenger.core.contract.response.NpsResponseDTO;
+import com.solaria.messenger.core.exception.BusinessRuleException;
+import com.solaria.messenger.core.exception.DuplicateResourceException;
+import com.solaria.messenger.core.exception.ResourceNotFoundException;
+import com.solaria.messenger.core.exception.UnauthorizedAccessException;
+import com.solaria.messenger.core.model.Conversation;
+import com.solaria.messenger.core.model.Nps;
+import com.solaria.messenger.core.model.enums.ConversationType;
+import com.solaria.messenger.core.model.enums.NpsClassification;
+import com.solaria.messenger.core.repository.ConversationRepository;
+import com.solaria.messenger.core.repository.NpsRepository;
+import com.solaria.messenger.core.security.rbac.RbacAuthorizationService;
 
 @ExtendWith(MockitoExtension.class)
 class NpsServiceTests {

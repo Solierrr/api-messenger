@@ -1,4 +1,4 @@
-package com.solaria.messenger.controller;
+package com.solaria.messenger.rest.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -20,14 +20,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.solaria.messenger.dto.request.MessageRequestDTO;
-import com.solaria.messenger.dto.response.MessageResponseDTO;
-import com.solaria.messenger.exception.handler.ProblemDetailFactory;
-import com.solaria.messenger.model.enums.MessageType;
-import com.solaria.messenger.service.MessageService;
+import com.solaria.messenger.core.contract.request.MessageRequestDTO;
+import com.solaria.messenger.core.contract.response.MessageResponseDTO;
+import com.solaria.messenger.rest.error.ProblemDetailFactory;
+import com.solaria.messenger.core.model.enums.MessageType;
+import com.solaria.messenger.core.security.rbac.RbacAuthorizationService;
+import com.solaria.messenger.core.service.message.MessageMutationService;
+import com.solaria.messenger.core.service.message.MessageQueryService;
+import com.solaria.messenger.core.service.message.MessageSendService;
 
 @WebMvcTest(MessageController.class)
 @Import(ProblemDetailFactory.class)
@@ -37,11 +41,24 @@ class MessageControllerTests {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private MessageService messageService;
+    private MessageSendService sends;
+
+    @MockitoBean
+    private MessageMutationService mutations;
+
+    @MockitoBean
+    private MessageQueryService queries;
+
+    // dependências do StompErrorHandler, que é @ControllerAdvice e entra no slice do @WebMvcTest
+    @MockitoBean
+    private RbacAuthorizationService rbac;
+
+    @MockitoBean
+    private SimpMessagingTemplate messaging;
 
     @Test
     void sendsGroupMessage() throws Exception {
-        given(messageService.sendUserMessage(any(MessageRequestDTO.class)))
+        given(sends.sendUserMessage(any(MessageRequestDTO.class)))
                 .willReturn(messageResponse(MessageType.USER_TO_GROUP));
 
         mockMvc.perform(post("/messaging/messages")
@@ -58,7 +75,7 @@ class MessageControllerTests {
     void sendMessageResponseHasNoLocationHeader() throws Exception {
         // F-17: sem GET por id de mensagem, o header antigo apontava para uma rota inexistente
         // (e resolveria via Kong para o serviço errado) - a resposta não deve ter Location.
-        given(messageService.sendUserMessage(any(MessageRequestDTO.class)))
+        given(sends.sendUserMessage(any(MessageRequestDTO.class)))
                 .willReturn(messageResponse(MessageType.USER_TO_GROUP));
 
         mockMvc.perform(post("/messaging/messages")
@@ -80,7 +97,7 @@ class MessageControllerTests {
     @Test
     void acceptsMessageWithoutRole() throws Exception {
         // F-21: role é derivado no servidor - o campo deixou de ser @NotBlank no DTO.
-        given(messageService.sendUserMessage(any(MessageRequestDTO.class)))
+        given(sends.sendUserMessage(any(MessageRequestDTO.class)))
                 .willReturn(messageResponse(MessageType.USER_TO_USER));
 
         mockMvc.perform(post("/messaging/messages")
@@ -92,7 +109,7 @@ class MessageControllerTests {
 
     @Test
     void getsMessagesByConversationId() throws Exception {
-        given(messageService.getMessagesByConversationId(eq("conv-1"), isNull(), isNull()))
+        given(queries.getMessagesByConversationId(eq("conv-1"), isNull(), isNull(), isNull()))
                 .willReturn(List.of(messageResponse(MessageType.USER_TO_GROUP)));
 
         mockMvc.perform(get("/messaging/messages/conversation/conv-1"))
@@ -103,7 +120,7 @@ class MessageControllerTests {
 
     @Test
     void passesSinceSequenceAndLimitToService() throws Exception {
-        given(messageService.getMessagesByConversationId(eq("conv-1"), eq(5), eq(20)))
+        given(queries.getMessagesByConversationId(eq("conv-1"), eq(5), isNull(), eq(20)))
                 .willReturn(List.of(messageResponse(MessageType.USER_TO_GROUP)));
 
         mockMvc.perform(get("/messaging/messages/conversation/conv-1")
@@ -111,7 +128,7 @@ class MessageControllerTests {
                         .param("limit", "20"))
                 .andExpect(status().isOk());
 
-        verify(messageService).getMessagesByConversationId("conv-1", 5, 20);
+        verify(queries).getMessagesByConversationId("conv-1", 5, null, 20);
     }
 
     private MessageResponseDTO messageResponse(MessageType type) {
