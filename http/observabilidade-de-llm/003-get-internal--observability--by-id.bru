@@ -10,7 +10,11 @@ get {
   auth: none
 }
 
+headers {
+  X-Service-Key: {{serviceKey}}
+}
+
 docs {
   Busca um evento de telemetria pelo identificador
-  Rota interna: a aplicação não exige Bearer; restrinja o acesso pela rede.
+  Rota interna: exige X-Service-Key de um agente de IA (ai-assistant, ai-operational ou ai-geographic).
 }
