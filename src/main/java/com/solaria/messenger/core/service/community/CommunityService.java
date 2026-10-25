@@ -84,8 +84,8 @@ public class CommunityService {
     public CommunityResponseDTO createCommunity(CommunityRequestDTO dto) {
         UUID currentUserId = rbac.currentUserId();
 
-        // só o demandante do projeto cria, e cada projeto tem uma comunidade só
-        projectAuthorityClient.requireRequester(dto.getProjectId(), currentUserId);
+        // só um responsável pelo projeto cria, e cada projeto tem uma comunidade só
+        projectAuthorityClient.requireManager(dto.getProjectId(), currentUserId);
         if (communityRepository.existsByProjectId(dto.getProjectId())) {
             throw new DuplicateResourceException("Já existe uma comunidade para o projeto: " + dto.getProjectId());
         }
