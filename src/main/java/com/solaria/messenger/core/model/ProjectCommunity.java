@@ -92,6 +92,14 @@ public class ProjectCommunity {
                 .orElse(false);
     }
 
+    /** Membro que pode escrever: todos menos o VIEWER. */
+    public boolean canWrite(UUID userId) {
+        return member(userId)
+                .map(m ->
+                 m.getRole() != CommunityRole.VIEWER)
+                .orElse(false);
+    }
+
     /** Indica se o usuário é o dono da comunidade. */
     public boolean isOwner(UUID userId) {
         return hasRole(userId, CommunityRole.OWNER);

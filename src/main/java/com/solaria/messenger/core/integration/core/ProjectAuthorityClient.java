@@ -19,7 +19,6 @@ import com.solaria.messenger.core.integration.core.dto.ProjectAccessResponseDTO;
  * <p>Principais operações disponibilizadas:</p>
  * <ul>
  *     <li>{@link #access(UUID, UUID)} -> papel do usuário, envolvidos e situação do projeto.</li>
- *     <li>{@link #requireManager(UUID, UUID)} -> exige que o usuário seja responsável (OWNER ou MANAGER) pelo projeto.</li>
  *     <li>{@link #requireWritable(UUID, UUID)} -> o mesmo acesso, exigindo que o usuário possa escrever.</li>
  * </ul>
  */
@@ -70,15 +69,6 @@ public class ProjectAuthorityClient {
             throw new DependencyUnavailableException(
                     "api-core indisponível ao consultar o acesso ao projeto " + projectId, ex);
         }
-    }
-
-    /** Exige que o usuário seja responsável pelo projeto (OWNER ou MANAGER) */
-    public ProjectAccessResponseDTO requireManager(UUID projectId, UUID authId) {
-        ProjectAccessResponseDTO access = access(projectId, authId);
-        if (!"OWNER".equals(access.role()) && !"MANAGER".equals(access.role())) {
-            throw new UnauthorizedAccessException("Apenas responsáveis pelo projeto podem criar a comunidade.");
-        }
-        return access;
     }
 
     /** Acesso ao projeto para escrita: projeto encerrado ou papel de leitor só consultam */

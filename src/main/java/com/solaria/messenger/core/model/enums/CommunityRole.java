@@ -10,10 +10,12 @@ package com.solaria.messenger.core.model.enums;
  *   <li>{@code ADMIN} -> adiciona/remove membros comuns</li>
  *   <li>{@code MEMBER} -> participa da comunidade, vê os membros e inicia conversas
  *       em grupo com outros membros.</li>
+ *   <li>{@code VIEWER} -> acompanha a comunidade e as conversas, sem escrever.</li>
  * </ul>
  */
 public enum CommunityRole {
     OWNER,
     ADMIN,
-    MEMBER
+    MEMBER,
+    VIEWER
 }

@@ -25,6 +25,7 @@ import com.solaria.messenger.core.model.enums.CommunityStatus;
  *     <li>{@link #findAllByMemberId(UUID)} -> comunidades das quais o usuário é membro.</li>
  *     <li>{@link #updateMembersIfCurrent(String, Long, List, Instant, Long)} -> substitui os membros na versão observada.</li>
  *     <li>{@link #updateStatusIfCurrent(String, Long, CommunityStatus, Instant, Long)} -> altera o status na versão observada.</li>
+ *     <li>{@link #updateRosterIfCurrent(String, Long, List, CommunityStatus, Instant, Long)} -> substitui membros e status na versão observada.</li>
  * </ul>
  */
 public interface CommunityRepository extends MongoRepository<ProjectCommunity, String> {
@@ -48,4 +49,10 @@ public interface CommunityRepository extends MongoRepository<ProjectCommunity, S
     @Query("{ '_id': ?0, 'version': ?1 }")
     @Update("{ '$set': { 'status': ?2, 'updated_at': ?3, 'version': ?4 } }")
     long updateStatusIfCurrent(String id, Long version, CommunityStatus status, Instant updatedAt, Long nextVersion);
+
+    /** Substitui membros e status de uma vez somente se a versão observada ainda for a atual (CAS). */
+    @Query("{ '_id': ?0, 'version': ?1 }")
+    @Update("{ '$set': { 'members': ?2, 'status': ?3, 'updated_at': ?4, 'version': ?5 } }")
+    long updateRosterIfCurrent(String id, Long version, List<CommunityMember> members, CommunityStatus status,
+            Instant updatedAt, Long nextVersion);
 }

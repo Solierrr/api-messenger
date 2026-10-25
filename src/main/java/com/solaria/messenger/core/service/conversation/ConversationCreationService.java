@@ -168,6 +168,9 @@ public class ConversationCreationService {
         if (parent != null && !parent.isMember(creator)) {
             throw new UnauthorizedAccessException("O criador não participa da comunidade.");
         }
+        if (parent != null && !parent.canWrite(creator)) {
+            throw new UnauthorizedAccessException("Projeto disponível apenas para consulta.");
+        }
         if (parent != null && parent.getStatus() != CommunityStatus.ACTIVE) {
             throw new BusinessRuleException("A comunidade está arquivada.");
         }

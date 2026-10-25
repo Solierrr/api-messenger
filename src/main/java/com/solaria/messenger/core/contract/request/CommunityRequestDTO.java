@@ -9,8 +9,8 @@ import lombok.Setter;
 
 /**
  * Cria a comunidade de um projeto
- * Quem cria vira {@code OWNER}
- * Os {@code memberIds} opcionais entram como {@code MEMBER}
+ * Os papéis e envolvidos são derivados da api-core.
+ * {@code memberIds} não concede participação nem altera papéis.
  */
 @Getter
 @Setter

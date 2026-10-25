@@ -44,16 +44,15 @@ public interface CommunityOpenApi {
     /** Contrato OpenAPI: cria a comunidade de um projeto. */
     @Operation(
         summary = "Cria a comunidade de um projeto",
-        description = "Quem cria vira OWNER | memberIds opcionais entram como MEMBER | Uma comunidade por projeto. "
-        + "Só o demandante do projeto pode criar "
+        description = "Membros e papéis vêm do projeto na api-core (OWNER -> OWNER, MANAGER -> ADMIN, MEMBER -> MEMBER, "
+        + "VIEWER -> VIEWER) | memberIds não concede participação | Uma comunidade por projeto: se já existir, "
+        + "é sincronizada e devolvida. Projeto só para consulta deixa a comunidade ARCHIVED."
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Comunidade criada"),
+            @ApiResponse(responseCode = "201", description = "Comunidade criada ou existente sincronizada"),
             @ApiResponse(responseCode = "400", description = "Dados de entrada inválidos"),
-            @ApiResponse(responseCode = "403", description = "Usuário autenticado não é o demandante ou um membro inicial está inativo"),
-            @ApiResponse(responseCode = "404", description = "Projeto ou membro inicial não encontrado"),
-            @ApiResponse(responseCode = "409", description = "Já existe uma comunidade para o projeto"),
-            @ApiResponse(responseCode = "503", description = "Dependência indisponível para validar o demandante ou os membros")
+            @ApiResponse(responseCode = "403", description = "Usuário autenticado não participa do projeto"),
+            @ApiResponse(responseCode = "503", description = "api-core indisponível ou chave de serviço não configurada")
     })
     ResponseEntity<CommunityResponseDTO> createCommunity(CommunityRequestDTO dto);
 
@@ -66,7 +65,7 @@ public interface CommunityOpenApi {
     @Operation(summary = "Busca uma comunidade pelo identificador (só membros)")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Comunidade encontrada"),
-            @ApiResponse(responseCode = "403", description = "O usuário autenticado não participa desta comunidade"),
+            @ApiResponse(responseCode = "403", description = "O usuário autenticado não participa do projeto da comunidade"),
             @ApiResponse(responseCode = "404", description = "Comunidade não encontrada")
     })
     ResponseEntity<CommunityResponseDTO> findById(String id);
@@ -75,62 +74,34 @@ public interface CommunityOpenApi {
     @Operation(summary = "Busca a comunidade de um projeto (só membros)")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Comunidade encontrada"),
-            @ApiResponse(responseCode = "403", description = "O usuário autenticado não participa desta comunidade"),
+            @ApiResponse(responseCode = "403", description = "O usuário autenticado não participa do projeto da comunidade"),
             @ApiResponse(responseCode = "404", description = "Comunidade não encontrada para o projeto")
     })
     ResponseEntity<CommunityResponseDTO> findByProjectId(UUID projectId);
 
-    /** Contrato OpenAPI: altera somente o status da comunidade. */
+    /** Contrato OpenAPI: alteração do status, recusada porque a situação vem do projeto. */
     @Operation(
-        summary = "Altera somente o status da comunidade",
-        description = "status é obrigatório; pedido vazio ou status nulo é 400 INVALID_FIELD, sem efeitos. "
-                + "Arquivar exige OWNER; reativar ARCHIVED exige OWNER/ADMIN atual. Mesmo status é no-op autorizado. "
-                + "ARCHIVED bloqueia mensagens e administração ordinária, preservando leitura, estado pessoal e saída. "
-                + "Não há cleanup de typing nem metadados descritivos editáveis."
+        summary = "Altera o status da comunidade (recusado)",
+        description = "Recusado: membros e situação da comunidade seguem o projeto na api-core e são geridos pela página do projeto."
     )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Status atualizado ou no-op autorizado"),
-            @ApiResponse(responseCode = "400", description = "INVALID_FIELD; status obrigatório, não nulo e válido"),
-            @ApiResponse(responseCode = "403", description = "OWNER para arquivar; OWNER/ADMIN para ativar ou repetir a ativação"),
-            @ApiResponse(responseCode = "404", description = "Comunidade não encontrada"),
-            @ApiResponse(responseCode = "409", description = "CONCURRENT_MODIFICATION"),
-            @ApiResponse(responseCode = "503", description = "Falha técnica de persistência ou de dependência")
-    })
+    @ApiResponses(@ApiResponse(responseCode = "422", description = "BUSINESS_RULE_VIOLATION"))
     ResponseEntity<CommunityResponseDTO> updateCommunity(String id, CommunityUpdateRequestDTO dto);
 
-    /** Contrato OpenAPI: adiciona membros ou altera seus papéis. */
+    /** Contrato OpenAPI: inclusão de membros, recusada porque os membros vêm do projeto. */
     @Operation(
-        summary = "Adiciona/altera papel de membros",
-        description = "Adicionar MEMBER exige ADMIN | conceder ADMIN exige OWNER"
+        summary = "Adiciona/altera papel de membros (recusado)",
+        description = "Recusado: membros e situação da comunidade seguem o projeto na api-core e são geridos pela página do projeto."
     )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Membros adicionados"),
-            @ApiResponse(responseCode = "403", description = "Papel insuficiente ou novo membro inativo"),
-            @ApiResponse(responseCode = "404", description = "Comunidade ou novo membro não encontrado"),
-            @ApiResponse(responseCode = "409", description = "CONCURRENT_MODIFICATION ou MEMBERSHIP_CLEANUP_REQUIRED antes da readmissão"),
-            @ApiResponse(responseCode = "503", description = "Core indisponível para validar novos membros"),
-            @ApiResponse(responseCode = "422", description = "Comunidade arquivada ou papel OWNER solicitado")
-    })
+    @ApiResponses(@ApiResponse(responseCode = "422", description = "BUSINESS_RULE_VIOLATION"))
     ResponseEntity<CommunityResponseDTO> addMembers(String id, CommunityMembersRequestDTO dto);
 
-    /** Contrato OpenAPI: remove um membro ou registra a saída do próprio usuário. */
+    /** Contrato OpenAPI: remoção de membro, recusada porque os membros vêm do projeto. */
     @Operation(
-        summary = "Remove um membro | sair da comunidade",
-        description = "Cada um pode sair | remover outros exige OWNER/ADMIN | OWNER não pode ser removido nem sair. "
-                + "A remoção também revoga participação nos subgrupos. Informe sucessor por conversa quando necessário; "
-                + "Somente remoção administrativa pode esvaziar um grupo sem sucessor. Retorna 204 sem roster. "
-                + "Após revogar no pai, repetição explícita só limpa resíduos; readmissão aguarda essa limpeza. "
-                + "Saída voluntária é permitida em comunidade arquivada; remoção ordinária de terceiros é bloqueada."
+        summary = "Remove um membro | sair da comunidade (recusado)",
+        description = "Recusado: membros e situação da comunidade seguem o projeto na api-core e são geridos pela página do projeto. "
+                + "Quem sai do projeto sai da comunidade e perde os subgrupos na próxima sincronização."
     )
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Membro e participações residuais removidos; sem corpo"),
-            @ApiResponse(responseCode = "400", description = "Sucessor duplicado/alheio, UUID ou corpo inválido"),
-            @ApiResponse(responseCode = "403", description = "Sem permissão para remover esse membro"),
-            @ApiResponse(responseCode = "404", description = "Comunidade não encontrada"),
-            @ApiResponse(responseCode = "409", description = "SUCCESSOR_REQUIRED, SUCCESSOR_INELIGIBLE, GROUP_MANAGER_UNAVAILABLE ou CONCURRENT_MODIFICATION"),
-            @ApiResponse(responseCode = "422", description = "Tentativa de remover o OWNER ou administrar terceiros em comunidade arquivada"),
-            @ApiResponse(responseCode = "503", description = "REMOVAL_INCOMPLETE; repetir DELETE revalida o estado atual e conclui a limpeza")
-    })
+    @ApiResponses(@ApiResponse(responseCode = "422", description = "BUSINESS_RULE_VIOLATION"))
     @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = false,
             content = @Content(schema = @Schema(implementation = CommunityMemberRemovalRequestDTO.class)))
@@ -154,7 +125,7 @@ public interface CommunityOpenApi {
             @ApiResponse(responseCode = "201", description = "Subgrupo criado, participantes admitidos e rejeições genéricas",
                     content = @Content(schema = @Schema(implementation = GroupCreationResponseDTO.class))),
             @ApiResponse(responseCode = "400", description = "Dados de entrada inválidos"),
-            @ApiResponse(responseCode = "403", description = "Criador não participa da comunidade ou está inativo"),
+            @ApiResponse(responseCode = "403", description = "Criador não participa da comunidade, é VIEWER ou está inativo"),
             @ApiResponse(responseCode = "404", description = "Comunidade não encontrada"),
             @ApiResponse(responseCode = "422", description = "Comunidade arquivada ou menos de dois participantes distintos elegíveis"),
             @ApiResponse(responseCode = "503", description = "Auth/banco indisponível ou resultado da transação não confirmado")
@@ -163,11 +134,11 @@ public interface CommunityOpenApi {
 
     /** Contrato OpenAPI: lista os metadados dos subgrupos da comunidade. */
     @Operation(summary = "Lista metadados dos subgrupos da comunidade",
-            description = "OWNER/ADMIN atuais veem todos os GROUPs; MEMBER vê apenas os GROUPs de que participa. "
+            description = "OWNER/ADMIN atuais veem todos os GROUPs; MEMBER e VIEWER veem apenas os GROUPs de que participa. "
                     + "Disponível em ARCHIVED, com sete campos e nulos explícitos; não concede acesso ao conteúdo.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso"),
-            @ApiResponse(responseCode = "403", description = "O usuário autenticado não participa desta comunidade"),
+            @ApiResponse(responseCode = "403", description = "O usuário autenticado não participa do projeto da comunidade"),
             @ApiResponse(responseCode = "404", description = "Comunidade não encontrada")
     })
     ResponseEntity<List<SubgroupMetadataResponseDTO>> listConversations(String id);

@@ -82,15 +82,6 @@ class ProjectAuthorityClientTests {
     }
 
     @Test
-    void onlyProjectManagersCreateTheCommunity() {
-        UUID user = UUID.randomUUID();
-        server.expect(anything()).andRespond(withSuccess(access("MEMBER", false, user), MediaType.APPLICATION_JSON));
-
-        assertThrows(UnauthorizedAccessException.class, () -> client(KEY).requireManager(UUID.randomUUID(), user));
-        server.verify();
-    }
-
-    @Test
     void serverErrorsBecomeDependencyUnavailable() {
         server.expect(anything()).andRespond(withStatus(HttpStatus.BAD_GATEWAY));
 

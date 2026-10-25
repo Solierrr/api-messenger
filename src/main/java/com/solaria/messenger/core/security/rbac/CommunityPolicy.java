@@ -7,7 +7,7 @@ import com.solaria.messenger.core.exception.UnauthorizedAccessException;
 import com.solaria.messenger.core.model.ProjectCommunity;
 import com.solaria.messenger.core.model.enums.CommunityStatus;
 
-/** Autorização por papel ({@code OWNER/ADMIN/MEMBER}) na comunidade, compartilhada pelos serviços e pela cascata. */
+/** Autorização por papel ({@code OWNER/ADMIN/MEMBER/VIEWER}) na comunidade, compartilhada pelos serviços e pela cascata. */
 public final class CommunityPolicy {
     private CommunityPolicy() { }
 
@@ -15,6 +15,14 @@ public final class CommunityPolicy {
     public static void requireMember(ProjectCommunity community, UUID actor) {
         if (!community.isMember(actor)) {
             throw new UnauthorizedAccessException("O usuário autenticado não participa desta comunidade.");
+        }
+    }
+
+    /** Exige um membro que possa escrever; o VIEWER só consulta. */
+    public static void requireWriter(ProjectCommunity community, UUID actor) {
+        requireMember(community, actor);
+        if (!community.canWrite(actor)) {
+            throw new UnauthorizedAccessException("Projeto disponível apenas para consulta.");
         }
     }
 

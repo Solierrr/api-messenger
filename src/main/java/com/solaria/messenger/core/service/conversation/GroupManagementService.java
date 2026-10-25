@@ -172,7 +172,7 @@ public class GroupManagementService {
     private void requireManageable(Conversation conversation, UUID actor) {
         authorizeManagement(conversation, actor);
         resourceAccess.requireActive(conversation);
-        resourceAccess.requireCommunityActive(conversation);
+        resourceAccess.requireCommunityWriter(conversation, actor);
     }
 
     /** O ator precisa participar e ser o gestor do grupo */
