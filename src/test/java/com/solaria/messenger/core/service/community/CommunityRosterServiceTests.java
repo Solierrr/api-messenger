@@ -37,6 +37,7 @@ import com.solaria.messenger.core.repository.CommunityRepository;
 import com.solaria.messenger.core.service.ConversationMutationGuard;
 import com.solaria.messenger.core.service.conversation.ConversationChangeNotifier;
 import com.solaria.messenger.core.service.conversation.ConversationQueryService;
+import com.solaria.messenger.core.service.conversation.ProjectGeneralConversationService;
 import com.solaria.messenger.core.service.port.SessionRevoker;
 
 @ExtendWith(MockitoExtension.class)
@@ -62,12 +63,15 @@ class CommunityRosterServiceTests {
     @Mock
     private SessionRevoker sessionRevoker;
 
+    @Mock
+    private ProjectGeneralConversationService general;
+
     private CommunityRosterService roster;
 
     @BeforeEach
     void setUp() {
         roster = new CommunityRosterService(communityRepository, projectAuthorityClient, queries, stateEvents,
-                new ConversationMutationGuard(), sessionRevoker);
+                new ConversationMutationGuard(), sessionRevoker, general);
     }
 
     private static ProjectCommunity community(CommunityMember... members) {
@@ -116,6 +120,7 @@ class CommunityRosterServiceTests {
         assertThat(written.getValue().getFirst().getJoinedAt()).isEqualTo(joined);
         verify(sessionRevoker).revokeUser(FORMER);
         verify(sessionRevoker, never()).revokeUser(OWNER);
+        verify(general).ensure(current, "Projeto");
     }
 
     @Test

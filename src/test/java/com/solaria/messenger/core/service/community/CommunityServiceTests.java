@@ -89,6 +89,7 @@ class CommunityServiceTests {
                 .willReturn(new ProjectAccessResponseDTO("VIEWER", true, Map.of(USER, "VIEWER"), "Projeto"));
         given(communityRepository.findByProjectId(PROJECT)).willReturn(Optional.empty());
         given(communityRepository.save(any(ProjectCommunity.class))).willAnswer(call -> call.getArgument(0));
+        given(roster.apply(any(ProjectCommunity.class), any())).willAnswer(call -> call.getArgument(0));
 
         service.createCommunity(request());
 

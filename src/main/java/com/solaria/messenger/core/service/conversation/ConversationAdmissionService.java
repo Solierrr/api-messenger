@@ -37,6 +37,7 @@ import com.solaria.messenger.core.service.OptimisticMutation;
  * <ul>
  *     <li>{@link #createWithInitialStates(Conversation)} -> cria a conversa e o estado de cada participante.</li>
  *     <li>{@link #admitParticipants(String, Long, UUID, Set)} -> adiciona participantes a um grupo.</li>
+ *     <li>{@link #syncProjectGeneral(String, Set, UUID, String)} -> alinha a conversa geral aos envolvidos do projeto.</li>
  * </ul>
  */
 @Service
@@ -127,6 +128,33 @@ public class ConversationAdmissionService {
             requested.stream().filter(user -> !current.hasParticipant(user)).forEach(user -> requireState(id, user, head, true));
             return conversations.findById(id).orElseThrow();
         }));
+    }
+
+    /**
+     * Alinha participantes, gestor e título da conversa geral; quem entra começa a ler da última mensagem e quem
+     * volta mantém o estado pessoal que já tinha. Devolve {@code null} quando não havia nada a mudar.
+     */
+    public Conversation syncProjectGeneral(String id, Set<UUID> participants, UUID manager, String title) {
+        return transaction.execute(status -> {
+            Conversation current = conversations.findById(id).orElse(null);
+            if (current == null || !current.isProjectGeneral()) {
+                throw new BusinessRuleException("A conversa geral do projeto não existe.");
+            }
+            if (participants.equals(current.getParticipantIds()) && Objects.equals(manager, current.getManagerUserId())
+                    && Objects.equals(title, current.getTitle())) {
+                return null;
+            }
+
+            if (conversations.updateProjectGeneralIfCurrent(id, current.getVersion(), participants, manager, title,
+                    OptimisticMutation.nextVersion(current.getVersion())) != 1) {
+                throw new OptimisticLockingFailureException(CONCURRENT);
+            }
+            int head = headSequence(id);
+            participants.stream().filter(user -> !current.hasParticipant(user))
+                    .filter(user -> userStates.findByConversationIdAndUserId(id, user).isEmpty())
+                    .forEach(user -> insertState(id, user, head));
+            return conversations.findById(id).orElseThrow();
+        });
     }
 
     /** Só grupo ativo, e só o gestor atual adiciona */

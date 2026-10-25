@@ -74,6 +74,7 @@ public class GroupManagementService {
             UUID actor = rbac.currentUserId();
             userAccessService.requireActiveActor(actor);
             Conversation initial = groups.managedConversation(id);
+            requireNotProjectGeneral(initial);
             requireManageable(initial, actor);
 
             // convidados sem nulos, membros da comunidade (se houver), e os novos precisam estar ativos
@@ -109,6 +110,7 @@ public class GroupManagementService {
             UUID actor = rbac.currentUserId();
             userAccessService.requireActiveActor(actor);
             Conversation initial = groups.managedConversation(id);
+            requireNotProjectGeneral(initial);
             requireManageable(initial, actor);
             groups.validateSuccessor(initial, actor, successorUserId);
             requireSuccessorActive(successorUserId);
@@ -133,6 +135,7 @@ public class GroupManagementService {
                 UUID actor = rbac.currentUserId();
                 userAccessService.requireActiveActor(actor);
                 Conversation initial = groups.managedConversation(id);
+                requireNotProjectGeneral(initial);
                 authorizeRemoval(initial, actor, userId);
                 if (!initial.hasParticipant(userId)) return null;
 
@@ -195,6 +198,13 @@ public class GroupManagementService {
         ProjectCommunity community = groups.communityFor(conversation);
         if (community != null && !community.isMember(actor) && actor.equals(conversation.getManagerUserId())) {
             throw new GroupManagerUnavailableException();
+        }
+    }
+
+    /** Participantes e gestão da conversa geral seguem os envolvidos do projeto */
+    private static void requireNotProjectGeneral(Conversation conversation) {
+        if (conversation.isProjectGeneral()) {
+            throw new BusinessRuleException("Gerencie os envolvidos pela página do projeto.");
         }
     }
 

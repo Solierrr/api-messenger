@@ -28,6 +28,7 @@ import com.solaria.messenger.core.service.ConversationMutationGuard;
 import com.solaria.messenger.core.service.OptimisticMutation;
 import com.solaria.messenger.core.service.conversation.ConversationChangeNotifier;
 import com.solaria.messenger.core.service.conversation.ConversationQueryService;
+import com.solaria.messenger.core.service.conversation.ProjectGeneralConversationService;
 import com.solaria.messenger.core.service.port.SessionRevoker;
 
 /**
@@ -37,6 +38,7 @@ import com.solaria.messenger.core.service.port.SessionRevoker;
  * Os envolvidos do projeto viram membros com o papel equivalente ({@code OWNER -> OWNER}, {@code MANAGER -> ADMIN},
  * {@code MEMBER -> MEMBER}, {@code VIEWER -> VIEWER}) e projeto só para consulta deixa a comunidade arquivada.
  * Quem saiu do projeto perde a comunidade e as sessões abertas, mesmo que seja ele quem consultou.
+ * A conversa geral do projeto ({@link ProjectGeneralConversationService}) acompanha os membros.
  * </p>
  * <ul>
  *     <li>{@link #sync(ProjectCommunity, UUID)} -> consulta o projeto em nome do user e aplica o resultado.</li>
@@ -54,16 +56,18 @@ public class CommunityRosterService {
     private final ConversationChangeNotifier stateEvents;
     private final ConversationMutationGuard guard;
     private final SessionRevoker sessionRevoker;
+    private final ProjectGeneralConversationService general;
 
     public CommunityRosterService(CommunityRepository communityRepository, ProjectAuthorityClient projectAuthorityClient,
             ConversationQueryService queries, ConversationChangeNotifier stateEvents, ConversationMutationGuard guard,
-            SessionRevoker sessionRevoker) {
+            SessionRevoker sessionRevoker, ProjectGeneralConversationService general) {
         this.communityRepository = communityRepository;
         this.projectAuthorityClient = projectAuthorityClient;
         this.queries = queries;
         this.stateEvents = stateEvents;
         this.guard = guard;
         this.sessionRevoker = sessionRevoker;
+        this.general = general;
     }
 
     /** Consulta o projeto em nome do user e alinha a comunidade; fora do projeto, o user sai da comunidade e recebe 403 */
@@ -97,6 +101,7 @@ public class CommunityRosterService {
         }, () -> requireEntityById(community.getId()),
                 () -> new ConcurrentUpdateException("A comunidade mudou durante a operação.")));
 
+        general.ensure(updated, access.name());
         if (changed[0]) publishCommunityConversations(updated.getId());
         removed.forEach(sessionRevoker::revokeUser);
         return updated;
@@ -116,6 +121,7 @@ public class CommunityRosterService {
         }, () -> requireEntityById(community.getId()),
                 () -> new ConcurrentUpdateException("A comunidade mudou durante a operação.")));
 
+        general.ensure(updated, null);
         if (changed[0]) publishCommunityConversations(updated.getId());
         sessionRevoker.revokeUser(user);
     }

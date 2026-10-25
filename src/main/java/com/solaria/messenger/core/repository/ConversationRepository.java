@@ -26,6 +26,7 @@ import com.solaria.messenger.core.model.enums.ConversationType;
  *     <li>{@link #findByParticipantIdsContainingOrderByLastInteractionAtDesc(UUID)} -> conversas do participante.</li>
  *     <li>{@link #updateParticipantsIfCurrent(String, Long, Set, UUID, Instant, Long)} -> altera participação e gestor na versão observada.</li>
  *     <li>{@link #updateManagerIfCurrent(String, Long, UUID, Instant, Long)} -> transfere a gestão na versão observada.</li>
+ *     <li>{@link #updateProjectGeneralIfCurrent(String, Long, Set, UUID, String, Long)} -> alinha a conversa geral do projeto.</li>
  *     <li>{@link #updateLastInteraction(String, Instant)} -> avança a última interação sem regredir o valor.</li>
  * </ul>
  */
@@ -64,6 +65,12 @@ public interface ConversationRepository extends MongoRepository<Conversation, St
             + "'$max': { 'last_interaction_at': ?4 } }")
     long updateParticipantsIfCurrent(String id, Long version, Set<UUID> participants, UUID manager,
             Instant interaction, Long nextVersion);
+
+    /** Alinha participantes, gestor e título da conversa geral do projeto na versão observada. */
+    @Query("{ '_id': ?0, 'version': ?1, 'project_general': true }")
+    @Update("{ '$set': { 'participant_ids': ?2, 'manager_user_id': ?3, 'title': ?4, 'version': ?5 } }")
+    long updateProjectGeneralIfCurrent(String id, Long version, Set<UUID> participants, UUID manager, String title,
+            Long nextVersion);
 
     /** A versão impede que uma transferência substitua outra decisão concorrente. */
     @Query("{ '_id': ?0, 'version': ?1 }")

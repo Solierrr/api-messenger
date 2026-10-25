@@ -91,7 +91,7 @@ public class CommunityService {
         community.setCreatedAt(now);
         community.setUpdatedAt(now);
         try {
-            return toResponse(communityRepository.save(community));
+            return toResponse(roster.apply(communityRepository.save(community), access));
         } catch (DuplicateKeyException collision) {
             ProjectCommunity winner = communityRepository.findByProjectId(dto.getProjectId()).orElseThrow(() -> collision);
             return toResponse(roster.apply(winner, access));

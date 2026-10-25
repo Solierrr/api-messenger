@@ -18,6 +18,7 @@ public record SubgroupMetadataResponseDTO(
         ConversationStatus status,
         Set<UUID> participantIds,
         UUID managerUserId,
+        boolean projectGeneral,
         Instant startedAt,
         Instant lastInteractionAt) {
 
