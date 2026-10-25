@@ -24,6 +24,8 @@ import com.solaria.messenger.core.model.enums.ConversationType;
 import com.solaria.messenger.core.repository.CommunityRepository;
 import com.solaria.messenger.core.repository.ConversationRepository;
 
+import static com.solaria.messenger.core.security.rbac.CommunityPolicy.requireWriter;
+
 /**
  * Service de autorização de conversas
  *
@@ -38,6 +40,7 @@ import com.solaria.messenger.core.repository.ConversationRepository;
  *     <li>{@link #withAccess(String, UUID, Function)} -> executa uma ação com a conversa já autorizada.</li>
  *     <li>{@link #withMessageMutation(String, UUID, Function)} -> autoriza e executa a edição/exclusão de mensagem.</li>
  *     <li>{@link #requireActive(Conversation)} / {@link #requireCommunityActive(Conversation)} -> bloqueiam escrita em conversa ou comunidade inativa.</li>
+ *     <li>{@link #requireCommunityWriter(Conversation, UUID)} -> além da comunidade ativa, exige um membro que possa escrever.</li>
  * </ul>
  */
 @Service
@@ -150,6 +153,13 @@ public class ConversationAuthorizationService {
         }
     }
 
+    /** Comunidade ativa e user com papel de escrita; o VIEWER só lê */
+    public void requireCommunityWriter(Conversation conversation, UUID actor) {
+        requireCommunityActive(conversation);
+        if (conversation.getCommunityId() == null) return;
+        requireWriter(requireCommunity(conversation.getCommunityId()), actor);
+    }
+
     /** Autoriza e executa a edição/exclusão de mensagem dentro do guard */
     public <T> T withMessageMutation(String conversationId, UUID actor, Function<Conversation, T> mutation) {
         try {
@@ -160,7 +170,7 @@ public class ConversationAuthorizationService {
                     throw new BusinessRuleException("A conversa não permite alterações de mensagens.");
                 }
                 requireActive(current);
-                requireCommunityActive(current);
+                requireCommunityWriter(current, actor);
                 return mutation.apply(current);
             });
         } catch (BusinessException business) {

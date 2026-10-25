@@ -34,6 +34,7 @@ public class ConversationResponseDTO {
     private UUID managerUserId;
     private String title;
     private String communityId;
+    private boolean projectGeneral;
     private String userType;
     private Map<String, Object> userDetails;
     private ConversationStatus status;

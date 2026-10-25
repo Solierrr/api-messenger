@@ -68,6 +68,10 @@ public class Conversation {
     @Field("community_id")
     private String communityId;
 
+    /** Conversa geral da comunidade: participantes seguem os envolvidos do projeto */
+    @Field("project_general")
+    private boolean projectGeneral;
+
     @Field("user_type")
     private String userType;
 

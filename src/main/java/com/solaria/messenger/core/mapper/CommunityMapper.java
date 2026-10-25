@@ -25,6 +25,8 @@ public final class CommunityMapper {
         return CommunityResponseDTO.builder()
                 .id(community.getId())
                 .projectId(community.getProjectId())
+                .name(community.getName())
+                .description(community.getDescription())
                 .members(members)
                 .status(community.getStatus())
                 .createdBy(community.getCreatedBy())

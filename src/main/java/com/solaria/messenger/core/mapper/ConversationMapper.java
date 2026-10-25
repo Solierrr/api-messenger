@@ -18,6 +18,7 @@ public final class ConversationMapper {
                 .managerUserId(conversation.getManagerUserId())
                 .title(conversation.getTitle())
                 .communityId(conversation.getCommunityId())
+                .projectGeneral(conversation.isProjectGeneral())
                 .userType(conversation.getUserType())
                 .userDetails(conversation.getUserDetails())
                 .status(conversation.getStatus())
@@ -34,6 +35,7 @@ public final class ConversationMapper {
                 conversation.getStatus(),
                 conversation.getParticipantIds(),
                 conversation.getManagerUserId(),
+                conversation.isProjectGeneral(),
                 conversation.getStartedAt(),
                 conversation.getLastInteractionAt());
     }

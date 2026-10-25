@@ -53,7 +53,7 @@ public class TypingService {
         // participante de conversa com comunidade ativa
         Conversation conversation = authorization.requireEntityById(conversationId);
         authorization.requireParticipant(conversation, actor);
-        authorization.requireCommunityActive(conversation);
+        authorization.requireCommunityWriter(conversation, actor);
 
         typingPresence.start(conversation.getId(), userId);
         publish(conversation.getId(), userId, "TYPING_STARTED");

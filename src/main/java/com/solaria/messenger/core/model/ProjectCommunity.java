@@ -50,6 +50,11 @@ public class ProjectCommunity {
     @Field("project_id")
     private UUID projectId;
 
+    /** Começa com o nome do projeto; OWNER e ADMIN podem editar */
+    private String name;
+
+    private String description;
+
     private List<CommunityMember> members = new ArrayList<>();
 
     private CommunityStatus status;
@@ -89,6 +94,14 @@ public class ProjectCommunity {
         return member(userId)
                 .map(m ->
                  m.getRole() == CommunityRole.OWNER || m.getRole() == CommunityRole.ADMIN)
+                .orElse(false);
+    }
+
+    /** Membro que pode escrever: todos menos o VIEWER. */
+    public boolean canWrite(UUID userId) {
+        return member(userId)
+                .map(m ->
+                 m.getRole() != CommunityRole.VIEWER)
                 .orElse(false);
     }
 

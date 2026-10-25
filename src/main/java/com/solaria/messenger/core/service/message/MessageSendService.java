@@ -101,7 +101,7 @@ public class MessageSendService {
     private Message sendUserMessageAuthorized(Conversation conversation, MessageRequestDTO dto, UUID clientMessageId) {
         resourceAccess.requireActive(conversation);
         requireMessageTypeMatchesConversation(dto.getMessageType(), conversation.getConversationType());
-        resourceAccess.requireCommunityActive(conversation);
+        resourceAccess.requireCommunityWriter(conversation, rbac.currentUserId());
 
         Message message = new Message();
         message.setConversationId(conversation.getId());
