@@ -4,17 +4,20 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Profile;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -26,7 +29,7 @@ import com.solaria.messenger.core.service.UserAccessService;
 /**
  * Fronteiras de segurança HTTP do Messenger
  * Actuator é restrito em sua configuração própria;
- * /internal/** usa isolamento de rede e a chain de usuário valida o JWT com o decoder comum de
+ * /internal/** exige X-Service-Key de um agente de IA e a chain de usuário valida o JWT com o decoder comum de
  * {@link com.solaria.messenger.core.security.jwt.JwtDecoderConfig}. 
  * O proxy /dev/login e sua chain só existem no perfil dev.
  */
@@ -35,6 +38,7 @@ import com.solaria.messenger.core.service.UserAccessService;
 
 // ativa a integração do Spring Security com Spring MVC
 @EnableWebSecurity
+@EnableConfigurationProperties(ServiceKeyProperties.class)
 public class SecurityConfig {
 
         // Handlers 401/403 usados pela chain @Order(2)
@@ -64,6 +68,21 @@ public class SecurityConfig {
                 return registration;
         }
 
+        /** Filtro da chave de serviço, usado só na chain de /internal/**. */
+        @Bean
+        public ServiceKeyAuthFilter serviceKeyAuthFilter(ServiceKeyProperties serviceKeyProperties) {
+                return new ServiceKeyAuthFilter(serviceKeyProperties);
+        }
+
+        /** Desliga o registro servlet do filtro da chave de serviço, para que ele rode só dentro da chain. */
+        @Bean
+        public FilterRegistrationBean<ServiceKeyAuthFilter> serviceKeyAuthFilterRegistration(
+                        ServiceKeyAuthFilter filter) {
+                FilterRegistrationBean<ServiceKeyAuthFilter> registration = new FilterRegistrationBean<>(filter);
+                registration.setEnabled(false);
+                return registration;
+        }
+
         /** O proxy de login só existe em dev e não exige um token anterior para obter o primeiro JWT. */
         @Bean
         @Profile("dev")
@@ -81,7 +100,12 @@ public class SecurityConfig {
         @Bean
         // @Order(1)-> esta chain é avaliada ANTES da chain @Order(2), por path mais específico
         @Order(1)
-        public SecurityFilterChain internalSecurityFilterChain(HttpSecurity http) {
+        public SecurityFilterChain internalSecurityFilterChain(HttpSecurity http,
+                        ServiceKeyAuthFilter serviceKeyAuthFilter) {
+                String[] agents = {
+                                ServiceKeyAuthFilter.authorityOf("ai-assistant"),
+                                ServiceKeyAuthFilter.authorityOf("ai-operational"),
+                                ServiceKeyAuthFilter.authorityOf("ai-geographic") };
                 http
                                 // Restringe essa chain apenas para /internal/**
                                 .securityMatcher("/internal/**")
@@ -91,8 +115,17 @@ public class SecurityConfig {
                                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                                 // CorsConfigurationSource é a mesma para as duas chains
                                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                                // Rotas internas de rede-> sem autenticação de aplicação
-                                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+                                .addFilterBefore(serviceKeyAuthFilter, AnonymousAuthenticationFilter.class)
+                                .authorizeHttpRequests(auth -> auth
+                                                .requestMatchers("/internal/messages", "/internal/messages/**",
+                                                                "/internal/observability", "/internal/observability/**")
+                                                .hasAnyAuthority(agents)
+                                                .anyRequest().denyAll())
+                                .exceptionHandling(e -> e
+                                                .authenticationEntryPoint(problemDetailAuthenticationEntryPoint)
+                                                .accessDeniedHandler((request, response, ex) -> problemDetailAuthenticationEntryPoint
+                                                                .commence(request, response, new InsufficientAuthenticationException(
+                                                                                "Chave de serviço ausente ou inválida", ex))));
                 // Constrói e devolve a SecurityFilterChain configurada acima como o bean deste método
                 return http.build();
         }
