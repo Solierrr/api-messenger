@@ -9,8 +9,6 @@ import java.util.UUID;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
-import com.solaria.messenger.core.contract.request.CommunityMemberRemovalRequestDTO;
-import com.solaria.messenger.core.contract.request.CommunityMembersRequestDTO;
 import com.solaria.messenger.core.contract.request.CommunityRequestDTO;
 import com.solaria.messenger.core.contract.request.CommunityUpdateRequestDTO;
 import com.solaria.messenger.core.contract.response.CommunityResponseDTO;
@@ -45,8 +43,7 @@ import static com.solaria.messenger.core.security.rbac.CommunityPolicy.requireWr
  *     <li>{@link #findById(String)} -> busca uma comunidade da qual o user é membro.</li>
  *     <li>{@link #findByProjectId(UUID)} -> busca a comunidade de um projeto.</li>
  *     <li>{@link #findMine()} -> lista as comunidades do user.</li>
- *     <li>{@link #updateCommunity(String, CommunityUpdateRequestDTO)}, {@link #addMembers(String, CommunityMembersRequestDTO)}
- *     e {@link #removeMember(String, UUID, CommunityMemberRemovalRequestDTO)} -> recusados: membros e situação vêm do projeto.</li>
+ *     <li>{@link #updateCommunity(String, CommunityUpdateRequestDTO)} -> recusado: a situação vem do projeto.</li>
  *     <li>{@link #startConversation(String, String, Set)} -> cria um subgrupo entre membros da comunidade.</li>
  *     <li>{@link #listConversations(String)} -> lista os subgrupos que o user pode ver.</li>
  * </ul>
@@ -132,16 +129,6 @@ public class CommunityService {
 
     /** Status e membros seguem o projeto, então a comunidade não é alterada por aqui */
     public CommunityResponseDTO updateCommunity(String id, CommunityUpdateRequestDTO dto) {
-        throw new BusinessRuleException(MANAGED_BY_PROJECT);
-    }
-
-    /** Membros e papéis seguem o projeto, então não são adicionados por aqui */
-    public CommunityResponseDTO addMembers(String id, CommunityMembersRequestDTO dto) {
-        throw new BusinessRuleException(MANAGED_BY_PROJECT);
-    }
-
-    /** Quem sai do projeto sai da comunidade na próxima sincronização, então ninguém é removido por aqui */
-    public void removeMember(String id, UUID userId, CommunityMemberRemovalRequestDTO dto) {
         throw new BusinessRuleException(MANAGED_BY_PROJECT);
     }
 

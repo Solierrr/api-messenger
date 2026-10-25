@@ -22,7 +22,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.solaria.messenger.core.contract.request.CommunityMembersRequestDTO;
 import com.solaria.messenger.core.contract.request.CommunityRequestDTO;
 import com.solaria.messenger.core.contract.request.CommunityUpdateRequestDTO;
 import com.solaria.messenger.core.exception.BusinessRuleException;
@@ -128,10 +127,6 @@ class CommunityServiceTests {
     @Test
     void membersAndStatusAreManagedByTheProject() {
         assertThatThrownBy(() -> service.updateCommunity("community-1", new CommunityUpdateRequestDTO()))
-                .isInstanceOf(BusinessRuleException.class);
-        assertThatThrownBy(() -> service.addMembers("community-1", new CommunityMembersRequestDTO()))
-                .isInstanceOf(BusinessRuleException.class);
-        assertThatThrownBy(() -> service.removeMember("community-1", OTHER, null))
                 .isInstanceOf(BusinessRuleException.class);
     }
 

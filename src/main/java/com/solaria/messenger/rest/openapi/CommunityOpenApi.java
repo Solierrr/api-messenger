@@ -6,8 +6,6 @@ import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 
 import com.solaria.messenger.rest.dto.request.CommunityConversationRequestDTO;
-import com.solaria.messenger.core.contract.request.CommunityMembersRequestDTO;
-import com.solaria.messenger.core.contract.request.CommunityMemberRemovalRequestDTO;
 import com.solaria.messenger.core.contract.request.CommunityRequestDTO;
 import com.solaria.messenger.core.contract.request.CommunityUpdateRequestDTO;
 import com.solaria.messenger.core.contract.response.CommunityResponseDTO;
@@ -32,8 +30,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
  *     <li>{@link #createCommunity(CommunityRequestDTO)} - cria a comunidade de um projeto.</li>
  *     <li>{@link #findMine()} - lista as comunidades do usuário autenticado.</li>
  *     <li>{@link #updateCommunity(String, CommunityUpdateRequestDTO)} - altera o status da comunidade.</li>
- *     <li>{@link #addMembers(String, CommunityMembersRequestDTO)} - adiciona membros ou altera papéis.</li>
- *     <li>{@link #removeMember(String, UUID, CommunityMemberRemovalRequestDTO)} - remove um membro ou registra a saída.</li>
  *     <li>{@link #startConversation(String, CommunityConversationRequestDTO)} - inicia um subgrupo.</li>
  *     <li>{@link #listConversations(String)} - lista os subgrupos da comunidade.</li>
  * </ul>
@@ -86,32 +82,6 @@ public interface CommunityOpenApi {
     )
     @ApiResponses(@ApiResponse(responseCode = "422", description = "BUSINESS_RULE_VIOLATION"))
     ResponseEntity<CommunityResponseDTO> updateCommunity(String id, CommunityUpdateRequestDTO dto);
-
-    /** Contrato OpenAPI: inclusão de membros, recusada porque os membros vêm do projeto. */
-    @Operation(
-        summary = "Adiciona/altera papel de membros (recusado)",
-        description = "Recusado: membros e situação da comunidade seguem o projeto na api-core e são geridos pela página do projeto."
-    )
-    @ApiResponses(@ApiResponse(responseCode = "422", description = "BUSINESS_RULE_VIOLATION"))
-    ResponseEntity<CommunityResponseDTO> addMembers(String id, CommunityMembersRequestDTO dto);
-
-    /** Contrato OpenAPI: remoção de membro, recusada porque os membros vêm do projeto. */
-    @Operation(
-        summary = "Remove um membro | sair da comunidade (recusado)",
-        description = "Recusado: membros e situação da comunidade seguem o projeto na api-core e são geridos pela página do projeto. "
-                + "Quem sai do projeto sai da comunidade e perde os subgrupos na próxima sincronização."
-    )
-    @ApiResponses(@ApiResponse(responseCode = "422", description = "BUSINESS_RULE_VIOLATION"))
-    @io.swagger.v3.oas.annotations.parameters.RequestBody(
-            required = false,
-            content = @Content(schema = @Schema(implementation = CommunityMemberRemovalRequestDTO.class)))
-    ResponseEntity<Void> removeMember(
-            String id, UUID userId, CommunityMemberRemovalRequestDTO dto);
-
-    /** Remoção sem corpo, sem sucessores explícitos. */
-    default ResponseEntity<Void> removeMember(String id, UUID userId) {
-        return removeMember(id, userId, null);
-    }
 
     /** Contrato OpenAPI: inicia um subgrupo entre membros da comunidade. */
     @Operation(
