@@ -9,6 +9,9 @@ import org.springframework.web.client.RestClient;
 
 /**
  * Cliente HTTP para a api-core
+ *
+ * <p>Com {@code serviceKey} configurada, toda chamada leva o header {@code X-Service-Key},
+ * exigido pela api-core nas rotas {@code /internal/**}</p>
  */
 @Configuration
 @EnableConfigurationProperties(CoreClientProperties.class)
@@ -20,9 +23,12 @@ public class CoreClientConfig {
         requestFactory.setConnectTimeout((int) properties.connectTimeout().toMillis());
         requestFactory.setReadTimeout((int) properties.readTimeout().toMillis());
 
-        return RestClient.builder()
+        RestClient.Builder builder = RestClient.builder()
                 .baseUrl(properties.baseUrl())
-                .requestFactory(requestFactory)
-                .build();
+                .requestFactory(requestFactory);
+        if (properties.serviceKey() != null && !properties.serviceKey().isBlank()) {
+            builder.defaultHeader("X-Service-Key", properties.serviceKey());
+        }
+        return builder.build();
     }
 }
