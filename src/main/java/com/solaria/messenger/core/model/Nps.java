@@ -21,7 +21,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "nps")
+@Document(collection = "nps_responses")
 public class Nps {
 
     @Id
