@@ -44,7 +44,7 @@ public class StompDestinationAuthorizer {
     }
 
     /** Libera filas próprias do usuário e tópicos de conversa em que ele participa. */
-    public Message<?> authorizeSubscribe(Message<?> message, StompHeaderAccessor accessor, String userId) {
+    public <T> Message<T> authorizeSubscribe(Message<T> message, StompHeaderAccessor accessor, String userId) {
         String destination = accessor.getDestination();
         if (destination == null) {
             return deny(userId, "SUBSCRIBE_DESTINATION_REQUIRED", "SUBSCRIBE sem destino.");
@@ -69,7 +69,7 @@ public class StompDestinationAuthorizer {
     }
 
     /** Aceita SEND só para os destinos /app mapeados e exige participação na conversa do frame. */
-    public Message<?> authorizeSend(Message<?> message, StompHeaderAccessor accessor, String userId) {
+    public <T> Message<T> authorizeSend(Message<T> message, StompHeaderAccessor accessor, String userId) {
         String destination = accessor.getDestination();
         if (destination == null || !ALLOWED_SEND_DESTINATIONS.contains(destination)) {
             log.warn("SEND recusado (userId={}, destino={}): fora da allowlist", userId, destination);
@@ -79,7 +79,7 @@ public class StompDestinationAuthorizer {
     }
 
     /** Frames sem conversa identificável passam; os demais exigem participação atual. */
-    public Message<?> authorizeResource(Message<?> message, String userId) {
+    public <T> Message<T> authorizeResource(Message<T> message, String userId) {
         String conversationId = StompDestinations.conversationId(message);
         if (conversationId == null) return message;
         try {
@@ -91,7 +91,7 @@ public class StompDestinationAuthorizer {
     }
 
     /** Avisa o cliente por {@code /user/queue/errors} e descarta o frame (sem fechar a conexão). */
-    public Message<?> deny(String userId, String code, String detail) {
+    public <T> Message<T> deny(String userId, String code, String detail) {
         WsErrorPayload payload = WsErrorPayload.builder()
                 .code(code)
                 .message(detail)

@@ -120,15 +120,20 @@ public class MessageMutationService {
 
             // reflete a gravação no objeto em memória para a resposta
             current.setMutationEpoch(nextEpoch);
-            if (delete) {
-                current.setDeleted(true);
-                current.setContent(null);
-            } else {
-                current.setContent(content);
-                current.setEdited(true);
-            }
+            applyInMemory(current, content, delete);
             return new MessageMutationResult(current, true);
         });
+    }
+
+    /** Reflete a edição ou exclusão já gravada no objeto devolvido na resposta */
+    private static void applyInMemory(Message message, String content, boolean delete) {
+        if (delete) {
+            message.setDeleted(true);
+            message.setContent(null);
+        } else {
+            message.setContent(content);
+            message.setEdited(true);
+        }
     }
 
     private Message requireMessage(String messageId) {

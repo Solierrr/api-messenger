@@ -68,7 +68,7 @@ public class ConversationProjectionService {
             for (UUID actor : authorized.getOrDefault(conversation.getId(), Set.of())) {
                 OwnedState state = stateOf(states, conversation, actor);
                 if (conversation.getConversationType() != ConversationType.CHAT_BOT && state == null) throw new BaselineUnavailableException();
-                if (archivedFilter != null && (state == null ? archivedFilter : state.archived() != archivedFilter)) continue;
+                if (!passesArchiveFilter(state, archivedFilter)) continue;
                 recipients.add(actor);
                 if (state != null) cursors.computeIfAbsent(conversation.getId(), ignored -> new LinkedHashMap<>())
                         .put(actor, state.lastReadSequence());
@@ -92,6 +92,12 @@ public class ConversationProjectionService {
             }
         }
         return result;
+    }
+
+    /** Sem filtro tudo passa; sem estado (chatbot) só passa quando o filtro pede os não arquivados */
+    private static boolean passesArchiveFilter(OwnedState state, Boolean archivedFilter) {
+        if (archivedFilter == null) return true;
+        return state == null ? !archivedFilter : state.archived() == archivedFilter;
     }
 
     private static OwnedState stateOf(Map<String, Map<UUID, OwnedState>> states, Conversation conversation, UUID actor) {

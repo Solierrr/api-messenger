@@ -105,20 +105,11 @@ public class ConversationAdmissionService {
             if (current == null || !Objects.equals(expectedVersion, current.getVersion())) {
                 throw new OptimisticLockingFailureException(CONCURRENT);
             }
-
-            // só grupo ativo, e só o gestor atual adiciona
-            if (current.getConversationType() != ConversationType.GROUP || current.getStatus() != ConversationStatus.ACTIVE) {
-                throw new BusinessRuleException("O grupo não aceita novas admissões.");
-            }
-            if (!current.hasParticipant(actor) || !actor.equals(current.getManagerUserId())) {
-                throw new UnauthorizedAccessException("Somente o gestor atual pode admitir participantes.");
-            }
+            requireCanAdmit(current, actor);
             requireCommunity(current, actor, requested);
 
             // última sequência da conversa: os novos começam a ler a partir dela
-            Message latest = messages.findFirstByConversationIdOrderBySequenceDesc(id).orElse(null);
-            int head = latest == null ? 0 : latest.getSequence();
-            if (latest != null && head < 1) throw new BusinessRuleException("Sequência persistida inválida.");
+            int head = headSequence(id);
 
             // quem já participa precisa ter estado válido
             for (UUID user : current.getParticipantIds()) requireState(id, user, head, false);
@@ -133,11 +124,27 @@ public class ConversationAdmissionService {
                     current.getManagerUserId(), Instant.now(), OptimisticMutation.nextVersion(current.getVersion())) != 1) {
                 throw new OptimisticLockingFailureException(CONCURRENT);
             }
-            for (UUID user : requested) {
-                if (!current.hasParticipant(user)) requireState(id, user, head, true);
-            }
+            requested.stream().filter(user -> !current.hasParticipant(user)).forEach(user -> requireState(id, user, head, true));
             return conversations.findById(id).orElseThrow();
         }));
+    }
+
+    /** Só grupo ativo, e só o gestor atual adiciona */
+    private void requireCanAdmit(Conversation current, UUID actor) {
+        if (current.getConversationType() != ConversationType.GROUP || current.getStatus() != ConversationStatus.ACTIVE) {
+            throw new BusinessRuleException("O grupo não aceita novas admissões.");
+        }
+        if (!current.hasParticipant(actor) || !actor.equals(current.getManagerUserId())) {
+            throw new UnauthorizedAccessException("Somente o gestor atual pode admitir participantes.");
+        }
+    }
+
+    /** Sequência da última mensagem da conversa; 0 quando ainda não há mensagens */
+    private int headSequence(String conversationId) {
+        Message latest = messages.findFirstByConversationIdOrderBySequenceDesc(conversationId).orElse(null);
+        if (latest == null) return 0;
+        if (latest.getSequence() < 1) throw new BusinessRuleException("Sequência persistida inválida.");
+        return latest.getSequence();
     }
 
     /** Se a conversa é de comunidade, ela precisa estar ativa e ter o ator e todos os participantes como membros */

@@ -63,11 +63,8 @@ public class CommunityGroupCascadeService {
 
         // user já saiu da comunidade: sucessor não vale mais, só barra se ainda for gestor de grupo com outras pessoas
         if (!community.isMember(target)) {
-            for (Conversation group : subgroups) {
-                if (group.hasParticipant(target) && target.equals(group.getManagerUserId())
-                        && group.getParticipantIds().size() > 1) {
-                    throw new GroupManagerUnavailableException();
-                }
+            if (subgroups.stream().anyMatch(group -> isManagerWithOthers(group, target))) {
+                throw new GroupManagerUnavailableException();
             }
             return subgroups;
         }
@@ -85,10 +82,10 @@ public class CommunityGroupCascadeService {
         // valida a remoção em cada grupo e junta os sucessores que vão receber a gestão
         Set<UUID> transfers = new LinkedHashSet<>();
         for (Conversation group : subgroups) {
-            if (!group.hasParticipant(target)) continue;
-            groups.validateRemoval(group, actor, target, successors.get(group.getId()));
-            if (target.equals(group.getManagerUserId()) && successors.get(group.getId()) != null) {
-                transfers.add(successors.get(group.getId()));
+            if (group.hasParticipant(target)) {
+                UUID successor = successors.get(group.getId());
+                groups.validateRemoval(group, actor, target, successor);
+                if (successor != null && target.equals(group.getManagerUserId())) transfers.add(successor);
             }
         }
 
@@ -101,33 +98,42 @@ public class CommunityGroupCascadeService {
         return subgroups;
     }
 
+    private static boolean isManagerWithOthers(Conversation group, UUID target) {
+        return group.hasParticipant(target) && target.equals(group.getManagerUserId())
+                && group.getParticipantIds().size() > 1;
+    }
+
     /** Passa a gestão dos grupos que o user administra antes de ele sair da comunidade */
     public void prepareCommunityRemoval(ProjectCommunity community, UUID actor, UUID target,
             Map<String, UUID> successors, List<Conversation> subgroups) {
+        // só interessa grupo onde o user é gestor; se já saiu da comunidade, resta apenas a limpeza
+        if (!community.isMember(target)) return;
+
         for (Conversation group : subgroups) {
-            // só interessa grupo onde o user é gestor; se já saiu da comunidade, resta apenas a limpeza
-            if (!group.hasParticipant(target) || !target.equals(group.getManagerUserId())) continue;
-            if (!community.isMember(target)) continue;
-
-            groups.mutateGroup(group, latest -> {
-                // revalida tudo na versão mais recente do grupo e da comunidade
-                if (!community.getId().equals(latest.getCommunityId())) throw new ConcurrentUpdateException();
-                ProjectCommunity parent = resourceAccess.requireCommunity(community.getId());
-                requireRemovalAuthority(parent, actor, target);
-                if (!parent.isMember(target)) throw new ConcurrentUpdateException();
-                if (!latest.hasParticipant(target) || !target.equals(latest.getManagerUserId())) return null;
-
-                // grupo só com o user, removido por outra pessoa: o grupo fica vazio
-                if (latest.getParticipantIds().size() == 1 && !actor.equals(target)) {
-                    return groups.writeParticipants(latest, Set.of(), null);
-                }
-
-                // senão, a gestão vai para o sucessor indicado
-                UUID successor = successors.get(latest.getId());
-                groups.validateSuccessor(latest, target, successor);
-                return groups.writeManager(latest, successor);
-            });
+            if (group.hasParticipant(target) && target.equals(group.getManagerUserId())) {
+                groups.mutateGroup(group, latest -> transferManagement(latest, community, actor, target, successors));
+            }
         }
+    }
+
+    /** Revalida na versão mais recente do grupo e da comunidade e passa a gestão; {@code null} = nada a gravar */
+    private Long transferManagement(Conversation latest, ProjectCommunity community, UUID actor, UUID target,
+            Map<String, UUID> successors) {
+        if (!community.getId().equals(latest.getCommunityId())) throw new ConcurrentUpdateException();
+        ProjectCommunity parent = resourceAccess.requireCommunity(community.getId());
+        requireRemovalAuthority(parent, actor, target);
+        if (!parent.isMember(target)) throw new ConcurrentUpdateException();
+        if (!latest.hasParticipant(target) || !target.equals(latest.getManagerUserId())) return null;
+
+        // grupo só com o user, removido por outra pessoa: o grupo fica vazio
+        if (latest.getParticipantIds().size() == 1 && !actor.equals(target)) {
+            return groups.writeParticipants(latest, Set.of(), null);
+        }
+
+        // senão, a gestão vai para o sucessor indicado
+        UUID successor = successors.get(latest.getId());
+        groups.validateSuccessor(latest, target, successor);
+        return groups.writeManager(latest, successor);
     }
 
     /** Tira o user dos subgrupos; se a limpeza falhar, a saída da comunidade já bloqueia o acesso */
