@@ -24,7 +24,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "rating")
+@Document(collection = "ratings")
 public class Rating {
 
     @Id
