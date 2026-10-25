@@ -52,14 +52,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     // Marca a observação como erro e registra um log correlacionado ao trace
-    private void recordError(Throwable ex, HttpStatusCode status, HttpServletRequest request) {
+    private void recordError(Throwable ex, HttpStatusCode status, String errorCode, HttpServletRequest request) {
         markObservationError(ex, request);
         String method = (request != null) ? request.getMethod() : "?";
         String uri = (request != null) ? request.getRequestURI() : "?";
         if (status.is5xxServerError()) {
-            log.error("Falha {} em {} {}", status.value(), method, uri, ex);
+            log.atError().addKeyValue("errorCode", errorCode).log("Falha {} em {} {}", status.value(), method, uri, ex);
         } else {
-            log.warn("Erro {} em {} {}: {}", status.value(), method, uri, ex.getMessage());
+            log.atWarn().addKeyValue("errorCode", errorCode).log("Erro {} em {} {}: {}", status.value(), method, uri, ex.getMessage());
         }
     }
 
@@ -67,7 +67,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ProblemDetail> handleBusinessException(BusinessException ex,
                                                                  HttpServletRequest request) {
-        recordError(ex, ex.getStatus(), request);
+        recordError(ex, ex.getStatus(), ex.getErrorCode(), request);
 
         ProblemDetail body = factory.create(
                 ex.getStatus(),
@@ -82,7 +82,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(DuplicateKeyException.class)
     public ResponseEntity<ProblemDetail> handleDuplicateKey(DuplicateKeyException ex,
                                                              HttpServletRequest request) {
-        recordError(ex, HttpStatus.CONFLICT, request);
+        recordError(ex, HttpStatus.CONFLICT, "DATA_INTEGRITY_VIOLATION", request);
 
         ProblemDetail body = factory.create(HttpStatus.CONFLICT,
                 "A operação viola uma restrição de unicidade.",
@@ -96,7 +96,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(OptimisticLockingFailureException.class)
     public ResponseEntity<ProblemDetail> handleOptimisticLock(OptimisticLockingFailureException ex,
                                                               HttpServletRequest request) {
-        recordError(ex, HttpStatus.CONFLICT, request);
+        recordError(ex, HttpStatus.CONFLICT, "CONCURRENT_MODIFICATION", request);
 
         ProblemDetail body = factory.create(HttpStatus.CONFLICT,
                 "O registro foi modificado por outra operação simultânea. Recarregue e tente novamente.",
@@ -110,11 +110,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ProblemDetail> handleAccessDenied(AccessDeniedException ex,
                                                              HttpServletRequest request) {
-        recordError(ex, HttpStatus.FORBIDDEN, request);
+        recordError(ex, HttpStatus.FORBIDDEN, "ACCESS_DENIED", request);
 
         ProblemDetail body = factory.create(HttpStatus.FORBIDDEN,
                 "Você não tem permissão para executar esta ação.",
-                "UNAUTHORIZED_ACCESS",
+                "ACCESS_DENIED",
                 null,
                 request);
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
@@ -124,8 +124,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemDetail> handleUnexpected(Exception ex, HttpServletRequest request) {
         // registra no span (status ERROR + evento de excecao) com stack trace
-        markObservationError(ex, request);
-        log.error("Unhandled exception on {} {}", request.getMethod(), request.getRequestURI(), ex);
+        recordError(ex, HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", request);
         ProblemDetail body = factory.create(HttpStatus.INTERNAL_SERVER_ERROR,
                 "Ocorreu um erro interno inesperado. Se persistir, contate o suporte.",
                 "INTERNAL_ERROR",
@@ -140,7 +139,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                                                                   HttpHeaders headers,
                                                                   HttpStatusCode status,
                                                                   WebRequest request) {
-        recordError(ex, HttpStatus.BAD_REQUEST, servletRequest(request));
+        recordError(ex, HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", servletRequest(request));
 
         List<Map<String, Object>> errors = ex.getBindingResult()
                 .getFieldErrors()
@@ -166,7 +165,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                                                                             HttpHeaders headers,
                                                                             HttpStatusCode status,
                                                                             WebRequest request) {
-        recordError(ex, HttpStatus.BAD_REQUEST, servletRequest(request));
+        recordError(ex, HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", servletRequest(request));
 
         List<Map<String, Object>> errors = ex.getAllErrors()
                 .stream()
@@ -189,7 +188,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                                                                   HttpHeaders headers,
                                                                   HttpStatusCode status,
                                                                   WebRequest request) {
-        recordError(ex, HttpStatus.BAD_REQUEST, servletRequest(request));
+        recordError(ex, HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST", servletRequest(request));
 
         ProblemDetail body = factory.create(HttpStatus.BAD_REQUEST,
                 "Corpo da requisição malformado ou ilegível.",

@@ -94,10 +94,10 @@ public class ActiveUserFilter extends OncePerRequestFilter {
             throws IOException {
         HttpObservationErrors.mark(request, ex);
         if (ex.getStatus().is5xxServerError()) {
-            log.error("Falha {} em {} {}: {}", ex.getStatus().value(), request.getMethod(), request.getRequestURI(),
+            log.atError().addKeyValue("errorCode", ex.getErrorCode()).log("Falha {} em {} {}: {}", ex.getStatus().value(), request.getMethod(), request.getRequestURI(),
                     ex.getMessage(), ex);
         } else {
-            log.warn("Erro {} em {} {}: {}", ex.getStatus().value(), request.getMethod(), request.getRequestURI(),
+            log.atWarn().addKeyValue("errorCode", ex.getErrorCode()).log("Erro {} em {} {}: {}", ex.getStatus().value(), request.getMethod(), request.getRequestURI(),
                     ex.getMessage());
         }
 

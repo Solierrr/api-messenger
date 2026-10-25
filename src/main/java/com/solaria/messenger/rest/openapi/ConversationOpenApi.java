@@ -141,7 +141,7 @@ public interface ConversationOpenApi {
                     @Header(name = "X-Conversation-Sync-Version", description = "Fronteira do snapshot para reconciliar ausências",
                             schema = @Schema(type = "integer", format = "int64"))
             }),
-            @ApiResponse(responseCode = "403", description = "UNAUTHORIZED_ACCESS; atividade/participação exigidas"),
+            @ApiResponse(responseCode = "403", description = "ACCESS_DENIED; atividade/participação exigidas"),
             @ApiResponse(responseCode = "422", description = "BUSINESS_RULE_VIOLATION; baseline de admissão não verificável, sem resposta parcial")
     })
     ResponseEntity<List<ConversationListItemResponseDTO>> findMine(boolean archived);
@@ -155,7 +155,7 @@ public interface ConversationOpenApi {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Estado próprio atual"),
             @ApiResponse(responseCode = "400", description = "INVALID_FIELD; vazio/nulo/tipos/cursor futuro, sem efeitos parciais"),
-            @ApiResponse(responseCode = "403", description = "UNAUTHORIZED_ACCESS"),
+            @ApiResponse(responseCode = "403", description = "ACCESS_DENIED"),
             @ApiResponse(responseCode = "404", description = "Conversa inexistente"),
             @ApiResponse(responseCode = "422", description = "BUSINESS_RULE_VIOLATION; CHAT_BOT ou baseline não verificável")
     })
