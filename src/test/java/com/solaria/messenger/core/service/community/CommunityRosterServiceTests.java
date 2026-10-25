@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 
 import java.time.Instant;
@@ -17,6 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -26,6 +28,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.solaria.messenger.core.exception.MembershipCleanupRequiredException;
 import com.solaria.messenger.core.exception.UnauthorizedAccessException;
 import com.solaria.messenger.core.integration.core.ProjectAuthorityClient;
 import com.solaria.messenger.core.integration.core.dto.ProjectAccessResponseDTO;
@@ -47,6 +50,7 @@ class CommunityRosterServiceTests {
     private static final UUID OWNER = UUID.randomUUID();
     private static final UUID VIEWER = UUID.randomUUID();
     private static final UUID FORMER = UUID.randomUUID();
+    private static final UUID PEER = UUID.randomUUID();
 
     @Mock
     private CommunityRepository communityRepository;
@@ -66,12 +70,15 @@ class CommunityRosterServiceTests {
     @Mock
     private ProjectGeneralConversationService general;
 
+    @Mock
+    private CommunityGroupCascadeService cascade;
+
     private CommunityRosterService roster;
 
     @BeforeEach
     void setUp() {
         roster = new CommunityRosterService(communityRepository, projectAuthorityClient, queries, stateEvents,
-                new ConversationMutationGuard(), sessionRevoker, general);
+                new ConversationMutationGuard(), sessionRevoker, general, cascade);
     }
 
     private static ProjectCommunity community(CommunityMember... members) {
@@ -108,6 +115,8 @@ class CommunityRosterServiceTests {
         given(communityRepository.updateRosterIfCurrent(eq("community-1"), eq(3L), anyList(),
                 eq(CommunityStatus.ARCHIVED), any(), eq(4L))).willReturn(1L);
         given(communityRepository.findById("community-1")).willReturn(Optional.of(current));
+        given(cascade.cleanupCommunityRemoval(eq("community-1"), any())).willAnswer(call ->
+                FORMER.equals(call.getArgument(1)) ? Map.of("subgroup-1", Set.of(FORMER, PEER)) : Map.of());
 
         roster.apply(current, access(true, members));
 
@@ -118,7 +127,11 @@ class CommunityRosterServiceTests {
         assertThat(written.getValue()).extracting(CommunityMember::getRole)
                 .containsExactly(CommunityRole.OWNER, CommunityRole.VIEWER);
         assertThat(written.getValue().getFirst().getJoinedAt()).isEqualTo(joined);
+        verify(cascade).requireNoResidualCommunityMembership("community-1", Set.of(VIEWER));
+        verify(stateEvents).publishRemovedConversation(FORMER, "subgroup-1");
+        verify(stateEvents).publishRemovedConversation(PEER, "subgroup-1");
         verify(sessionRevoker).revokeUser(FORMER);
+        verify(sessionRevoker).revokeUser(PEER);
         verify(sessionRevoker, never()).revokeUser(OWNER);
         verify(general).ensure(current, "Projeto");
     }
@@ -147,6 +160,21 @@ class CommunityRosterServiceTests {
 
         verify(communityRepository).updateMembersIfCurrent(eq("community-1"), eq(3L),
                 eq(List.of(current.getMembers().getFirst())), any(), eq(4L));
+        verify(cascade).cleanupCommunityRemoval("community-1", FORMER);
         verify(sessionRevoker).revokeUser(FORMER);
+    }
+
+    @Test
+    void returningMemberWithSubgroupResidueIsNotReadmitted() {
+        ProjectCommunity current = community(CommunityMember.of(OWNER, CommunityRole.OWNER, Instant.now()));
+        willThrow(new MembershipCleanupRequiredException()).given(cascade)
+                .requireNoResidualCommunityMembership("community-1", Set.of(FORMER));
+
+        assertThatThrownBy(() -> roster.apply(current, access(false, Map.of(OWNER, "OWNER", FORMER, "MEMBER"))))
+                .isInstanceOf(MembershipCleanupRequiredException.class);
+
+        verify(cascade).cleanupCommunityRemoval("community-1", FORMER);
+        verify(communityRepository, never()).updateRosterIfCurrent(anyString(), anyLong(), anyList(), any(), any(),
+                anyLong());
     }
 }

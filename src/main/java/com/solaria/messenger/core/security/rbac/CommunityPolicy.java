@@ -2,10 +2,8 @@ package com.solaria.messenger.core.security.rbac;
 
 import java.util.UUID;
 
-import com.solaria.messenger.core.exception.BusinessRuleException;
 import com.solaria.messenger.core.exception.UnauthorizedAccessException;
 import com.solaria.messenger.core.model.ProjectCommunity;
-import com.solaria.messenger.core.model.enums.CommunityStatus;
 
 /** Autorização por papel ({@code OWNER/ADMIN/MEMBER/VIEWER}) na comunidade, compartilhada pelos serviços e pela cascata. */
 public final class CommunityPolicy {
@@ -37,19 +35,6 @@ public final class CommunityPolicy {
     public static void requireOwner(ProjectCommunity community, UUID actor) {
         if (!community.isOwner(actor)) {
             throw new UnauthorizedAccessException("Esta ação exige papel OWNER na comunidade.");
-        }
-    }
-
-    /** A limpeza de uma participação já revogada só retira resíduos, nunca concede acesso ou gestão. */
-    public static void requireRemovalAuthority(ProjectCommunity community, UUID actor, UUID target) {
-        if (community.isOwner(target)) {
-            throw new BusinessRuleException("O dono da comunidade não pode ser removido.");
-        }
-        if (!actor.equals(target) && (!community.isMember(actor) || !community.isAdmin(actor))) {
-            throw new UnauthorizedAccessException("A remoção de terceiros exige OWNER ou ADMIN atuais.");
-        }
-        if (community.isMember(target) && !actor.equals(target) && community.getStatus() != CommunityStatus.ACTIVE) {
-            throw new BusinessRuleException("A comunidade está arquivada.");
         }
     }
 }

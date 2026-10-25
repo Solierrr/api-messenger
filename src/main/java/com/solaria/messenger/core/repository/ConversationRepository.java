@@ -26,6 +26,7 @@ import com.solaria.messenger.core.model.enums.ConversationType;
  *     <li>{@link #findByParticipantIdsContainingOrderByLastInteractionAtDesc(UUID)} -> conversas do participante.</li>
  *     <li>{@link #updateParticipantsIfCurrent(String, Long, Set, UUID, Instant, Long)} -> altera participação e gestor na versão observada.</li>
  *     <li>{@link #updateManagerIfCurrent(String, Long, UUID, Instant, Long)} -> transfere a gestão na versão observada.</li>
+ *     <li>{@link #dissolveIfCurrent(String, Long, Instant, Long)} -> desfaz o grupo na versão observada.</li>
  *     <li>{@link #updateProjectGeneralIfCurrent(String, Long, Set, UUID, String, Long)} -> alinha a conversa geral do projeto.</li>
  *     <li>{@link #updateLastInteraction(String, Instant)} -> avança a última interação sem regredir o valor.</li>
  * </ul>
@@ -56,9 +57,6 @@ public interface ConversationRepository extends MongoRepository<Conversation, St
     List<Conversation> findByCommunityIdAndConversationTypeAndParticipantIdsContainingOrderByLastInteractionAtDesc(
             String communityId, ConversationType conversationType, UUID userId);
 
-    /** Indica se o usuário ainda participa de algum subgrupo da comunidade. */
-    boolean existsByCommunityIdAndParticipantIdsContaining(String communityId, UUID userId);
-
     /** Altera participação/gestor sem substituir estado pessoal ou demais campos. */
     @Query("{ '_id': ?0, 'version': ?1 }")
     @Update("{ '$set': { 'participant_ids': ?2, 'manager_user_id': ?3, 'version': ?5 }, "
@@ -71,6 +69,12 @@ public interface ConversationRepository extends MongoRepository<Conversation, St
     @Update("{ '$set': { 'participant_ids': ?2, 'manager_user_id': ?3, 'title': ?4, 'version': ?5 } }")
     long updateProjectGeneralIfCurrent(String id, Long version, Set<UUID> participants, UUID manager, String title,
             Long nextVersion);
+
+    /** Desfaz o grupo na versão observada: todos saem, sem gestor, e a conversa fica desativada. */
+    @Query("{ '_id': ?0, 'version': ?1 }")
+    @Update("{ '$set': { 'participant_ids': [], 'manager_user_id': null, 'status': 'DEACTIVATED', 'version': ?3 }, "
+            + "'$max': { 'last_interaction_at': ?2 } }")
+    long dissolveIfCurrent(String id, Long version, Instant interaction, Long nextVersion);
 
     /** A versão impede que uma transferência substitua outra decisão concorrente. */
     @Query("{ '_id': ?0, 'version': ?1 }")

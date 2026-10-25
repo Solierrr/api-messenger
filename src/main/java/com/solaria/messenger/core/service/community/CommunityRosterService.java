@@ -2,7 +2,8 @@ package com.solaria.messenger.core.service.community;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,7 +38,8 @@ import com.solaria.messenger.core.service.port.SessionRevoker;
  * <p>
  * Os envolvidos do projeto viram membros com o papel equivalente ({@code OWNER -> OWNER}, {@code MANAGER -> ADMIN},
  * {@code MEMBER -> MEMBER}, {@code VIEWER -> VIEWER}) e projeto só para consulta deixa a comunidade arquivada.
- * Quem saiu do projeto perde a comunidade e as sessões abertas, mesmo que seja ele quem consultou.
+ * Quem saiu do projeto perde a comunidade, os subgrupos ({@link CommunityGroupCascadeService}) e as sessões
+ * abertas, mesmo que seja ele quem consultou.
  * A conversa geral do projeto ({@link ProjectGeneralConversationService}) acompanha os membros.
  * </p>
  * <ul>
@@ -57,10 +59,12 @@ public class CommunityRosterService {
     private final ConversationMutationGuard guard;
     private final SessionRevoker sessionRevoker;
     private final ProjectGeneralConversationService general;
+    private final CommunityGroupCascadeService cascade;
 
     public CommunityRosterService(CommunityRepository communityRepository, ProjectAuthorityClient projectAuthorityClient,
             ConversationQueryService queries, ConversationChangeNotifier stateEvents, ConversationMutationGuard guard,
-            SessionRevoker sessionRevoker, ProjectGeneralConversationService general) {
+            SessionRevoker sessionRevoker, ProjectGeneralConversationService general,
+            CommunityGroupCascadeService cascade) {
         this.communityRepository = communityRepository;
         this.projectAuthorityClient = projectAuthorityClient;
         this.queries = queries;
@@ -68,6 +72,7 @@ public class CommunityRosterService {
         this.guard = guard;
         this.sessionRevoker = sessionRevoker;
         this.general = general;
+        this.cascade = cascade;
     }
 
     /** Consulta o projeto em nome do user e alinha a comunidade; fora do projeto, o user sai da comunidade e recebe 403 */
@@ -80,50 +85,89 @@ public class CommunityRosterService {
         }
     }
 
-    /** Grava membros e status derivados com CAS; avisa os subgrupos e derruba as sessões de quem saiu */
+    /**
+     * Grava membros e status derivados com CAS. Quem saiu sai também dos subgrupos (os que ele geria são desfeitos);
+     * quem volta só entra depois de limpo o resíduo nos subgrupos. Avisa as conversas e derruba as sessões de quem
+     * perdeu acesso.
+     */
     public ProjectCommunity apply(ProjectCommunity community, ProjectAccessResponseDTO access) {
-        Set<UUID> removed = new HashSet<>();
+        Set<UUID> removed = new LinkedHashSet<>();
+        Map<String, Set<UUID>> lost = new LinkedHashMap<>();
         boolean[] changed = { false };
 
-        ProjectCommunity updated = guard.execute(() -> OptimisticMutation.apply(community, current -> {
-            List<CommunityMember> members = membersOf(access, current.getMembers(), Instant.now());
-            CommunityStatus status = access.readOnly() ? CommunityStatus.ARCHIVED : CommunityStatus.ACTIVE;
-            if (sameRoster(current.getMembers(), members) && current.getStatus() == status) return null;
+        ProjectCommunity updated = guard.execute(() -> {
+            ProjectCommunity written = OptimisticMutation.apply(community, current -> {
+                List<CommunityMember> members = membersOf(access, current.getMembers(), Instant.now());
+                CommunityStatus status = access.readOnly() ? CommunityStatus.ARCHIVED : CommunityStatus.ACTIVE;
+                if (sameRoster(current.getMembers(), members) && current.getStatus() == status) return null;
 
-            long modified = communityRepository.updateRosterIfCurrent(current.getId(), current.getVersion(), members,
-                    status, Instant.now(), OptimisticMutation.nextVersion(current.getVersion()));
-            if (modified == 1) {
-                changed[0] = true;
-                Set<UUID> remaining = members.stream().map(CommunityMember::getUserId).collect(Collectors.toSet());
-                current.memberIds().stream().filter(user -> !remaining.contains(user)).forEach(removed::add);
-            }
-            return modified;
-        }, () -> requireEntityById(community.getId()),
-                () -> new ConcurrentUpdateException("A comunidade mudou durante a operação.")));
+                Set<UUID> admitted = members.stream().map(CommunityMember::getUserId)
+                        .filter(user -> !current.isMember(user)).collect(Collectors.toCollection(LinkedHashSet::new));
+                admitted.forEach(user -> lost.putAll(cascade.cleanupCommunityRemoval(current.getId(), user)));
+                cascade.requireNoResidualCommunityMembership(current.getId(), admitted);
+
+                long modified = communityRepository.updateRosterIfCurrent(current.getId(), current.getVersion(),
+                        members, status, Instant.now(), OptimisticMutation.nextVersion(current.getVersion()));
+                if (modified == 1) {
+                    changed[0] = true;
+                    Set<UUID> remaining = members.stream().map(CommunityMember::getUserId).collect(Collectors.toSet());
+                    current.memberIds().stream().filter(user -> !remaining.contains(user)).forEach(removed::add);
+                }
+                return modified;
+            }, () -> requireEntityById(community.getId()),
+                    () -> new ConcurrentUpdateException("A comunidade mudou durante a operação."));
+            removed.forEach(user -> lost.putAll(cleanupSubgroups(written.getId(), user)));
+            return written;
+        });
 
         general.ensure(updated, access.name());
-        if (changed[0]) publishCommunityConversations(updated.getId());
-        removed.forEach(sessionRevoker::revokeUser);
+        publishLoss(updated.getId(), changed[0], removed, lost);
         return updated;
     }
 
-    /** Tira da comunidade quem a api-core já não reconhece no projeto e derruba as sessões dele */
+    /** Tira da comunidade, e dos subgrupos, quem a api-core já não reconhece no projeto */
     private void dropMember(ProjectCommunity community, UUID user) {
+        Map<String, Set<UUID>> lost = new LinkedHashMap<>();
         boolean[] changed = { false };
-        ProjectCommunity updated = guard.execute(() -> OptimisticMutation.apply(community, current -> {
-            if (!current.isMember(user)) return null;
-            List<CommunityMember> survivors = new ArrayList<>(current.getMembers());
-            survivors.removeIf(member -> member.getUserId().equals(user));
-            long modified = communityRepository.updateMembersIfCurrent(current.getId(), current.getVersion(), survivors,
-                    Instant.now(), OptimisticMutation.nextVersion(current.getVersion()));
-            if (modified == 1) changed[0] = true;
-            return modified;
-        }, () -> requireEntityById(community.getId()),
-                () -> new ConcurrentUpdateException("A comunidade mudou durante a operação.")));
+        ProjectCommunity updated = guard.execute(() -> {
+            ProjectCommunity written = OptimisticMutation.apply(community, current -> {
+                if (!current.isMember(user)) return null;
+                List<CommunityMember> survivors = new ArrayList<>(current.getMembers());
+                survivors.removeIf(member -> member.getUserId().equals(user));
+                long modified = communityRepository.updateMembersIfCurrent(current.getId(), current.getVersion(),
+                        survivors, Instant.now(), OptimisticMutation.nextVersion(current.getVersion()));
+                if (modified == 1) changed[0] = true;
+                return modified;
+            }, () -> requireEntityById(community.getId()),
+                    () -> new ConcurrentUpdateException("A comunidade mudou durante a operação."));
+            lost.putAll(cleanupSubgroups(written.getId(), user));
+            return written;
+        });
 
         general.ensure(updated, null);
-        if (changed[0]) publishCommunityConversations(updated.getId());
-        sessionRevoker.revokeUser(user);
+        publishLoss(updated.getId(), changed[0], Set.of(user), lost);
+    }
+
+    /** Limpa os subgrupos de quem saiu; se falhar, a saída da comunidade já bloqueia o acesso e a readmissão refaz */
+    private Map<String, Set<UUID>> cleanupSubgroups(String communityId, UUID user) {
+        try {
+            return cascade.cleanupCommunityRemoval(communityId, user);
+        } catch (RuntimeException failure) {
+            log.warn("Falha ao tirar dos subgrupos quem saiu da comunidade (communityId={}, userId={})",
+                    communityId, user, failure);
+            return Map.of();
+        }
+    }
+
+    /** Avisa quem perdeu cada conversa, atualiza os subgrupos e derruba as sessões de quem perdeu acesso */
+    private void publishLoss(String communityId, boolean changed, Set<UUID> removed, Map<String, Set<UUID>> lost) {
+        lost.forEach((conversationId, users) ->
+                users.forEach(user -> stateEvents.publishRemovedConversation(user, conversationId)));
+        if (changed || !lost.isEmpty()) publishCommunityConversations(communityId);
+
+        Set<UUID> revoked = new LinkedHashSet<>(removed);
+        lost.values().forEach(revoked::addAll);
+        revoked.forEach(sessionRevoker::revokeUser);
     }
 
     /** Membros com o papel do projeto, preservando a data de entrada de quem já era membro */
