@@ -10,6 +10,10 @@ post {
   auth: none
 }
 
+headers {
+  X-Service-Key: {{serviceKey}}
+}
+
 body:json {
   {
     "node": "recommendation",
@@ -27,6 +31,6 @@ body:json {
 
 docs {
   Registra um evento de telemetria de um passo do pipeline de LLM
-  Log de auditoria imutável -> não há update/delete. Se timestamp não for informado o horário de ingestão (Instant.now()) é usado. Rota interna: a aplicação não exige Bearer; restrinja o acesso pela rede.
+  Log de auditoria imutável -> não há update/delete. Se timestamp não for informado o horário de ingestão (Instant.now()) é usado. Rota interna: exige X-Service-Key de um agente de IA (ai-assistant, ai-operational ou ai-geographic).
   This operation may change server state.
 }

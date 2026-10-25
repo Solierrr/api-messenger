@@ -12,7 +12,7 @@ Este repositório é Java 21 + Spring Boot, buildado com Maven. O processo local
 
 - **JDK 21 instalado localmente**, a mesma versão usada no [`Dockerfile`](./Dockerfile) do repositório (`eclipse-temurin:21`) — rodar fora do container exige essa versão instalada e configurada como `JAVA_HOME`.
 - **MongoDB acessível**, o serviço se conecta via `DB_MONGO_URI` (padrão `mongodb://localhost:27017`) no banco `DB_MONGO_MESSENGER` (padrão `solaria_messenger_db`), ver `spring.data.mongodb.uri` em `application.properties` — sem uma instância local ou remota no ar, a aplicação sobe (não há checagem de conexão no boot), mas qualquer chamada a `/messaging/**` ou `/internal/**` que toque o banco falha. O jeito mais simples de ter um Mongo local é `docker run -d -p 27017:27017 --name mongo-messenger mongo`.
-- **Segredo do token de serviço M2M**, `SERVICE_JWT_SECRET` e `SERVICE_CLIENT_SECRET` não têm valor padrão em `application.properties` — sem eles, o `ServiceTokenProperties`/`ServiceTokenProvider` falha ao subir e nenhuma rota `/internal/**` funciona (nem a emissão de token via `POST /internal/service-tokens`, nem a validação feita por `ServiceTokenAuthFilter`).
+- **Chaves de serviço**, `SERVICE_KEY` (chave deste serviço, enviada ao `api-core`) e `SERVICE_KEY_AI_ASSISTANT`, `SERVICE_KEY_AI_OPERATIONAL` e `SERVICE_KEY_AI_GEOGRAPHIC` (aceitas nas rotas `/internal/**`), na pasta `/service-keys` do Infisical; sem elas a aplicação sobe, mas as rotas internas respondem 401 e a autoridade de projeto fica indisponível.
 - **JWKS do `api-auth` para validar JWT de usuário**, `JWT_JWK_SET_URI` aponta por padrão para `http://localhost:8081/.well-known/jwks.json` — sem o `api-auth` no ar nessa porta (ou a URL ajustada para o ambiente correto), qualquer rota `/messaging/**` retorna 401, já que o `NimbusJwtDecoder` não consegue buscar a chave pública para validar a assinatura.
 - **Secrets locais**, variáveis de ambiente equivalentes às injetadas em runtime pelo [Infisical](https://infisical.com) precisam ser criadas manualmente em `.env` na raiz do projeto (ver [`.env.example`](./.env.example) para a lista completa) — sem elas, a aplicação sobe mas falha ao tentar se conectar em dependências externas.
 
@@ -49,7 +49,7 @@ Use sempre o wrapper (`mvnw`/`mvnw.cmd`) em vez de um Maven instalado globalment
 ./mvnw spring-boot:run
 ```
 
-A aplicação sobe por padrão na porta `8080` (mesma porta exposta no `Dockerfile`, sem `server.port` customizado em `application.properties`). Com o serviço e o MongoDB no ar, `POST /internal/service-tokens` com o `clientSecret` configurado é um bom smoke test — não depende do `api-auth`, só do `SERVICE_CLIENT_SECRET` local, e confirma que o serviço subiu e consegue mintar um token M2M.
+A aplicação sobe por padrão na porta `8080` (mesma porta exposta no `Dockerfile`, sem `server.port` customizado em `application.properties`). Com o serviço e o MongoDB no ar, `GET /actuator/health` é um bom smoke test: não depende do `api-auth` e confirma que o serviço subiu e alcança o MongoDB.
 
 ### Testando os endpoints
 
@@ -59,4 +59,4 @@ A aplicação sobe por padrão na porta `8080` (mesma porta exposta no `Dockerfi
   </a>
 </p>
 
-O repositório expõe a documentação OpenAPI/Swagger via `springdoc-openapi-starter-webmvc-ui` (`OpenApiConfig`), disponível publicamente (sem autenticação) em `/swagger-ui.html` com o serviço no ar. As rotas `/messaging/**` exigem um JWT de usuário válido emitido pelo `api-auth` no header `Authorization: Bearer {token}`; as rotas `/internal/**` são permitidas pela autenticação da aplicação e devem ser protegidas pela rede. A coleção Bruno versionada em `http/` oferece requests de exemplo para as rotas documentadas; selecione o ambiente `local` e preencha os tokens somente no Bruno local.
+O repositório expõe a documentação OpenAPI/Swagger via `springdoc-openapi-starter-webmvc-ui` (`OpenApiConfig`), disponível publicamente (sem autenticação) em `/swagger-ui.html` com o serviço no ar. As rotas `/messaging/**` exigem um JWT de usuário válido emitido pelo `api-auth` no header `Authorization: Bearer {token}`; as rotas `/internal/**` exigem o cabeçalho `X-Service-Key` com a chave de um agente de IA (variável `serviceKey` no ambiente do Bruno). A coleção Bruno versionada em `http/` oferece requests de exemplo para as rotas documentadas; selecione o ambiente `local` e preencha os tokens somente no Bruno local.

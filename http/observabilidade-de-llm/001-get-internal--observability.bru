@@ -10,11 +10,15 @@ get {
   auth: none
 }
 
+headers {
+  X-Service-Key: {{serviceKey}}
+}
+
 params:query {
   conversationId: {{conversationId}}
 }
 
 docs {
   Lista/filtra eventos de telemetria
-  No máximo um filtro (conversationId, node ou status) pode ser informado por chamada nesta versão; nenhum filtro informado devolve todos os eventos. Rota interna: a aplicação não exige Bearer; restrinja o acesso pela rede.
+  No máximo um filtro (conversationId, node ou status) pode ser informado por chamada nesta versão; nenhum filtro informado devolve todos os eventos. Rota interna: exige X-Service-Key de um agente de IA (ai-assistant, ai-operational ou ai-geographic).
 }
