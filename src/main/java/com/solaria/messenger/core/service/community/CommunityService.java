@@ -3,6 +3,7 @@ package com.solaria.messenger.core.service.community;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -15,6 +16,8 @@ import com.solaria.messenger.core.contract.response.CommunityResponseDTO;
 import com.solaria.messenger.core.contract.response.GroupCreationResponseDTO;
 import com.solaria.messenger.core.contract.response.SubgroupMetadataResponseDTO;
 import com.solaria.messenger.core.exception.BusinessRuleException;
+import com.solaria.messenger.core.exception.ConcurrentUpdateException;
+import com.solaria.messenger.core.exception.InvalidFieldException;
 import com.solaria.messenger.core.exception.ResourceNotFoundException;
 import com.solaria.messenger.core.exception.UnauthorizedAccessException;
 import com.solaria.messenger.core.integration.core.ProjectAuthorityClient;
@@ -24,10 +27,13 @@ import com.solaria.messenger.core.model.enums.CommunityRole;
 import com.solaria.messenger.core.model.enums.CommunityStatus;
 import com.solaria.messenger.core.repository.CommunityRepository;
 import com.solaria.messenger.core.security.rbac.RbacAuthorizationService;
+import com.solaria.messenger.core.service.ConversationMutationGuard;
+import com.solaria.messenger.core.service.OptimisticMutation;
 import com.solaria.messenger.core.service.conversation.ConversationCreationService;
 import com.solaria.messenger.core.service.conversation.ConversationQueryService;
 
 import static com.solaria.messenger.core.mapper.CommunityMapper.toResponse;
+import static com.solaria.messenger.core.security.rbac.CommunityPolicy.requireAdmin;
 import static com.solaria.messenger.core.security.rbac.CommunityPolicy.requireMember;
 import static com.solaria.messenger.core.security.rbac.CommunityPolicy.requireWriter;
 
@@ -43,7 +49,7 @@ import static com.solaria.messenger.core.security.rbac.CommunityPolicy.requireWr
  *     <li>{@link #findById(String)} -> busca uma comunidade da qual o user é membro.</li>
  *     <li>{@link #findByProjectId(UUID)} -> busca a comunidade de um projeto.</li>
  *     <li>{@link #findMine()} -> lista as comunidades do user.</li>
- *     <li>{@link #updateCommunity(String, CommunityUpdateRequestDTO)} -> recusado: a situação vem do projeto.</li>
+ *     <li>{@link #updateCommunity(String, CommunityUpdateRequestDTO)} -> altera nome e descrição (OWNER/ADMIN).</li>
  *     <li>{@link #startConversation(String, String, Set)} -> cria um subgrupo entre membros da comunidade.</li>
  *     <li>{@link #listConversations(String)} -> lista os subgrupos que o user pode ver.</li>
  * </ul>
@@ -51,24 +57,25 @@ import static com.solaria.messenger.core.security.rbac.CommunityPolicy.requireWr
 @Service
 public class CommunityService {
 
-    static final String MANAGED_BY_PROJECT = "Gerencie participantes e situação pela página do projeto.";
-
     private final CommunityRepository communityRepository;
     private final ConversationQueryService queries;
     private final ConversationCreationService creations;
     private final RbacAuthorizationService rbac;
     private final ProjectAuthorityClient projectAuthorityClient;
     private final CommunityRosterService roster;
+    private final ConversationMutationGuard guard;
 
     public CommunityService(CommunityRepository communityRepository, ConversationQueryService queries,
             ConversationCreationService creations, RbacAuthorizationService rbac,
-            ProjectAuthorityClient projectAuthorityClient, CommunityRosterService roster) {
+            ProjectAuthorityClient projectAuthorityClient, CommunityRosterService roster,
+            ConversationMutationGuard guard) {
         this.communityRepository = communityRepository;
         this.queries = queries;
         this.creations = creations;
         this.rbac = rbac;
         this.projectAuthorityClient = projectAuthorityClient;
         this.roster = roster;
+        this.guard = guard;
     }
 
     /** Cria a comunidade com os envolvidos do projeto; se ela já existe, sincroniza e devolve a existente */
@@ -82,6 +89,7 @@ public class CommunityService {
         Instant now = Instant.now();
         ProjectCommunity community = new ProjectCommunity();
         community.setProjectId(dto.getProjectId());
+        community.setName(access.name());
         community.setMembers(new ArrayList<>(CommunityRosterService.membersOf(access, null, now)));
         community.setStatus(access.readOnly() ? CommunityStatus.ARCHIVED : CommunityStatus.ACTIVE);
         community.setCreatedBy(currentUserId);
@@ -127,9 +135,32 @@ public class CommunityService {
         }
     }
 
-    /** Status e membros seguem o projeto, então a comunidade não é alterada por aqui */
+    /** OWNER e ADMIN alteram nome e descrição; comunidade arquivada não muda; grava com CAS */
     public CommunityResponseDTO updateCommunity(String id, CommunityUpdateRequestDTO dto) {
-        throw new BusinessRuleException(MANAGED_BY_PROJECT);
+        if (dto == null || (dto.getName() == null && dto.getDescription() == null)) {
+            throw new InvalidFieldException("Informe o nome ou a descrição.");
+        }
+        if (dto.getName() != null && dto.getName().isBlank()) {
+            throw new InvalidFieldException("O nome não pode ficar vazio.");
+        }
+
+        ProjectCommunity synced = requireSyncedMember(requireEntityById(id));
+        UUID actor = rbac.currentUserId();
+        return toResponse(guard.execute(() -> OptimisticMutation.apply(synced, current -> {
+            requireAdmin(current, actor);
+            if (current.getStatus() != CommunityStatus.ACTIVE) {
+                throw new BusinessRuleException("A comunidade está arquivada.");
+            }
+
+            String name = dto.getName() == null ? current.getName() : dto.getName().strip();
+            String description = dto.getDescription() == null ? current.getDescription()
+                    : dto.getDescription().isBlank() ? null : dto.getDescription().strip();
+            if (Objects.equals(name, current.getName()) && Objects.equals(description, current.getDescription())) {
+                return null;
+            }
+            return communityRepository.updateDetailsIfCurrent(current.getId(), current.getVersion(), name,
+                    description, Instant.now(), OptimisticMutation.nextVersion(current.getVersion()));
+        }, () -> requireEntityById(id), () -> new ConcurrentUpdateException("A comunidade mudou durante a operação."))));
     }
 
     /** Cria um subgrupo; o criador precisa poder escrever no projeto */

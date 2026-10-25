@@ -37,7 +37,7 @@ import jakarta.validation.Valid;
  *     <li>{@link #findMine()} -> lista as comunidades do usuário autenticado.</li>
  *     <li>{@link #findById(String)} -> busca uma comunidade da qual o usuário é membro.</li>
  *     <li>{@link #findByProjectId(UUID)} -> busca a comunidade de um projeto.</li>
- *     <li>{@link #updateCommunity(String, CommunityUpdateRequestDTO)} -> recusado: a situação vem do projeto.</li>
+ *     <li>{@link #updateCommunity(String, CommunityUpdateRequestDTO)} -> altera o nome e a descrição da comunidade.</li>
  *     <li>{@link #startConversation(String, CommunityConversationRequestDTO)} -> cria um subgrupo (201).</li>
  *     <li>{@link #listConversations(String)} -> lista os subgrupos visíveis ao usuário.</li>
  * </ul>
@@ -81,7 +81,7 @@ public class CommunityController implements CommunityOpenApi {
         return ResponseEntity.ok(communityService.findByProjectId(projectId));
     }
 
-    /** Arquiva ou reativa a comunidade. */
+    /** Altera o nome e a descrição da comunidade. */
     @Override
     @PatchMapping("/{id}")
     public ResponseEntity<CommunityResponseDTO> updateCommunity(

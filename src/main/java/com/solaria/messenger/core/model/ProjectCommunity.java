@@ -50,6 +50,11 @@ public class ProjectCommunity {
     @Field("project_id")
     private UUID projectId;
 
+    /** Começa com o nome do projeto; OWNER e ADMIN podem editar */
+    private String name;
+
+    private String description;
+
     private List<CommunityMember> members = new ArrayList<>();
 
     private CommunityStatus status;

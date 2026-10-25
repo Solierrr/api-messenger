@@ -26,6 +26,8 @@ public class CommunityResponseDTO {
 
     private String id;
     private UUID projectId;
+    private String name;
+    private String description;
     private List<CommunityMemberDTO> members;
     private CommunityStatus status;
     private UUID createdBy;

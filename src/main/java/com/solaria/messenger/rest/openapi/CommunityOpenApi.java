@@ -29,7 +29,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
  * <ul>
  *     <li>{@link #createCommunity(CommunityRequestDTO)} - cria a comunidade de um projeto.</li>
  *     <li>{@link #findMine()} - lista as comunidades do usuário autenticado.</li>
- *     <li>{@link #updateCommunity(String, CommunityUpdateRequestDTO)} - altera o status da comunidade.</li>
+ *     <li>{@link #updateCommunity(String, CommunityUpdateRequestDTO)} - altera o nome e a descrição da comunidade.</li>
  *     <li>{@link #startConversation(String, CommunityConversationRequestDTO)} - inicia um subgrupo.</li>
  *     <li>{@link #listConversations(String)} - lista os subgrupos da comunidade.</li>
  * </ul>
@@ -41,7 +41,8 @@ public interface CommunityOpenApi {
     @Operation(
         summary = "Cria a comunidade de um projeto",
         description = "Membros e papéis vêm do projeto na api-core (OWNER -> OWNER, MANAGER -> ADMIN, MEMBER -> MEMBER, "
-        + "VIEWER -> VIEWER) | memberIds não concede participação | Uma comunidade por projeto: se já existir, "
+        + "VIEWER -> VIEWER) | o nome começa como o do projeto | memberIds não concede participação | "
+        + "Uma comunidade por projeto: se já existir, "
         + "é sincronizada e devolvida. Projeto só para consulta deixa a comunidade ARCHIVED."
     )
     @ApiResponses({
@@ -75,12 +76,21 @@ public interface CommunityOpenApi {
     })
     ResponseEntity<CommunityResponseDTO> findByProjectId(UUID projectId);
 
-    /** Contrato OpenAPI: alteração do status, recusada porque a situação vem do projeto. */
+    /** Contrato OpenAPI: altera o nome e a descrição da comunidade. */
     @Operation(
-        summary = "Altera o status da comunidade (recusado)",
-        description = "Recusado: membros e situação da comunidade seguem o projeto na api-core e são geridos pela página do projeto."
+        summary = "Altera o nome e a descrição da comunidade",
+        description = "OWNER e ADMIN editam nome e descrição; campo ausente fica como está, descrição vazia apaga. "
+                + "Membros e status seguem o projeto na api-core e não mudam por aqui. Comunidade ARCHIVED não é editada."
     )
-    @ApiResponses(@ApiResponse(responseCode = "422", description = "BUSINESS_RULE_VIOLATION"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Comunidade atualizada ou sem mudança"),
+            @ApiResponse(responseCode = "400", description = "INVALID_FIELD; nenhum campo informado, nome vazio ou longo demais"),
+            @ApiResponse(responseCode = "403", description = "Usuário fora do projeto ou sem papel OWNER/ADMIN"),
+            @ApiResponse(responseCode = "404", description = "Comunidade não encontrada"),
+            @ApiResponse(responseCode = "409", description = "CONCURRENT_MODIFICATION"),
+            @ApiResponse(responseCode = "422", description = "Comunidade arquivada"),
+            @ApiResponse(responseCode = "503", description = "api-core indisponível")
+    })
     ResponseEntity<CommunityResponseDTO> updateCommunity(String id, CommunityUpdateRequestDTO dto);
 
     /** Contrato OpenAPI: inicia um subgrupo entre membros da comunidade. */
