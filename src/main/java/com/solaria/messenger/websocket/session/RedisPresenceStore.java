@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -131,14 +132,14 @@ public class RedisPresenceStore {
      * Diz se o user tem sessão em qualquer pod.
      *
      * @param userId user consultado.
-     * @return a presença, ou {@code null} se o Redis falhar.
+     * @return a presença, ou vazio se o Redis falhar.
      */
-    public Boolean online(UUID userId) {
+    public Optional<Boolean> online(UUID userId) {
         try {
-            return count(userId) > 0;
+            return Optional.of(count(userId) > 0);
         } catch (RuntimeException failure) {
             log.warn("Redis indisponível ao ler presença (userId={})", userId, failure);
-            return null;
+            return Optional.empty();
         }
     }
 
@@ -188,7 +189,7 @@ public class RedisPresenceStore {
      */
     public void renew(Map<String, UUID> localSessions) {
         try {
-            redis.opsForZSet().add(PODS, podId, System.currentTimeMillis());
+            redis.opsForZSet().add(PODS, podId, (double) System.currentTimeMillis());
             if (localSessions.isEmpty()) return;
             localSessions.forEach((sessionId, userId) -> {
                 redis.opsForHash().put(PRESENCE + userId, sessionId, podId);
@@ -207,7 +208,7 @@ public class RedisPresenceStore {
     public Set<UUID> reapDeadPods() {
         Set<UUID> affected = new HashSet<>();
         try {
-            Set<String> dead = redis.opsForZSet().rangeByScore(PODS, 0, System.currentTimeMillis() - POD_TIMEOUT_MS);
+            Set<String> dead = redis.opsForZSet().rangeByScore(PODS, 0, (double) System.currentTimeMillis() - POD_TIMEOUT_MS);
             for (String pod : dead == null ? Set.<String>of() : dead) {
                 if (pod.equals(podId) || !Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(REAP + pod, podId, REAP_LOCK))) {
                     continue;

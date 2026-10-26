@@ -138,8 +138,7 @@ public class LocalWebSocketSessionRegistry {
 
     /** Online em qualquer pod; sem Redis, vale a visão deste pod */
     public boolean isOnlineAnywhere(UUID userId) {
-        Boolean online = presence.online(userId);
-        return online != null ? online : isOnline(userId);
+        return presence.online(userId).orElseGet(() -> isOnline(userId));
     }
 
     /** Remove a sessão (DISCONNECT do STOMP ou fechamento do socket); última sessão deste pod avisa a presença */

@@ -30,8 +30,8 @@ public class ResourceOutboundChannelInterceptor implements ChannelInterceptor {
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         var headers = SimpMessageHeaderAccessor.wrap(message);
-        // o RabbitMQ fecha a conexão do cliente que acabou de dar DISCONNECT e o relay avisa com um ERROR;
-        // ele levaria o app a achar que a conexão caiu e fecharia o socket com 1002. Queda real do broker segue passando.
+        // Depois de um DISCONNECT o RabbitMQ fecha a conexão e o relay manda esse ERROR, que faria o app achar que a
+        // conexão caiu e fecharia o socket com 1002. Para sessões que ainda operam (queda real do broker) ele passa.
         if (BROKER_CLOSED.equals(StompHeaderAccessor.wrap(message).getMessage()) && !sessions.isOperational(headers.getSessionId())) {
             return null;
         }
