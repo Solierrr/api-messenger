@@ -194,6 +194,9 @@ public class StompAuthChannelInterceptor implements ExecutorChannelInterceptor {
         String userId = canonicalUserId(jwt);
         StompCommand command = accessor.getCommand();
 
+        // o DISCONNECT é marcado antes de o relay encaminhá-lo; o ERROR de broker fechado que vem depois é esperado
+        if (StompCommand.DISCONNECT.equals(command)) sessions.markDisconnecting(accessor.getSessionId());
+
         // heartbeat, UNSUBSCRIBE e DISCONNECT passam direto
         if (command == null || StompCommand.UNSUBSCRIBE.equals(command) || StompCommand.DISCONNECT.equals(command)) {
             return message;

@@ -113,10 +113,16 @@ public class LocalWebSocketSessionRegistry {
         return SessionAdmission.ADMITTED;
     }
 
-    /** Sessão admitida, não revogada e com o socket aberto; revogada para de operar antes de fechar */
+    /** Sessão admitida, não revogada, sem DISCONNECT do cliente e com o socket aberto; revogada para de operar antes de fechar */
     public synchronized boolean isOperational(String sessionId) {
         LocalSession session = sessions.get(sessionId);
-        return session != null && isActive(session) && session.transport.isOpen();
+        return session != null && isActive(session) && !session.disconnecting && session.transport.isOpen();
+    }
+
+    /** O cliente mandou DISCONNECT: a sessão para de operar já, antes de o socket fechar */
+    public synchronized void markDisconnecting(String sessionId) {
+        LocalSession session = sessions.get(sessionId);
+        if (session != null) session.disconnecting = true;
     }
 
     /** User ligado à sessão, ou {@code null} antes do CONNECT */

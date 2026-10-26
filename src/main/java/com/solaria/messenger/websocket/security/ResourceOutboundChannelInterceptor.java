@@ -5,6 +5,7 @@ import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessageType;
+import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 
 import com.solaria.messenger.core.exception.BusinessException;
 import com.solaria.messenger.core.service.ConversationAuthorizationService;
@@ -12,6 +13,9 @@ import com.solaria.messenger.websocket.session.LocalWebSocketSessionRegistry;
 
 /** Verifica novas saídas pelo estado atual, sem interceptar escrita física ou drenar buffers. */
 public class ResourceOutboundChannelInterceptor implements ChannelInterceptor {
+
+    // texto fixo que o StompBrokerRelayMessageHandler envia quando a conexão TCP com o broker fecha
+    private static final String BROKER_CLOSED = "Connection to broker closed.";
 
     private final LocalWebSocketSessionRegistry sessions;
     private final ConversationAuthorizationService authorization;
@@ -26,6 +30,11 @@ public class ResourceOutboundChannelInterceptor implements ChannelInterceptor {
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         var headers = SimpMessageHeaderAccessor.wrap(message);
+        // o RabbitMQ fecha a conexão do cliente que acabou de dar DISCONNECT e o relay avisa com um ERROR;
+        // ele levaria o app a achar que a conexão caiu e fecharia o socket com 1002. Queda real do broker segue passando.
+        if (BROKER_CLOSED.equals(StompHeaderAccessor.wrap(message).getMessage()) && !sessions.isOperational(headers.getSessionId())) {
+            return null;
+        }
         if (headers.getMessageType() != SimpMessageType.MESSAGE) return message;
         String sessionId = headers.getSessionId();
         if (!sessions.isOperational(sessionId)) return null;

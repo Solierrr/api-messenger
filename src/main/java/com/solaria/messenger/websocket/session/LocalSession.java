@@ -14,6 +14,8 @@ final class LocalSession {
     UUID userId;
     boolean admitted;
     boolean revoked;
+    // o cliente já mandou DISCONNECT; a sessão ainda existe até o socket fechar
+    boolean disconnecting;
 
     LocalSession(WebSocketSession transport) {
         this.transport = transport;
