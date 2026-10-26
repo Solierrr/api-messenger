@@ -101,20 +101,20 @@ public class PresenceService {
     @EventListener
     public void onPresenceChanged(SessionPresenceChanged change) {
         try {
+            // estado já mudou de novo: o evento mais novo (versão maior) é que vale
+            if (sessions.isOnlineAnywhere(change.userId()) != change.online()) return;
+
             // procura as conversas que o user participa
             List<Conversation> current = conversations.findByParticipantIdsContainingOrderByLastInteractionAtDesc(change.userId());
             // verifica se o user está apto a conversa
             Map<String, Set<UUID>> authorized = authorization.authorizedParticipants(current);
 
             for (Conversation conversation : current) {
-                // confere se o estado anunciado para mudança de presença continua igual
-                if (sessions.isOnline(change.userId()) != change.online()) return;
-            
                 // verifica se o user ainda está na conversa
                 if (!authorized.getOrDefault(conversation.getId(), Set.of()).contains(change.userId())) continue;
 
                 // monta e envia mensagem
-                var payload = Map.of("userId", change.userId().toString(), "presenceEpoch", sessions.presenceEpoch(),
+                var payload = Map.of("userId", change.userId().toString(), "presenceEpoch", change.presenceEpoch(),
                         "presenceVersion", change.presenceVersion());
                         
                 messaging.convertAndSend(StompDestinations.conversationTopic(conversation.getId()),

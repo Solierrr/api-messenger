@@ -70,10 +70,13 @@ public class TypingService {
         publish(conversation.getId(), userId, "TYPING_STOPPED");
     }
 
-    /** Encerra o typing só quando a última sessão do user cai; outra sessão aberta mantém ele digitando */
+    /**
+     * Encerra o typing quando a última sessão do user neste pod cai; o typing nasce no pod da sessão,
+     * então vale a visão local mesmo com o user online em outro pod
+     */
     @EventListener
     public void onPresenceChanged(SessionPresenceChanged change) {
-        if (change.online() || sessions.isOnline(change.userId())) return;
+        if (sessions.isOnline(change.userId())) return;
 
         // para o typing em todas as conversas; falha numa não impede as outras
         String userId = change.userId().toString();

@@ -26,14 +26,16 @@ import com.solaria.messenger.websocket.event.SessionPresenceChanged;
  * Registro local das sessões WebSocket desta instância
  *
  * <p>
- * Guarda cada conexão física, controla a admissão (até 4 sessões por user) e calcula a presença online/offline.
+ * Guarda cada conexão física, controla a admissão (até 4 sessões por user, contadas em todos os pods) e espelha as
+ * sessões admitidas no {@link RedisPresenceStore}, que dá a presença online/offline entre pods.
  * A identidade é gravada antes da consulta à Auth, para que uma remoção alcance também conexões com CONNECT em andamento.
- * Cada acesso ao mapa acontece sob o monitor ({@code synchronized}) do próprio registro.
+ * Cada acesso ao mapa acontece sob o monitor ({@code synchronized}) do próprio registro; o Redis é chamado fora dele.
  * </p>
  * <ul>
  *     <li>{@link #capture(WebSocketSession)} -> registra a conexão física.</li>
  *     <li>{@link #identify(String, UUID)} / {@link #admit(String, UUID)} -> ligam a sessão ao user e a admitem.</li>
- *     <li>{@link #isOperational(String)} / {@link #isOnline(UUID)} -> estado da sessão e presença do user.</li>
+ *     <li>{@link #isOperational(String)} / {@link #isOnline(UUID)} -> estado da sessão e presença do user neste pod.</li>
+ *     <li>{@link #isOnlineAnywhere(UUID)} -> presença do user em qualquer pod.</li>
  *     <li>{@link #disconnect(String)} / {@link #reject(String)} / {@link #closeUser(UUID)} -> removem ou derrubam sessões.</li>
  *     <li>{@link #presenceSnapshot(String, Set)} -> fotografia de quem está online.</li>
  * </ul>
@@ -46,12 +48,17 @@ public class LocalWebSocketSessionRegistry {
 
     private final Map<String, LocalSession> sessions = new HashMap<>();
     private final ApplicationEventPublisher events;
-    private final String presenceEpoch = UUID.randomUUID().toString();
-    private long presenceVersion;
+    private final RedisPresenceStore presence;
+    // ordena as escritas de uma mesma sessão no Redis: sem isso um HSET atrasado ressuscitaria uma sessão já apagada
+    private final Object presenceWrites = new Object();
+    // época e versão usadas só quando o Redis falha
+    private final String localEpoch = "local-" + UUID.randomUUID();
+    private long localVersion;
     private final ExecutorService closes = Executors.newCachedThreadPool();
 
-    public LocalWebSocketSessionRegistry(ApplicationEventPublisher events) {
+    public LocalWebSocketSessionRegistry(ApplicationEventPublisher events, RedisPresenceStore presence) {
         this.events = events;
+        this.presence = presence;
     }
 
     /** Registra a conexão física recém-aberta */
@@ -73,7 +80,11 @@ public class LocalWebSocketSessionRegistry {
 
     /** Admite a sessão se o user ainda tiver vaga; a 5ª conexão é recusada e não derruba as outras */
     public SessionAdmission admit(String sessionId, UUID userId) {
-        SessionPresenceChanged change;
+        // shortcut: contar e gravar não são atômicos entre pods (dois CONNECTs simultâneos podem admitir a 5ª),
+        // trocar por MULTI/Lua no Redis se o limite virar regra rígida
+        if (presence.sessionCount(userId) >= MAX_SESSIONS_PER_USER) return SessionAdmission.SESSION_LIMIT;
+
+        boolean first;
         synchronized (this) {
             // a sessão precisa estar identificada para este user, aberta e ainda não admitida
             LocalSession session = sessions.get(sessionId);
@@ -82,15 +93,20 @@ public class LocalWebSocketSessionRegistry {
                 return SessionAdmission.REJECTED;
             }
 
-            // contagem e admissão no mesmo bloco, para duas conexões simultâneas não passarem do limite
+            // contagem local e admissão no mesmo bloco, para duas conexões simultâneas deste pod não passarem do limite
             long count = sessionCount(userId);
             if (count >= MAX_SESSIONS_PER_USER) return SessionAdmission.SESSION_LIMIT;
             session.admitted = true;
-
-            // primeira sessão do user: ele fica online
-            change = count == 0 ? new SessionPresenceChanged(userId, true, ++presenceVersion) : null;
+            first = count == 0;
         }
-        publishPresence(change);
+
+        // grava no Redis só se a sessão ainda estiver ativa; um disconnect já concluído não é desfeito
+        synchronized (presenceWrites) {
+            if (isOperational(sessionId)) presence.add(userId, sessionId);
+        }
+
+        // primeira sessão do user neste pod: avisa o estado em todos os pods
+        if (first) publishPresence(userId);
         return SessionAdmission.ADMITTED;
     }
 
@@ -106,70 +122,85 @@ public class LocalWebSocketSessionRegistry {
         return session == null ? null : session.userId;
     }
 
-    /** Online = pelo menos uma sessão admitida (sem TTL, então socket aberto nunca é esquecido) */
+    /** Online neste pod = pelo menos uma sessão admitida (sem TTL, então socket aberto nunca é esquecido) */
     public synchronized boolean isOnline(UUID userId) {
         return sessionCount(userId) > 0;
     }
 
-    /** Remove a sessão (DISCONNECT do STOMP ou fechamento do socket); última sessão deixa o user offline */
+    /** Online em qualquer pod; sem Redis, vale a visão deste pod */
+    public boolean isOnlineAnywhere(UUID userId) {
+        Boolean online = presence.online(userId);
+        return online != null ? online : isOnline(userId);
+    }
+
+    /** Remove a sessão (DISCONNECT do STOMP ou fechamento do socket); última sessão deste pod avisa a presença */
     public void disconnect(String sessionId) {
-        SessionPresenceChanged change = null;
+        LocalSession removed;
+        boolean last;
         synchronized (this) {
-            LocalSession removed = sessions.remove(sessionId);
-            if (removed != null && isActive(removed) && sessionCount(removed.userId) == 0) {
-                change = new SessionPresenceChanged(removed.userId, false, ++presenceVersion);
-            }
+            removed = sessions.remove(sessionId);
+            // revogada já saiu do Redis em reject/closeUser
+            if (removed == null || !isActive(removed)) return;
+            last = sessionCount(removed.userId) == 0;
         }
-        publishPresence(change);
+        synchronized (presenceWrites) {
+            presence.remove(removed.userId, last, sessionId);
+        }
+        if (last) publishPresence(removed.userId);
     }
 
     /** Recusa e fecha só esta sessão, inclusive quando a admissão dela falhou */
     public void reject(String sessionId) {
         LocalSession session;
-        SessionPresenceChanged change = null;
+        boolean wasAdmitted;
+        boolean last;
         synchronized (this) {
             session = sessions.get(sessionId);
             if (session == null || session.revoked) return;
 
-            // revoga; se era a última sessão admitida, o user fica offline
-            boolean wasAdmitted = session.admitted;
+            // revoga; se era a última sessão admitida deste pod, avisa a presença
+            wasAdmitted = session.admitted;
             session.revoked = true;
-            if (wasAdmitted && sessionCount(session.userId) == 0) {
-                change = new SessionPresenceChanged(session.userId, false, ++presenceVersion);
+            last = wasAdmitted && sessionCount(session.userId) == 0;
+        }
+        if (wasAdmitted) {
+            synchronized (presenceWrites) {
+                presence.remove(session.userId, last, sessionId);
             }
         }
-        publishPresence(change);
+        if (last) publishPresence(session.userId);
         close(session);
     }
 
-    /** Derruba todas as sessões do user, inclusive CONNECT pendente; não bloqueia reconexões futuras */
+    /** Derruba todas as sessões do user neste pod, inclusive CONNECT pendente; não bloqueia reconexões futuras */
     public void closeUser(UUID userId) {
         List<LocalSession> captured;
-        SessionPresenceChanged change;
+        String[] admitted;
+        boolean wasOnline;
         synchronized (this) {
-            boolean wasOnline = isOnline(userId);
+            wasOnline = isOnline(userId);
             captured = sessions.values().stream().filter(session -> userId.equals(session.userId)).toList();
+            admitted = captured.stream().filter(LocalWebSocketSessionRegistry::isActive)
+                    .map(session -> session.transport.getId()).toArray(String[]::new);
             captured.forEach(session -> session.revoked = true);
-            change = wasOnline ? new SessionPresenceChanged(userId, false, ++presenceVersion) : null;
         }
 
-        // aviso e fechamento fora do monitor; o fechamento não espera frames em trânsito
-        publishPresence(change);
+        // Redis, aviso e fechamento fora do monitor; o fechamento não espera frames em trânsito
+        synchronized (presenceWrites) {
+            presence.remove(userId, true, admitted);
+        }
+        if (wasOnline) publishPresence(userId);
         captured.forEach(this::close);
     }
 
-    /** Quem está online entre os users informados, com época e versão lidas juntas */
-    public synchronized PresenceSnapshotDTO presenceSnapshot(String subscriptionId, Set<UUID> users) {
-        Map<UUID, Boolean> online = new HashMap<>();
-        users.forEach(user -> online.put(user, false));
-        for (LocalSession session : sessions.values()) {
-            if (isActive(session) && online.containsKey(session.userId)) online.put(session.userId, true);
+    /** Quem está online entre os users informados, com época e versão lidas juntas; sem Redis, só este pod */
+    public PresenceSnapshotDTO presenceSnapshot(String subscriptionId, Set<UUID> users) {
+        RedisPresenceStore.Snapshot global = presence.snapshot(users);
+        if (global != null) {
+            return new PresenceSnapshotDTO(subscriptionId, global.epoch(), global.version(), global.online());
         }
-        return new PresenceSnapshotDTO(subscriptionId, presenceEpoch, presenceVersion, Map.copyOf(online));
+        return localSnapshot(subscriptionId, users);
     }
-
-    /** Época da presença desta instância (muda a cada restart) */
-    public String presenceEpoch() { return presenceEpoch; }
 
     /** Encerra o executor de fechamentos ao desligar a aplicação */
     @PreDestroy
@@ -177,7 +208,17 @@ public class LocalWebSocketSessionRegistry {
         closes.shutdown();
     }
 
-    /** Sessões admitidas e não revogadas do user; chamar sempre sob o monitor */
+    /** Fotografia só deste pod, usada quando o Redis falha */
+    private synchronized PresenceSnapshotDTO localSnapshot(String subscriptionId, Set<UUID> users) {
+        Map<UUID, Boolean> online = new HashMap<>();
+        users.forEach(user -> online.put(user, false));
+        for (LocalSession session : sessions.values()) {
+            if (isActive(session) && online.containsKey(session.userId)) online.put(session.userId, true);
+        }
+        return new PresenceSnapshotDTO(subscriptionId, localEpoch, ++localVersion, Map.copyOf(online));
+    }
+
+    /** Sessões admitidas e não revogadas do user neste pod; chamar sempre sob o monitor */
     private long sessionCount(UUID userId) {
         return sessions.values().stream()
                 .filter(session -> userId.equals(session.userId) && isActive(session))
@@ -202,13 +243,19 @@ public class LocalWebSocketSessionRegistry {
         });
     }
 
-    /** Publica a mudança de presença fora do monitor; falha só gera log */
-    private void publishPresence(SessionPresenceChanged change) {
-        if (change == null) return;
+    /** Publica o estado atual do user (em todos os pods) fora do monitor; falha só gera log */
+    private void publishPresence(UUID userId) {
         try {
-            events.publishEvent(change);
+            RedisPresenceStore.Level level = presence.level(userId);
+            events.publishEvent(level != null
+                    ? new SessionPresenceChanged(userId, level.online(), level.epoch(), level.version())
+                    : localChange(userId));
         } catch (RuntimeException failure) {
-            log.warn("Falha ao publicar presença local (userId={}, online={})", change.userId(), change.online(), failure);
+            log.warn("Falha ao publicar presença (userId={})", userId, failure);
         }
+    }
+
+    private synchronized SessionPresenceChanged localChange(UUID userId) {
+        return new SessionPresenceChanged(userId, isOnline(userId), localEpoch, ++localVersion);
     }
 }
