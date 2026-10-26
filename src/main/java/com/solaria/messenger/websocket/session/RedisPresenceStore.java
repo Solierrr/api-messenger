@@ -1,6 +1,8 @@
 package com.solaria.messenger.websocket.session;
 
+import java.time.Duration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -32,6 +34,7 @@ import org.springframework.stereotype.Component;
  *     <li>{@link #sessionCount(UUID)} -> sessões do user em todos os pods (limite global).</li>
  *     <li>{@link #add(UUID, String)} / {@link #remove(UUID, boolean, String...)} -> gravam ou apagam sessões.</li>
  *     <li>{@link #online(UUID)} / {@link #level(UUID)} / {@link #snapshot(Set)} -> leem a presença.</li>
+ *     <li>{@link #renew(Map)} / {@link #reapDeadPods()} -> heartbeat do pod e limpeza dos pods mortos.</li>
  * </ul>
  */
 @Component
@@ -42,8 +45,15 @@ public class RedisPresenceStore {
     private static final String PRESENCE = "messenger:presence:";
     // + podId -> SET dos users com sessão no pod, para limpar o pod se ele morrer
     private static final String POD_USERS = "messenger:pod-users:";
+    // ZSET podId -> último heartbeat (ms)
+    private static final String PODS = "messenger:pods";
     private static final String EPOCH = "messenger:presence:epoch";
     private static final String VERSION = "messenger:presence:version";
+    // + podId -> trava (SET NX) de quem limpa o pod morto
+    private static final String REAP = "messenger:reap:";
+    // shortcut: user de pod morto segue online (e contando no limite) por até ~2 min, baixar se o app precisar de menos
+    private static final long POD_TIMEOUT_MS = Duration.ofSeconds(90).toMillis();
+    private static final Duration REAP_LOCK = Duration.ofMinutes(10);
 
     private final StringRedisTemplate redis;
     // UUID por processo: um container reiniciado mantém o hostname, mas não as sessões
@@ -168,6 +178,56 @@ public class RedisPresenceStore {
             log.warn("Redis indisponível ao montar snapshot de presença", failure);
             return null;
         }
+    }
+
+    /**
+     * Renova o heartbeat do pod e regrava as sessões locais; recupera a presença se o Redis perdeu os dados
+     * ou se outro pod limpou este por engano (pausa longa). Chamado a cada 30s.
+     *
+     * @param localSessions sessões admitidas neste pod, de sessionId para userId.
+     */
+    public void renew(Map<String, UUID> localSessions) {
+        try {
+            redis.opsForZSet().add(PODS, podId, System.currentTimeMillis());
+            if (localSessions.isEmpty()) return;
+            localSessions.forEach((sessionId, userId) -> {
+                redis.opsForHash().put(PRESENCE + userId, sessionId, podId);
+                redis.opsForSet().add(POD_USERS + podId, userId.toString());
+            });
+        } catch (RuntimeException failure) {
+            log.warn("Redis indisponível ao renovar o heartbeat do pod", failure);
+        }
+    }
+
+    /**
+     * Apaga as sessões de pods sem heartbeat há 90s; cada pod morto é limpo por um só pod ({@code SET NX}).
+     *
+     * @return users que perderam sessões, para o chamador avisar o OFFLINE.
+     */
+    public Set<UUID> reapDeadPods() {
+        Set<UUID> affected = new HashSet<>();
+        try {
+            Set<String> dead = redis.opsForZSet().rangeByScore(PODS, 0, System.currentTimeMillis() - POD_TIMEOUT_MS);
+            for (String pod : dead == null ? Set.<String>of() : dead) {
+                if (pod.equals(podId) || !Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(REAP + pod, podId, REAP_LOCK))) {
+                    continue;
+                }
+                Set<String> users = redis.opsForSet().members(POD_USERS + pod);
+                for (String user : users == null ? Set.<String>of() : users) {
+                    // só os campos do pod morto; sessões do mesmo user em pods vivos ficam
+                    Object[] stale = redis.opsForHash().entries(PRESENCE + user).entrySet().stream()
+                            .filter(field -> pod.equals(field.getValue())).map(Map.Entry::getKey).toArray();
+                    if (stale.length == 0) continue;
+                    redis.opsForHash().delete(PRESENCE + user, stale);
+                    affected.add(UUID.fromString(user));
+                }
+                redis.delete(POD_USERS + pod);
+                redis.opsForZSet().remove(PODS, pod);
+            }
+        } catch (RuntimeException failure) {
+            log.warn("Falha ao limpar pods sem heartbeat", failure);
+        }
+        return affected;
     }
 
     // só muda se o Redis perder os dados, e aí o app descarta as versões antigas

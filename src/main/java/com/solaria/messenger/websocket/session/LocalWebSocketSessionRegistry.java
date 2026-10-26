@@ -8,10 +8,12 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketSession;
@@ -38,6 +40,7 @@ import com.solaria.messenger.websocket.event.SessionPresenceChanged;
  *     <li>{@link #isOnlineAnywhere(UUID)} -> presença do user em qualquer pod.</li>
  *     <li>{@link #disconnect(String)} / {@link #reject(String)} / {@link #closeUser(UUID)} -> removem ou derrubam sessões.</li>
  *     <li>{@link #presenceSnapshot(String, Set)} -> fotografia de quem está online.</li>
+ *     <li>{@link #heartbeat()} -> renova este pod no Redis e avisa o OFFLINE de quem estava em pod morto.</li>
  * </ul>
  */
 @Service
@@ -200,6 +203,23 @@ public class LocalWebSocketSessionRegistry {
             return new PresenceSnapshotDTO(subscriptionId, global.epoch(), global.version(), global.online());
         }
         return localSnapshot(subscriptionId, users);
+    }
+
+    /**
+     * A cada 30s renova este pod no Redis com as sessões locais e limpa pods sem heartbeat;
+     * quem estava num pod morto recebe o aviso de presença
+     */
+    @Scheduled(fixedDelay = 30_000)
+    public void heartbeat() {
+        synchronized (presenceWrites) {
+            Map<String, UUID> local;
+            synchronized (this) {
+                local = sessions.values().stream().filter(LocalWebSocketSessionRegistry::isActive)
+                        .collect(Collectors.toMap(session -> session.transport.getId(), session -> session.userId));
+            }
+            presence.renew(local);
+        }
+        presence.reapDeadPods().forEach(this::publishPresence);
     }
 
     /** Encerra o executor de fechamentos ao desligar a aplicação */
