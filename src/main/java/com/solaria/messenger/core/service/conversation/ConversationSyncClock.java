@@ -1,20 +1,45 @@
 package com.solaria.messenger.core.service.conversation;
 
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
 
+import org.bson.Document;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Component;
 
-/** Época e versão monotônica da sincronização de conversas, compartilhadas por REST e eventos. */
+/**
+ * Época e versão monotônica da sincronização de conversas, compartilhadas por REST e eventos e por todos os pods
+ */
 @Component
 public class ConversationSyncClock {
 
-    private final String epoch = UUID.randomUUID().toString();
-    private final AtomicLong versions = new AtomicLong();
+    private static final String COLLECTION = "sync_clock";
+    private static final Query CLOCK = Query.query(Criteria.where("_id").is("conversation-sync"));
 
-    /** Época desta instância; muda a cada reinício para invalidar versões antigas. */
-    public String epoch() { return epoch; }
+    private final MongoTemplate mongo;
+    private volatile String epoch;
 
-    /** Chamado dentro da fronteira local de projeção, antes de liberar a leitura para outra mutação. */
-    public long nextVersion() { return versions.incrementAndGet(); }
+    public ConversationSyncClock(MongoTemplate mongo) {
+        this.mongo = mongo;
+    }
+
+    public String epoch() {
+        if (epoch == null) advance(0);
+        return epoch;
+    }
+
+    public long nextVersion() {
+        return advance(1);
+    }
+
+    private long advance(int step) {
+        Update update = new Update().inc("version", step).setOnInsert("epoch", UUID.randomUUID().toString());
+        Document clock = mongo.findAndModify(CLOCK, update, FindAndModifyOptions.options().upsert(true).returnNew(true),
+                Document.class, COLLECTION);
+        epoch = clock.getString("epoch");
+        return clock.get("version", Number.class).longValue();
+    }
 }

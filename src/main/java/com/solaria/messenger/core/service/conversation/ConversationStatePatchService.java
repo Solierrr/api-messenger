@@ -57,6 +57,7 @@ public class ConversationStatePatchService {
     public ConversationStateResponseDTO patchOwnedState(String id, ConversationStatePatchRequestDTO patch) {
         UUID actor = rbac.currentUserId();
         boolean[] changed = { false };
+        long version = clock.nextVersion();
 
         ConversationStateResponseDTO response = guard.execute(() -> resourceAccess.withAccess(id, actor, current -> {
             if (current.getConversationType() == ConversationType.CHAT_BOT) throw new BusinessRuleException("CHAT_BOT não possui estado pessoal.");
@@ -69,7 +70,7 @@ public class ConversationStatePatchService {
             // recalcula as não lidas a partir do novo cursor e monta a resposta
             OwnedState state = change.state();
             long unread = messages.countUnreadByConversationCursors(actor, Map.of(id, state.lastReadSequence())).get(id);
-            return new ConversationStateResponseDTO(id, clock.epoch(), clock.nextVersion(), state.lastReadSequence(),
+            return new ConversationStateResponseDTO(id, clock.epoch(), version, state.lastReadSequence(),
                     unread, state.muted(), state.archived(), state.muted() || state.archived());
         }));
 

@@ -62,6 +62,7 @@ public class ConversationQueryService {
 
     /** Lista as conversas do user com época e versão, para o app reconciliar mesmo quando a lista vem vazia */
     public ConversationListSnapshotDTO findMineSnapshot(boolean archived) {
+        long version = clock.nextVersion();
         return guard.execute(() -> {
             // conversas do user e quem está autorizado em cada uma
             UUID actor = rbac.currentUserId();
@@ -74,14 +75,12 @@ public class ConversationQueryService {
             authorized.replaceAll((id, users) -> users.contains(actor) ? Set.of(actor) : Set.of());
 
             // monta os itens e ordena da interação mais recente para a mais antiga
-            List<ConversationListItemResponseDTO> items = projections.project(candidates, authorized, parents, archived)
+            List<ConversationListItemResponseDTO> items = projections.project(candidates, authorized, parents, archived, version)
                     .getOrDefault(actor, List.of()).stream()
                     .sorted(Comparator.comparing(ConversationListItemResponseDTO::lastInteractionAt,
                             Comparator.nullsLast(Comparator.reverseOrder()))
                             .thenComparing(ConversationListItemResponseDTO::id)).toList();
 
-            // lista vazia ainda recebe uma versão nova, para não apagar um evento que chegue depois
-            long version = items.isEmpty() ? clock.nextVersion() : items.getFirst().syncVersion();
             return new ConversationListSnapshotDTO(clock.epoch(), version, items);
         });
     }
