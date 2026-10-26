@@ -21,6 +21,16 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      # presença entre pods (RedisPresenceStore) e canal de revogação
+      redis:
+        image: redis:7.4
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - uses: actions/checkout@v4
