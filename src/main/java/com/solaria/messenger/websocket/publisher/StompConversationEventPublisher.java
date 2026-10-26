@@ -12,8 +12,9 @@ import org.springframework.stereotype.Component;
 import com.solaria.messenger.core.contract.response.ConversationListItemResponseDTO;
 import com.solaria.messenger.core.service.port.ConversationEventPublisher;
 import com.solaria.messenger.websocket.dto.response.WsEventEnvelope;
+import com.solaria.messenger.websocket.security.StompDestinations;
 
-/** Entrega o estado das conversas na fila privada {@code /user/queue/conversations} de cada destinatário. */
+/** Entrega o estado das conversas no tópico privado {@code /topic/users.{userId}.conversations} de cada destinatário. */
 @Component
 public class StompConversationEventPublisher implements ConversationEventPublisher {
 
@@ -43,7 +44,7 @@ public class StompConversationEventPublisher implements ConversationEventPublish
     /** O comando já persistiu; uma falha de entrega não repete nem desfaz a escrita. */
     private void send(UUID recipient, WsEventEnvelope event) {
         try {
-            messaging.convertAndSendToUser(recipient.toString(), "/queue/conversations", event);
+            messaging.convertAndSend(StompDestinations.userTopic(recipient, "conversations"), event);
         } catch (RuntimeException failure) {
             log.warn("Falha ao publicar evento de conversa (eventId={}, type={})", event.getEventId(), event.getType(), failure);
         }

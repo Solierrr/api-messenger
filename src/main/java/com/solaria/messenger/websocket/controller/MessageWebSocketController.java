@@ -16,6 +16,7 @@ import com.solaria.messenger.core.service.message.MessageSendService;
 import com.solaria.messenger.websocket.dto.request.TypingRequest;
 import com.solaria.messenger.websocket.dto.response.WsEventEnvelope;
 import com.solaria.messenger.websocket.presence.TypingService;
+import com.solaria.messenger.websocket.security.StompDestinations;
 
 import jakarta.validation.Valid;
 
@@ -33,7 +34,7 @@ import jakarta.validation.Valid;
  * <p>
  * Os destinos aceitos são declarados em {@link com.solaria.messenger.websocket.security.StompDestinationAuthorizer}.
  * Os erros são tratados em {@link com.solaria.messenger.websocket.error.StompErrorHandler} 
- * e devolvidos em {@code /user/queue/errors}, sem encerrar a conexão
+ * e devolvidos em {@code /topic/users.{userId}.errors}, sem encerrar a conexão
  * </p>
  *
  * <p><b>Depende de:</b></p>
@@ -41,12 +42,12 @@ import jakarta.validation.Valid;
  *     <li>{@link MessageSendService} -> persiste a mensagem e dispara as notificações, igual ao REST.</li>
  *     <li>{@link TypingService} -> valida a participação e publica a indicação de digitação.</li>
  *     <li>{@link RbacAuthorizationService} -> fornece o id do usuário autenticado.</li>
- *     <li>{@link SimpMessagingTemplate} -> envia o ACK à fila privada do remetente.</li>
+ *     <li>{@link SimpMessagingTemplate} -> envia o ACK ao tópico privado do remetente.</li>
  * </ul>
  *
  * <p>Principais operações disponibilizadas:</p>
  * <ul>
- *     <li>{@link #sendMessage(MessageRequestDTO)} -> {@code /app/messages.send}: envia a mensagem e confirma com {@code MESSAGE_ACK} em {@code /user/queue/acks}.</li>
+ *     <li>{@link #sendMessage(MessageRequestDTO)} -> {@code /app/messages.send}: envia a mensagem e confirma com {@code MESSAGE_ACK} em {@code /topic/users.{userId}.acks}.</li>
  *     <li>{@link #typingStarted(TypingRequest)} -> {@code /app/typing.started}: indica que o usuário começou a digitar.</li>
  *     <li>{@link #typingStopped(TypingRequest)} -> {@code /app/typing.stopped}: indica que parou de digitar.</li>
  *     <li>{@link #presencePing()} -> {@code /app/presence.ping}: mantém a conexão ativa, sem alterar a presença.</li>
@@ -72,14 +73,14 @@ public class MessageWebSocketController {
         this.simpMessagingTemplate = simpMessagingTemplate;
     }
 
-    /** Persiste a mensagem e confirma ao remetente em {@code /user/queue/acks} */
+    /** Persiste a mensagem e confirma ao remetente em {@code /topic/users.{userId}.acks} */
     @MessageMapping("/messages.send")
     public void sendMessage(@Valid @Payload MessageRequestDTO dto) {
 
         // valida regra de negócios e insere no MongoDB
         MessageResponseDTO response = messageService.sendUserMessage(dto);
 
-        // tenta enviar o ACK na fila de acks do remetente
+        // tenta enviar o ACK no tópico de acks do remetente
         WsEventEnvelope ack = WsEventEnvelope.builder()
                 .type("MESSAGE_ACK")
                 .conversationId(response.getConversationId())
@@ -88,7 +89,7 @@ public class MessageWebSocketController {
                 .payload(response)
                 .build();
         try {
-            simpMessagingTemplate.convertAndSendToUser(rbac.currentUserId().toString(), "/queue/acks", ack);
+            simpMessagingTemplate.convertAndSend(StompDestinations.userTopic(rbac.currentUserId(), "acks"), ack);
         } catch (RuntimeException publicationFailure) {
             log.warn("Falha ao publicar ACK de mensagem persistida (messageId={})", response.getId(), publicationFailure);
         }

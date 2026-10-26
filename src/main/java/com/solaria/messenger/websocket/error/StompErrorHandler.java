@@ -15,10 +15,11 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import com.solaria.messenger.core.exception.BusinessException;
 import com.solaria.messenger.core.security.rbac.RbacAuthorizationService;
 import com.solaria.messenger.websocket.dto.response.WsErrorPayload;
+import com.solaria.messenger.websocket.security.StompDestinations;
 
 /**
  * Tratamento centralizado dos erros dos handlers {@code @MessageMapping}
- * o cliente é avisado em {@code /user/queue/errors} e a conexão permanece aberta
+ * o cliente é avisado em {@code /topic/users.{userId}.errors} e a conexão permanece aberta
  */
 @ControllerAdvice
 public class StompErrorHandler {
@@ -61,7 +62,7 @@ public class StompErrorHandler {
 
     /**
      * Corpo do SEND que não é JSON válido 
-     * comando é descartado e ocliente é avisado em /user/queue/errors
+     * comando é descartado e ocliente é avisado no tópico privado de erros
      */
     @MessageExceptionHandler(MessageConversionException.class)
     public void handleMalformedPayload(MessageConversionException ex) {
@@ -86,12 +87,12 @@ public class StompErrorHandler {
         return ex.getProperties().get("clientMessageId") instanceof String clientMessageId ? clientMessageId : null;
     }
 
-    /** Erros de comando vão para fila do user */
+    /** Erros de comando vão para o tópico privado do user */
     private void sendError(WsErrorPayload payload, String kind) {
         try {
-            messaging.convertAndSendToUser(rbac.currentUserId().toString(), "/queue/errors", payload);
+            messaging.convertAndSend(StompDestinations.userTopic(rbac.currentUserId(), "errors"), payload);
         } catch (Exception sendEx) {
-            log.warn("Falha ao enviar {} WS para /queue/errors", kind, sendEx);
+            log.warn("Falha ao enviar {} WS para o tópico de erros", kind, sendEx);
         }
     }
 }

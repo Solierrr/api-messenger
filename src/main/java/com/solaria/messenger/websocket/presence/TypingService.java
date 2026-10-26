@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import com.solaria.messenger.core.model.Conversation;
 import com.solaria.messenger.core.service.ConversationAuthorizationService;
 import com.solaria.messenger.websocket.dto.response.WsEventEnvelope;
+import com.solaria.messenger.websocket.security.StompDestinations;
 import com.solaria.messenger.websocket.session.LocalWebSocketSessionRegistry;
 import com.solaria.messenger.websocket.event.SessionPresenceChanged;
 
@@ -92,6 +93,6 @@ public class TypingService {
                 .serverTimestamp(Instant.now())
                 .payload(Map.of("userId", userId))
                 .build();
-        messaging.convertAndSend("/topic/conversations/" + conversationId, envelope);
+        messaging.convertAndSend(StompDestinations.conversationTopic(conversationId), envelope);
     }
 }

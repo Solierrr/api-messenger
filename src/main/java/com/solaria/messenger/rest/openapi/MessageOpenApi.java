@@ -39,7 +39,7 @@ public interface MessageOpenApi {
                 + "clientMessageId é opcional e serve somente para correlação. Cada envio cria outra mensagem e retorna 201, "
                 + "mesmo com o mesmo clientMessageId. Não há replay nem retry automático. Conflitos comprovados de sequência "
                 + "podem retornar 409; persistência sem confirmação retorna 503 MESSAGE_PERSISTENCE_UNCERTAIN. "
-                + "O evento WS MESSAGE_CREATED correspondente (tópico /topic/conversations/{id}) é "
+                + "O evento WS MESSAGE_CREATED correspondente (tópico /topic/conversations.{id}) é "
                 + "best-effort: clientes conectados devem fazer resync via sinceSequence a cada "
                 + "(re)conexão e reconciliar ACK/broadcast pelo id persistido. Receber MESSAGE_CREATED não marca leitura."
     )

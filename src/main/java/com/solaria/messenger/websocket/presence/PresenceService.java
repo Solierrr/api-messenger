@@ -22,6 +22,7 @@ import com.solaria.messenger.core.repository.ConversationRepository;
 import com.solaria.messenger.core.service.ConversationAuthorizationService;
 import com.solaria.messenger.websocket.dto.response.WsEventEnvelope;
 import com.solaria.messenger.websocket.event.ConversationSubscriptionRegistered;
+import com.solaria.messenger.websocket.security.StompDestinations;
 import com.solaria.messenger.websocket.session.LocalWebSocketSessionRegistry;
 import com.solaria.messenger.websocket.event.SessionPresenceChanged;
 
@@ -41,8 +42,6 @@ import com.solaria.messenger.websocket.event.SessionPresenceChanged;
 public class PresenceService {
 
     private static final Logger log = LoggerFactory.getLogger(PresenceService.class);
-    private static final String TOPIC = "/topic/conversations/";
-
     private final ConversationRepository conversations;
     private final ConversationAuthorizationService authorization;
     private final LocalWebSocketSessionRegistry sessions;
@@ -85,7 +84,7 @@ public class PresenceService {
             var headers = SimpMessageHeaderAccessor.create(SimpMessageType.MESSAGE);
             headers.setSessionId(subscription.sessionId());
             headers.setSubscriptionId(subscription.subscriptionId());
-            headers.setDestination(TOPIC + current.getId());
+            headers.setDestination(StompDestinations.conversationTopic(current.getId()));
             var message = converter.toMessage(envelope("PRESENCE_SNAPSHOT", current.getId(), snapshot),
                     headers.getMessageHeaders());
 
@@ -118,7 +117,7 @@ public class PresenceService {
                 var payload = Map.of("userId", change.userId().toString(), "presenceEpoch", sessions.presenceEpoch(),
                         "presenceVersion", change.presenceVersion());
                         
-                messaging.convertAndSend(TOPIC + conversation.getId(),
+                messaging.convertAndSend(StompDestinations.conversationTopic(conversation.getId()),
                         envelope(change.online() ? "USER_ONLINE" : "USER_OFFLINE", conversation.getId(), payload));
             }
 
