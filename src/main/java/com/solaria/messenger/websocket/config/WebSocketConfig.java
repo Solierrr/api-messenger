@@ -1,5 +1,6 @@
 package com.solaria.messenger.websocket.config;
 
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -22,26 +23,28 @@ import com.solaria.messenger.core.service.ConversationAuthorizationService;
  *
  * - endpoint STOMP em /ws
  * - prefixo /app para destinos de comando
- * - heartbeat 10s/10s e autenticacao real do CONNECT via {@link StompAuthChannelInterceptor}
+ * - autenticacao real do CONNECT via {@link StompAuthChannelInterceptor}
  * - endpoints websocket registrados em /messanging/ws por conta do Kong(gateway)
- * - Kong derruba conexoes ociosas apos ~60s,
- * heartbeat STOMP 10s/10s garante trafego continuo bem abaixo desse timeout
+ * - broker externo: relay STOMP para o RabbitMQ, que entrega os eventos a todos os pods
+ * - Kong derruba conexoes ociosas apos ~60s; o heartbeat 10s/10s pedido pelo cliente é negociado com o RabbitMQ
  */
 @Configuration
 @EnableWebSocketMessageBroker
+@EnableConfigurationProperties(BrokerProperties.class)
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
-
-    private static final long[] HEARTBEAT_MS = {10_000, 10_000};
 
     private final StompAuthChannelInterceptor stompAuthChannelInterceptor;
     private final LocalWebSocketSessionRegistry webSocketSessionRegistry;
     private final ConversationAuthorizationService authorization;
+    private final BrokerProperties broker;
 
     public WebSocketConfig(StompAuthChannelInterceptor stompAuthChannelInterceptor,
-            LocalWebSocketSessionRegistry webSocketSessionRegistry, ConversationAuthorizationService authorization) {
+            LocalWebSocketSessionRegistry webSocketSessionRegistry, ConversationAuthorizationService authorization,
+            BrokerProperties broker) {
         this.stompAuthChannelInterceptor = stompAuthChannelInterceptor;
         this.webSocketSessionRegistry = webSocketSessionRegistry;
         this.authorization = authorization;
+        this.broker = broker;
     }
 
     /** registra rotas que o cliente se conecta */
@@ -54,13 +57,22 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 .setAllowedOriginPatterns("*"); // aceita qualquer origem
     }
 
-    /** Broker simples em /topic e /queue com heartbeat, prefixo /app e ordem de publicação preservada. */
+    /**
+     * Relay de /topic para o RabbitMQ, prefixo /app e ordem de publicação preservada.
+     * O RabbitMQ recusa '/' depois de /topic, por isso os destinos usam '.' (ver {@code StompDestinations}).
+     */
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        registry.configureBrokerChannel().interceptors(new BrokerMessageCopyInterceptor());
-        registry.enableSimpleBroker("/topic", "/queue")
-                .setHeartbeatValue(HEARTBEAT_MS)
-                .setTaskScheduler(heartbeatTaskScheduler());
+        registry.enableStompBrokerRelay("/topic")
+                .setRelayHost(broker.host())
+                .setRelayPort(broker.stompPort())
+                // sem isto o relay manda o host do broker como vhost e o RabbitMQ recusa o CONNECT
+                .setVirtualHost("/")
+                .setClientLogin(broker.login())
+                .setClientPasscode(broker.passcode())
+                .setSystemLogin(broker.login())
+                .setSystemPasscode(broker.passcode())
+                .setAutoStartup(broker.autoStartup());
         registry.setApplicationDestinationPrefixes("/app");
         registry.setPreservePublishOrder(true);
     }
@@ -84,7 +96,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         registration.addDecoratorFactory(handler -> new SessionRegistryHandlerDecorator(handler, webSocketSessionRegistry));
     }
 
-    /** Agendador dos heartbeats STOMP. */
+    /** Agendador dos jobs {@code @Scheduled}; {@code @Primary} desempata com o agendador interno do STOMP. */
     @Bean
     @Primary
     public TaskScheduler heartbeatTaskScheduler() {
