@@ -1,0 +1,9 @@
+# Pastas do Infisical que este repositório lê. Serve de documentação e de base
+# para a checagem do .env.example; o Render não usa este arquivo.
+folders:
+  - /database
+  - /auth
+  - /service-urls
+  - /otel
+# Variáveis do .env.example que não vêm do Infisical.
+ignore: []
