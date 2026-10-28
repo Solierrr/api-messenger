@@ -1,4 +1,4 @@
-package com.solaria.messenger.core.service;
+package com.solaria.messenger.core.usecase.admin;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -22,7 +22,7 @@ import com.solaria.messenger.core.contract.response.LangSmithSummaryDTO;
 import com.solaria.messenger.core.integration.langsmith.LangSmithClient;
 
 @ExtendWith(MockitoExtension.class)
-class LangSmithSummaryServiceTests {
+class GetLangSmithSummaryUseCaseTests {
 
     private static final LangSmithStatsDTO TOTALS = new LangSmithStatsDTO("total", 4, 0, 10, 6, 4, 0.2, 100, 300);
 
@@ -33,7 +33,7 @@ class LangSmithSummaryServiceTests {
     void answersDisabledWithoutCallingLangSmithWhenNotConfigured() {
         given(client.enabled()).willReturn(false);
 
-        LangSmithSummaryDTO summary = new LangSmithSummaryService(client, "").summary(null, null);
+        LangSmithSummaryDTO summary = new GetLangSmithSummaryUseCase(client, "").execute(null, null);
 
         assertThat(summary.enabled()).isFalse();
         assertThat(summary.totals()).isNull();
@@ -48,8 +48,8 @@ class LangSmithSummaryServiceTests {
         given(client.byAssistant(any(), any())).willReturn(List.of());
         given(client.byModel(any(), any())).willReturn(List.of());
 
-        LangSmithSummaryDTO summary = new LangSmithSummaryService(client, " https://smith/p ")
-                .summary(LocalDate.parse("2026-10-20"), LocalDate.parse("2026-10-26"));
+        LangSmithSummaryDTO summary = new GetLangSmithSummaryUseCase(client, " https://smith/p ")
+                .execute(LocalDate.parse("2026-10-20"), LocalDate.parse("2026-10-26"));
 
         ArgumentCaptor<Instant> start = ArgumentCaptor.forClass(Instant.class);
         ArgumentCaptor<Instant> end = ArgumentCaptor.forClass(Instant.class);
@@ -68,12 +68,12 @@ class LangSmithSummaryServiceTests {
         given(client.totals(any(), any())).willReturn(TOTALS);
         given(client.byAssistant(any(), any())).willReturn(List.of());
         given(client.byModel(any(), any())).willReturn(List.of());
-        LangSmithSummaryService service = new LangSmithSummaryService(client, "");
+        GetLangSmithSummaryUseCase service = new GetLangSmithSummaryUseCase(client, "");
         LocalDate day = LocalDate.parse("2026-10-20");
 
-        LangSmithSummaryDTO first = service.summary(day, day);
-        LangSmithSummaryDTO second = service.summary(day, day);
-        service.summary(day, day.plusDays(1));
+        LangSmithSummaryDTO first = service.execute(day, day);
+        LangSmithSummaryDTO second = service.execute(day, day);
+        service.execute(day, day.plusDays(1));
 
         assertThat(second).isSameAs(first);
         verify(client, times(2)).totals(any(), any());

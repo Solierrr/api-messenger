@@ -1,4 +1,4 @@
-package com.solaria.messenger.core.service;
+package com.solaria.messenger.core.usecase.admin;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -13,9 +13,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -24,6 +24,8 @@ import org.springframework.data.mongodb.core.query.Query;
 import com.solaria.messenger.core.contract.response.AdminConversationDetailDTO;
 import com.solaria.messenger.core.contract.response.AdminConversationPageDTO;
 import com.solaria.messenger.core.exception.ResourceNotFoundException;
+import com.solaria.messenger.core.helper.AdminHistoryHelper;
+import com.solaria.messenger.core.mapper.AdminConversationMapper;
 import com.solaria.messenger.core.model.Conversation;
 import com.solaria.messenger.core.model.LlmObservability;
 import com.solaria.messenger.core.model.Message;
@@ -33,7 +35,7 @@ import com.solaria.messenger.core.model.enums.ConversationType;
 import com.solaria.messenger.core.model.enums.ObservabilityStepType;
 
 @ExtendWith(MockitoExtension.class)
-class AdminHistoryServiceTests {
+class AdminHistoryUseCasesTests {
 
     private static final Instant T0 = Instant.parse("2026-10-20T10:00:00Z");
     private static final UUID USER = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -41,8 +43,15 @@ class AdminHistoryServiceTests {
     @Mock
     private MongoTemplate mongoTemplate;
 
-    @InjectMocks
-    private AdminHistoryService service;
+    private ListAdminConversationsUseCase listConversations;
+    private GetAdminConversationUseCase getConversation;
+
+    @BeforeEach
+    void setUp() {
+        AdminHistoryHelper history = new AdminHistoryHelper(mongoTemplate);
+        listConversations = new ListAdminConversationsUseCase(mongoTemplate, history);
+        getConversation = new GetAdminConversationUseCase(mongoTemplate, history);
+    }
 
     @Test
     void listaResumoComCustoLatenciaNpsEErro() {
@@ -55,8 +64,8 @@ class AdminHistoryServiceTests {
                 step("c1", "faq_reader", 2, "timeout", 250.0, 0.002, T0.plusSeconds(3))));
         given(mongoTemplate.find(any(Query.class), eq(Nps.class))).willReturn(List.of(nps("c1", 9)));
 
-        AdminConversationPageDTO page = service.list(LocalDate.of(2026, 10, 20), LocalDate.of(2026, 10, 21),
-                null, null, null, null, null);
+        AdminConversationPageDTO page = listConversations.execute(LocalDate.of(2026, 10, 20),
+                LocalDate.of(2026, 10, 21), null, null, null, null, null);
 
         assertThat(page.total()).isEqualTo(1);
         assertThat(page.truncated()).isFalse();
@@ -79,9 +88,9 @@ class AdminHistoryServiceTests {
         givenSteps(List.of());
         given(mongoTemplate.find(any(Query.class), eq(Nps.class))).willReturn(List.of());
 
-        var item = service.list(null, null, null, null, null, null, null).items().getFirst();
+        var item = listConversations.execute(null, null, null, null, null, null, null).items().getFirst();
 
-        assertThat(item.assistant()).isEqualTo(AdminHistoryService.UNKNOWN_ASSISTANT);
+        assertThat(item.assistant()).isEqualTo(AdminConversationMapper.UNKNOWN_ASSISTANT);
         assertThat(item.nps()).isNull();
         assertThat(item.error()).isFalse();
     }
@@ -93,10 +102,10 @@ class AdminHistoryServiceTests {
         givenSteps(List.of());
         given(mongoTemplate.find(any(Query.class), eq(Nps.class))).willReturn(List.of());
 
-        assertThat(service.list(null, null, null, "C12", null, null, null).items()).hasSize(1);
-        assertThat(service.list(null, null, null, "zzz", null, null, null).items()).isEmpty();
-        assertThat(service.list(null, null, null, null, "1111", null, null).items()).hasSize(1);
-        assertThat(service.list(null, null, null, null, "9999", null, null).items()).isEmpty();
+        assertThat(listConversations.execute(null, null, null, "C12", null, null, null).items()).hasSize(1);
+        assertThat(listConversations.execute(null, null, null, "zzz", null, null, null).items()).isEmpty();
+        assertThat(listConversations.execute(null, null, null, null, "1111", null, null).items()).hasSize(1);
+        assertThat(listConversations.execute(null, null, null, null, "9999", null, null).items()).isEmpty();
     }
 
     @Test
@@ -106,9 +115,9 @@ class AdminHistoryServiceTests {
         givenSteps(List.of());
         given(mongoTemplate.find(any(Query.class), eq(Nps.class))).willReturn(List.of());
 
-        assertThat(service.list(null, null, null, null, null, "ELETRICISTA", null).items()).hasSize(1);
-        assertThat(service.list(null, null, null, null, null, "(urgente)", null).items()).hasSize(1);
-        assertThat(service.list(null, null, null, null, null, ".*", null).items()).isEmpty();
+        assertThat(listConversations.execute(null, null, null, null, null, "ELETRICISTA", null).items()).hasSize(1);
+        assertThat(listConversations.execute(null, null, null, null, null, "(urgente)", null).items()).hasSize(1);
+        assertThat(listConversations.execute(null, null, null, null, null, ".*", null).items()).isEmpty();
     }
 
     @Test
@@ -132,7 +141,7 @@ class AdminHistoryServiceTests {
                 step("c1", "router", 1, "ok", 50.0, 0.0005, T0.plusSeconds(62))));
         given(mongoTemplate.find(any(Query.class), eq(Nps.class))).willReturn(List.of());
 
-        AdminConversationDetailDTO detail = service.detail("c1");
+        AdminConversationDetailDTO detail = getConversation.execute("c1");
 
         assertThat(detail.threadId()).isEqualTo("debug:u:abc");
         assertThat(detail.messages()).hasSize(4);
@@ -157,8 +166,8 @@ class AdminHistoryServiceTests {
         direct.setConversationType(ConversationType.DIRECT);
         given(mongoTemplate.findById("d", Conversation.class)).willReturn(direct);
 
-        assertThatThrownBy(() -> service.detail("x")).isInstanceOf(ResourceNotFoundException.class);
-        assertThatThrownBy(() -> service.detail("d")).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> getConversation.execute("x")).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> getConversation.execute("d")).isInstanceOf(ResourceNotFoundException.class);
     }
 
     private void givenConversation(String id, Map<String, Object> details) {

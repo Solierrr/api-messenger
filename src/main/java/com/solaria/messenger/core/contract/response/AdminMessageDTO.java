@@ -3,6 +3,7 @@ package com.solaria.messenger.core.contract.response;
 import java.time.Instant;
 import java.util.List;
 
+/** Mensagem do histórico administrativo; respostas do assistente trazem turno, custo, latência e etapas */
 public record AdminMessageDTO(
         String role,
         String content,
