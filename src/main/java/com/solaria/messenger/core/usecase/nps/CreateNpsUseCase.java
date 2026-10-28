@@ -1,4 +1,4 @@
-package com.solaria.messenger.core.service;
+package com.solaria.messenger.core.usecase.nps;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -21,41 +21,23 @@ import com.solaria.messenger.core.security.rbac.RbacAuthorizationService;
 
 import static com.solaria.messenger.core.mapper.NpsMapper.toResponse;
 
-/**
- * Serviço de registro de NPS (Net Promoter Score) das conversas com o chatbot.
- *
- * <p>Garante que a conversa existe, que o usuário autenticado participa dela, que é do tipo
- * {@code CHAT_BOT} e que ainda não recebeu NPS. A classificação é derivada da nota.</p>
- *
- * <p><b>Depende de:</b></p>
- * <ul>
- *     <li>{@link NpsRepository} - persistência das respostas de NPS.</li>
- *     <li>{@link ConversationRepository} - leitura da conversa avaliada.</li>
- *     <li>{@link RbacAuthorizationService} - identificação do usuário e checagem de participação.</li>
- * </ul>
- *
- * <p>Principais operações disponibilizadas:</p>
- * <ul>
- *     <li>{@link #create(NpsRequestDTO)} - registra o NPS único de uma conversa com o chatbot.</li>
- * </ul>
- */
 @Service
-public class NpsService {
+public class CreateNpsUseCase {
 
     private final NpsRepository npsRepository;
     private final ConversationRepository conversationRepository;
     private final RbacAuthorizationService rbac;
 
-    public NpsService(NpsRepository npsRepository,
-                      ConversationRepository conversationRepository,
-                      RbacAuthorizationService rbac) {
+    public CreateNpsUseCase(NpsRepository npsRepository,
+                            ConversationRepository conversationRepository,
+                            RbacAuthorizationService rbac) {
         this.npsRepository = npsRepository;
         this.conversationRepository = conversationRepository;
         this.rbac = rbac;
     }
 
     /** Registra o NPS único de uma conversa CHAT_BOT da qual o usuário participa. */
-    public NpsResponseDTO create(NpsRequestDTO dto) {
+    public NpsResponseDTO execute(NpsRequestDTO dto) {
         UUID userId = rbac.currentUserId();
 
         Conversation conversation = conversationRepository.findById(dto.getConversationId())

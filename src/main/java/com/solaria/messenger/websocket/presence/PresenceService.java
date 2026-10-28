@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 
 import com.solaria.messenger.core.model.Conversation;
 import com.solaria.messenger.core.repository.ConversationRepository;
-import com.solaria.messenger.core.service.ConversationAuthorizationService;
+import com.solaria.messenger.core.helper.ConversationAccessHelper;
 import com.solaria.messenger.websocket.dto.response.WsEventEnvelope;
 import com.solaria.messenger.websocket.event.ConversationSubscriptionRegistered;
 import com.solaria.messenger.websocket.security.StompDestinations;
@@ -43,13 +43,13 @@ public class PresenceService {
 
     private static final Logger log = LoggerFactory.getLogger(PresenceService.class);
     private final ConversationRepository conversations;
-    private final ConversationAuthorizationService authorization;
+    private final ConversationAccessHelper authorization;
     private final LocalWebSocketSessionRegistry sessions;
     private final SimpMessagingTemplate messaging;
     private final MessageChannel outbound;
     private final MessageConverter converter;
 
-    public PresenceService(ConversationRepository conversations, ConversationAuthorizationService authorization,
+    public PresenceService(ConversationRepository conversations, ConversationAccessHelper authorization,
             LocalWebSocketSessionRegistry sessions, SimpMessagingTemplate messaging,
             @Qualifier("clientOutboundChannel") MessageChannel outbound,
             @Qualifier("brokerMessageConverter") MessageConverter converter) {

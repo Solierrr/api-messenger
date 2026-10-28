@@ -23,9 +23,15 @@ import com.solaria.messenger.core.contract.response.CommunityResponseDTO;
 import com.solaria.messenger.core.contract.response.GroupCreationResponseDTO;
 import com.solaria.messenger.core.contract.response.SubgroupMetadataResponseDTO;
 import com.solaria.messenger.rest.openapi.CommunityOpenApi;
-import com.solaria.messenger.core.service.community.CommunityMembershipService;
-import com.solaria.messenger.core.service.community.CommunityService;
-import com.solaria.messenger.core.service.conversation.ConversationCreationService;
+import com.solaria.messenger.core.usecase.community.AddCommunityMembersUseCase;
+import com.solaria.messenger.core.usecase.community.CreateCommunityUseCase;
+import com.solaria.messenger.core.usecase.community.GetCommunityByProjectUseCase;
+import com.solaria.messenger.core.usecase.community.GetCommunityUseCase;
+import com.solaria.messenger.core.usecase.community.ListCommunitySubgroupsUseCase;
+import com.solaria.messenger.core.usecase.community.ListMyCommunitiesUseCase;
+import com.solaria.messenger.core.usecase.community.RemoveCommunityMemberUseCase;
+import com.solaria.messenger.core.usecase.community.UpdateCommunityStatusUseCase;
+import com.solaria.messenger.core.usecase.conversation.CreateGroupConversationUseCase;
 
 import jakarta.validation.Valid;
 
@@ -53,22 +59,37 @@ import jakarta.validation.Valid;
 @RequestMapping("/messaging/communities")
 public class CommunityController implements CommunityOpenApi {
 
-    private final CommunityService communityService;
-    private final CommunityMembershipService memberships;
-    private final ConversationCreationService creations;
+    private final CreateCommunityUseCase createCommunity;
+    private final ListMyCommunitiesUseCase listMine;
+    private final GetCommunityUseCase getCommunity;
+    private final GetCommunityByProjectUseCase getByProject;
+    private final UpdateCommunityStatusUseCase updateStatus;
+    private final AddCommunityMembersUseCase addMembers;
+    private final RemoveCommunityMemberUseCase removeMember;
+    private final CreateGroupConversationUseCase createGroup;
+    private final ListCommunitySubgroupsUseCase listSubgroups;
 
-    public CommunityController(CommunityService communityService, CommunityMembershipService memberships,
-            ConversationCreationService creations) {
-        this.communityService = communityService;
-        this.memberships = memberships;
-        this.creations = creations;
+    public CommunityController(CreateCommunityUseCase createCommunity, ListMyCommunitiesUseCase listMine,
+            GetCommunityUseCase getCommunity, GetCommunityByProjectUseCase getByProject,
+            UpdateCommunityStatusUseCase updateStatus, AddCommunityMembersUseCase addMembers,
+            RemoveCommunityMemberUseCase removeMember, CreateGroupConversationUseCase createGroup,
+            ListCommunitySubgroupsUseCase listSubgroups) {
+        this.createCommunity = createCommunity;
+        this.listMine = listMine;
+        this.getCommunity = getCommunity;
+        this.getByProject = getByProject;
+        this.updateStatus = updateStatus;
+        this.addMembers = addMembers;
+        this.removeMember = removeMember;
+        this.createGroup = createGroup;
+        this.listSubgroups = listSubgroups;
     }
 
     /** Cria a comunidade do projeto e devolve 201 com a localização do recurso. */
     @Override
     @PostMapping
     public ResponseEntity<CommunityResponseDTO> createCommunity(@Valid @RequestBody CommunityRequestDTO dto) {
-        CommunityResponseDTO response = communityService.createCommunity(dto);
+        CommunityResponseDTO response = createCommunity.execute(dto);
         return ResponseEntity.created(URI.create("/messaging/communities/" + response.getId())).body(response);
     }
 
@@ -76,21 +97,21 @@ public class CommunityController implements CommunityOpenApi {
     @Override
     @GetMapping("/me")
     public ResponseEntity<List<CommunityResponseDTO>> findMine() {
-        return ResponseEntity.ok(communityService.findMine());
+        return ResponseEntity.ok(listMine.execute());
     }
 
     /** Busca uma comunidade da qual o usuário é membro. */
     @Override
     @GetMapping("/{id}")
     public ResponseEntity<CommunityResponseDTO> findById(@PathVariable String id) {
-        return ResponseEntity.ok(communityService.findById(id));
+        return ResponseEntity.ok(getCommunity.execute(id));
     }
 
     /** Busca a comunidade de um projeto da qual o usuário é membro. */
     @Override
     @GetMapping("/project/{projectId}")
     public ResponseEntity<CommunityResponseDTO> findByProjectId(@PathVariable UUID projectId) {
-        return ResponseEntity.ok(communityService.findByProjectId(projectId));
+        return ResponseEntity.ok(getByProject.execute(projectId));
     }
 
     /** Arquiva ou reativa a comunidade. */
@@ -99,7 +120,7 @@ public class CommunityController implements CommunityOpenApi {
     public ResponseEntity<CommunityResponseDTO> updateCommunity(
             @PathVariable String id,
             @Valid @RequestBody CommunityUpdateRequestDTO dto) {
-        return ResponseEntity.ok(communityService.updateCommunity(id, dto));
+        return ResponseEntity.ok(updateStatus.execute(id, dto));
     }
 
     /** Adiciona membros ou altera o papel de membros existentes. */
@@ -108,7 +129,7 @@ public class CommunityController implements CommunityOpenApi {
     public ResponseEntity<CommunityResponseDTO> addMembers(
             @PathVariable String id,
             @Valid @RequestBody CommunityMembersRequestDTO dto) {
-        return ResponseEntity.ok(memberships.addMembers(id, dto));
+        return ResponseEntity.ok(addMembers.execute(id, dto));
     }
 
     /** Remove um membro, ou o próprio usuário sai, com os sucessores opcionais dos subgrupos. */
@@ -118,7 +139,7 @@ public class CommunityController implements CommunityOpenApi {
             @PathVariable String id,
             @PathVariable UUID userId,
             @Valid @RequestBody(required = false) CommunityMemberRemovalRequestDTO dto) {
-        memberships.removeMember(id, userId, dto);
+        removeMember.execute(id, userId, dto);
         return ResponseEntity.noContent().build();
     }
 
@@ -128,7 +149,7 @@ public class CommunityController implements CommunityOpenApi {
     public ResponseEntity<GroupCreationResponseDTO> startConversation(
             @PathVariable String id,
             @Valid @RequestBody CommunityConversationRequestDTO dto) {
-        GroupCreationResponseDTO response = creations.createCommunityGroupConversation(id, dto.getTitle(), dto.getParticipantIds());
+        GroupCreationResponseDTO response = createGroup.execute(id, dto.getTitle(), dto.getParticipantIds());
         return ResponseEntity.created(URI.create("/messaging/conversations/" + response.conversation().getId())).body(response);
     }
 
@@ -136,6 +157,6 @@ public class CommunityController implements CommunityOpenApi {
     @Override
     @GetMapping("/{id}/conversations")
     public ResponseEntity<List<SubgroupMetadataResponseDTO>> listConversations(@PathVariable String id) {
-        return ResponseEntity.ok(communityService.listConversations(id));
+        return ResponseEntity.ok(listSubgroups.execute(id));
     }
 }

@@ -23,7 +23,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.stereotype.Component;
 
 import com.solaria.messenger.core.exception.BusinessException;
-import com.solaria.messenger.core.service.UserAccessService;
+import com.solaria.messenger.core.helper.UserAccessHelper;
 import com.solaria.messenger.websocket.event.ConversationSubscriptionRegistered;
 import com.solaria.messenger.websocket.session.LocalWebSocketSessionRegistry;
 import com.solaria.messenger.websocket.enums.SessionAdmission;
@@ -56,12 +56,12 @@ public class StompAuthChannelInterceptor implements ExecutorChannelInterceptor {
     private final JwtDecoder jwtDecoder;
     private final StompDestinationAuthorizer destinations;
     private final ApplicationEventPublisher events;
-    private final UserAccessService userAccessService;
+    private final UserAccessHelper userAccessService;
     private final LocalWebSocketSessionRegistry sessions;
 
     public StompAuthChannelInterceptor(JwtDecoder jwtDecoder, StompDestinationAuthorizer destinations,
             ApplicationEventPublisher events,
-            UserAccessService userAccessService, LocalWebSocketSessionRegistry sessions) {
+            UserAccessHelper userAccessService, LocalWebSocketSessionRegistry sessions) {
         this.jwtDecoder = jwtDecoder;
         this.destinations = destinations;
         this.events = events;

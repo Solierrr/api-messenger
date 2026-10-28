@@ -18,7 +18,12 @@ import com.solaria.messenger.core.contract.request.RatingStatusUpdateRequestDTO;
 import com.solaria.messenger.core.contract.request.RatingUpdateRequestDTO;
 import com.solaria.messenger.core.contract.response.RatingResponseDTO;
 import com.solaria.messenger.rest.openapi.RatingOpenApi;
-import com.solaria.messenger.core.service.RatingService;
+import com.solaria.messenger.core.usecase.rating.CreateRatingUseCase;
+import com.solaria.messenger.core.usecase.rating.GetRatingUseCase;
+import com.solaria.messenger.core.usecase.rating.ListRatingsByEvaluatedUseCase;
+import com.solaria.messenger.core.usecase.rating.ListRatingsByEvaluatorUseCase;
+import com.solaria.messenger.core.usecase.rating.UpdateRatingStatusUseCase;
+import com.solaria.messenger.core.usecase.rating.UpdateRatingUseCase;
 
 import jakarta.validation.Valid;
 
@@ -42,17 +47,29 @@ import jakarta.validation.Valid;
 @RequestMapping("/messaging/ratings")
 public class RatingController implements RatingOpenApi {
 
-    private final RatingService ratingService;
+    private final CreateRatingUseCase createRating;
+    private final GetRatingUseCase getRating;
+    private final ListRatingsByEvaluatedUseCase listByEvaluated;
+    private final ListRatingsByEvaluatorUseCase listByEvaluator;
+    private final UpdateRatingUseCase updateRating;
+    private final UpdateRatingStatusUseCase updateRatingStatus;
 
-    public RatingController(RatingService ratingService) {
-        this.ratingService = ratingService;
+    public RatingController(CreateRatingUseCase createRating, GetRatingUseCase getRating,
+            ListRatingsByEvaluatedUseCase listByEvaluated, ListRatingsByEvaluatorUseCase listByEvaluator,
+            UpdateRatingUseCase updateRating, UpdateRatingStatusUseCase updateRatingStatus) {
+        this.createRating = createRating;
+        this.getRating = getRating;
+        this.listByEvaluated = listByEvaluated;
+        this.listByEvaluator = listByEvaluator;
+        this.updateRating = updateRating;
+        this.updateRatingStatus = updateRatingStatus;
     }
 
     /** Cria uma avaliação feita pelo usuário autenticado e devolve 201. */
     @Override
     @PostMapping
     public ResponseEntity<RatingResponseDTO> create(@Valid @RequestBody RatingRequestDTO dto) {
-        RatingResponseDTO response = ratingService.create(dto);
+        RatingResponseDTO response = createRating.execute(dto);
         return ResponseEntity.created(URI.create("/messaging/ratings/" + response.getId())).body(response);
     }
 
@@ -60,21 +77,21 @@ public class RatingController implements RatingOpenApi {
     @Override
     @GetMapping("/{id}")
     public ResponseEntity<RatingResponseDTO> findById(@PathVariable String id) {
-        return ResponseEntity.ok(ratingService.findById(id));
+        return ResponseEntity.ok(getRating.execute(id));
     }
 
     /** Lista as avaliações recebidas por um avaliado. */
     @Override
     @GetMapping("/evaluated/{evaluatedId}")
     public ResponseEntity<List<RatingResponseDTO>> findByEvaluated(@PathVariable UUID evaluatedId) {
-        return ResponseEntity.ok(ratingService.findByEvaluated(evaluatedId));
+        return ResponseEntity.ok(listByEvaluated.execute(evaluatedId));
     }
 
     /** Lista as avaliações feitas por um avaliador. */
     @Override
     @GetMapping("/evaluator/{evaluatorId}")
     public ResponseEntity<List<RatingResponseDTO>> findByEvaluator(@PathVariable UUID evaluatorId) {
-        return ResponseEntity.ok(ratingService.findByEvaluator(evaluatorId));
+        return ResponseEntity.ok(listByEvaluator.execute(evaluatorId));
     }
 
     /** Edita comentário e/ou nota de uma avaliação própria. */
@@ -82,7 +99,7 @@ public class RatingController implements RatingOpenApi {
     @PatchMapping("/{id}")
     public ResponseEntity<RatingResponseDTO> update(@PathVariable String id,
                                                       @Valid @RequestBody RatingUpdateRequestDTO dto) {
-        return ResponseEntity.ok(ratingService.update(id, dto));
+        return ResponseEntity.ok(updateRating.execute(id, dto));
     }
 
     /** Altera o status de uma avaliação própria. */
@@ -90,6 +107,6 @@ public class RatingController implements RatingOpenApi {
     @PatchMapping("/{id}/status")
     public ResponseEntity<RatingResponseDTO> updateStatus(@PathVariable String id,
                                                             @Valid @RequestBody RatingStatusUpdateRequestDTO dto) {
-        return ResponseEntity.ok(ratingService.updateStatus(id, dto));
+        return ResponseEntity.ok(updateRatingStatus.execute(id, dto));
     }
 }

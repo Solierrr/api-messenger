@@ -1,4 +1,4 @@
-package com.solaria.messenger.core.service.community;
+package com.solaria.messenger.core.helper;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -6,55 +6,60 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
+import com.solaria.messenger.core.contract.response.SubgroupMetadataResponseDTO;
+import com.solaria.messenger.core.exception.BusinessException;
 import com.solaria.messenger.core.exception.ConcurrentUpdateException;
 import com.solaria.messenger.core.exception.GroupManagerUnavailableException;
 import com.solaria.messenger.core.exception.InvalidFieldException;
 import com.solaria.messenger.core.exception.MembershipCleanupRequiredException;
-import com.solaria.messenger.core.exception.ResourceNotFoundException;
-import com.solaria.messenger.core.exception.SuccessorIneligibleException;
-import com.solaria.messenger.core.exception.UnauthorizedAccessException;
+import com.solaria.messenger.core.mapper.ConversationMapper;
 import com.solaria.messenger.core.model.Conversation;
 import com.solaria.messenger.core.model.ProjectCommunity;
 import com.solaria.messenger.core.model.enums.ConversationType;
 import com.solaria.messenger.core.repository.ConversationRepository;
-import com.solaria.messenger.core.service.ConversationAuthorizationService;
-import com.solaria.messenger.core.service.UserAccessService;
-import com.solaria.messenger.core.service.conversation.GroupMutationSupport;
 
-import static com.solaria.messenger.core.security.rbac.CommunityPolicy.requireRemovalAuthority;
+import static com.solaria.messenger.core.helper.PureRulesHelper.applyOptimistic;
+import static com.solaria.messenger.core.helper.PureRulesHelper.requireRemovalAuthority;
+import static com.solaria.messenger.core.helper.PureRulesHelper.withoutUser;
 
-/**
- * Service que propaga a saída de um membro da comunidade para os subgrupos dela
- *
- * <p>
- * Quando alguém sai da comunidade, ele também precisa sair dos grupos filhos. Se ele for gestor de algum
- * grupo, a gestão passa para o sucessor indicado antes da remoção.
- * </p>
- * <ul>
- *     <li>{@link #validateCommunityRemoval(ProjectCommunity, UUID, UUID, Map)} -> valida o plano de remoção e os sucessores.</li>
- *     <li>{@link #prepareCommunityRemoval(ProjectCommunity, UUID, UUID, Map, List)} -> transfere a gestão dos grupos antes da saída.</li>
- *     <li>{@link #cleanupCommunityRemoval(String, UUID, UUID)} -> tira o user dos subgrupos depois da saída.</li>
- *     <li>{@link #requireNoResidualCommunityMembership(String, Set)} -> barra readmissão enquanto houver resíduo nos subgrupos.</li>
- * </ul>
- */
-@Service
-public class CommunityGroupCascadeService {
+@Component
+public class CommunityHelper {
 
     private final ConversationRepository conversationRepository;
-    private final UserAccessService userAccessService;
-    private final ConversationAuthorizationService resourceAccess;
-    private final GroupMutationSupport groups;
+    private final UserAccessHelper users;
+    private final LookupHelper lookup;
+    private final GroupHelper groups;
 
-    public CommunityGroupCascadeService(ConversationRepository conversations, UserAccessService users,
-            ConversationAuthorizationService authorization, GroupMutationSupport groups) {
+    public CommunityHelper(ConversationRepository conversations, UserAccessHelper users, LookupHelper lookup,
+            GroupHelper groups) {
         this.conversationRepository = conversations;
-        this.userAccessService = users;
-        this.resourceAccess = authorization;
+        this.users = users;
+        this.lookup = lookup;
         this.groups = groups;
     }
+
+    // escrita da comunidade
+
+    /** Aplica a escrita com CAS; se a versão mudou, relê a comunidade e tenta de novo */
+    public ProjectCommunity mutateCommunity(ProjectCommunity initial, Function<ProjectCommunity, Long> mutation) {
+        return applyOptimistic(initial, mutation, () -> lookup.requireCommunity(initial.getId()),
+                this::concurrentModification);
+    }
+
+    public BusinessException concurrentModification() {
+        return new ConcurrentUpdateException("A comunidade mudou durante a operação.");
+    }
+
+    /** Subgrupos da comunidade no formato de listagem */
+    public List<SubgroupMetadataResponseDTO> subgroupMetadata(String communityId) {
+        return findSubgroups(communityId).stream().map(ConversationMapper::toSubgroupMetadata).toList();
+    }
+
+    // cascata para os subgrupos
 
     /** Valida o plano inteiro (sucessores e elegibilidade) antes de qualquer transferência ou remoção */
     public List<Conversation> validateCommunityRemoval(ProjectCommunity community, UUID actor, UUID target,
@@ -90,11 +95,7 @@ public class CommunityGroupCascadeService {
         }
 
         // os sucessores precisam ser users ativos
-        try {
-            userAccessService.requireActiveUsers(transfers);
-        } catch (ResourceNotFoundException | UnauthorizedAccessException ineligible) {
-            throw new SuccessorIneligibleException();
-        }
+        users.requireSuccessorsActive(transfers);
         return subgroups;
     }
 
@@ -120,7 +121,7 @@ public class CommunityGroupCascadeService {
     private Long transferManagement(Conversation latest, ProjectCommunity community, UUID actor, UUID target,
             Map<String, UUID> successors) {
         if (!community.getId().equals(latest.getCommunityId())) throw new ConcurrentUpdateException();
-        ProjectCommunity parent = resourceAccess.requireCommunity(community.getId());
+        ProjectCommunity parent = lookup.requireParentCommunity(community.getId());
         requireRemovalAuthority(parent, actor, target);
         if (!parent.isMember(target)) throw new ConcurrentUpdateException();
         if (!latest.hasParticipant(target) || !target.equals(latest.getManagerUserId())) return null;
@@ -144,14 +145,13 @@ public class CommunityGroupCascadeService {
             groups.mutateGroup(group, latest -> {
                 // revalida na versão mais recente; o user já não pode estar na comunidade
                 if (!communityId.equals(latest.getCommunityId())) throw new ConcurrentUpdateException();
-                ProjectCommunity parent = resourceAccess.requireCommunity(communityId);
+                ProjectCommunity parent = lookup.requireParentCommunity(communityId);
                 requireRemovalAuthority(parent, actor, target);
                 if (parent.isMember(target)) throw new ConcurrentUpdateException();
                 if (!latest.hasParticipant(target)) return null;
 
                 // remove o user; grupo que ficou vazio perde o gestor
-                Set<UUID> survivors = new LinkedHashSet<>(latest.getParticipantIds());
-                survivors.remove(target);
+                Set<UUID> survivors = withoutUser(latest.getParticipantIds(), target);
                 return groups.writeParticipants(latest, survivors, survivors.isEmpty() ? null : latest.getManagerUserId());
             });
         }

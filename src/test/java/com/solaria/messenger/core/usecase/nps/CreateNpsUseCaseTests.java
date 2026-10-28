@@ -1,4 +1,4 @@
-package com.solaria.messenger.core.service;
+package com.solaria.messenger.core.usecase.nps;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -38,7 +38,7 @@ import com.solaria.messenger.core.repository.NpsRepository;
 import com.solaria.messenger.core.security.rbac.RbacAuthorizationService;
 
 @ExtendWith(MockitoExtension.class)
-class NpsServiceTests {
+class CreateNpsUseCaseTests {
 
     private static final String CONVERSATION_ID = "conv-1";
     private static final UUID USER_ID = UUID.randomUUID();
@@ -53,7 +53,7 @@ class NpsServiceTests {
     private RbacAuthorizationService rbac;
 
     @InjectMocks
-    private NpsService npsService;
+    private CreateNpsUseCase createNps;
 
     @ParameterizedTest
     @CsvSource({
@@ -79,7 +79,7 @@ class NpsServiceTests {
         given(npsRepository.existsByConversationId(CONVERSATION_ID)).willReturn(false);
         given(npsRepository.save(any(Nps.class))).willAnswer(invocation -> invocation.getArgument(0));
 
-        NpsResponseDTO response = npsService.create(request(9));
+        NpsResponseDTO response = createNps.execute(request(9));
 
         ArgumentCaptor<Nps> captor = ArgumentCaptor.forClass(Nps.class);
         verify(npsRepository).save(captor.capture());
@@ -97,7 +97,7 @@ class NpsServiceTests {
         doThrow(new UnauthorizedAccessException("O objeto da operação não foi encontrado."))
                 .when(rbac).requireParticipant(any(Set.class));
 
-        assertThatThrownBy(() -> npsService.create(request(10)))
+        assertThatThrownBy(() -> createNps.execute(request(10)))
                 .isInstanceOf(UnauthorizedAccessException.class);
         verify(npsRepository, never()).save(any(Nps.class));
     }
@@ -107,7 +107,7 @@ class NpsServiceTests {
         given(rbac.currentUserId()).willReturn(USER_ID);
         given(conversationRepository.findById(CONVERSATION_ID)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> npsService.create(request(10)))
+        assertThatThrownBy(() -> createNps.execute(request(10)))
                 .isInstanceOf(ResourceNotFoundException.class);
         verify(npsRepository, never()).save(any(Nps.class));
     }
@@ -119,7 +119,7 @@ class NpsServiceTests {
         direct.setConversationType(ConversationType.DIRECT);
         given(conversationRepository.findById(CONVERSATION_ID)).willReturn(Optional.of(direct));
 
-        assertThatThrownBy(() -> npsService.create(request(10)))
+        assertThatThrownBy(() -> createNps.execute(request(10)))
                 .isInstanceOf(BusinessRuleException.class);
         verify(npsRepository, never()).save(any(Nps.class));
     }
@@ -131,7 +131,7 @@ class NpsServiceTests {
         given(npsRepository.existsByConversationId(CONVERSATION_ID)).willReturn(false);
         given(npsRepository.save(any(Nps.class))).willThrow(new DuplicateKeyException("dup"));
 
-        assertThatThrownBy(() -> npsService.create(request(10)))
+        assertThatThrownBy(() -> createNps.execute(request(10)))
                 .isInstanceOf(DuplicateResourceException.class);
     }
 
@@ -141,7 +141,7 @@ class NpsServiceTests {
         given(rbac.currentUserId()).willReturn(USER_ID);
         given(npsRepository.existsByConversationId(CONVERSATION_ID)).willReturn(true);
 
-        assertThatThrownBy(() -> npsService.create(request(10)))
+        assertThatThrownBy(() -> createNps.execute(request(10)))
                 .isInstanceOf(DuplicateResourceException.class);
         verify(npsRepository, never()).save(any(Nps.class));
     }

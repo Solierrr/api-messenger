@@ -16,7 +16,7 @@ import org.springframework.web.socket.config.annotation.WebSocketTransportRegist
 import com.solaria.messenger.websocket.security.StompAuthChannelInterceptor;
 import com.solaria.messenger.websocket.security.ResourceOutboundChannelInterceptor;
 import com.solaria.messenger.websocket.session.LocalWebSocketSessionRegistry;
-import com.solaria.messenger.core.service.ConversationAuthorizationService;
+import com.solaria.messenger.core.helper.ConversationAccessHelper;
 
 /**
  * Configuracao do WebSocket/STOMP
@@ -35,11 +35,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final StompAuthChannelInterceptor stompAuthChannelInterceptor;
     private final LocalWebSocketSessionRegistry webSocketSessionRegistry;
-    private final ConversationAuthorizationService authorization;
+    private final ConversationAccessHelper authorization;
     private final BrokerProperties broker;
 
     public WebSocketConfig(StompAuthChannelInterceptor stompAuthChannelInterceptor,
-            LocalWebSocketSessionRegistry webSocketSessionRegistry, ConversationAuthorizationService authorization,
+            LocalWebSocketSessionRegistry webSocketSessionRegistry, ConversationAccessHelper authorization,
             BrokerProperties broker) {
         this.stompAuthChannelInterceptor = stompAuthChannelInterceptor;
         this.webSocketSessionRegistry = webSocketSessionRegistry;

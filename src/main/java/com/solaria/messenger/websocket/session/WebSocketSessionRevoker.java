@@ -10,7 +10,7 @@ import org.springframework.data.redis.connection.MessageListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
-import com.solaria.messenger.core.service.port.SessionRevoker;
+import com.solaria.messenger.core.port.SessionRevoker;
 
 /**
  * Encerra as conexões do user em todos os pods depois que o domínio registra a perda de participação.

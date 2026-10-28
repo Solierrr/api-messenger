@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.solaria.messenger.core.contract.request.NpsRequestDTO;
 import com.solaria.messenger.core.contract.response.NpsResponseDTO;
 import com.solaria.messenger.rest.openapi.NpsOpenApi;
-import com.solaria.messenger.core.service.NpsService;
+import com.solaria.messenger.core.usecase.nps.CreateNpsUseCase;
 
 import jakarta.validation.Valid;
 
@@ -30,17 +30,17 @@ import jakarta.validation.Valid;
 @RequestMapping("/messaging/nps")
 public class NpsController implements NpsOpenApi {
 
-    private final NpsService npsService;
+    private final CreateNpsUseCase createNps;
 
-    public NpsController(NpsService npsService) {
-        this.npsService = npsService;
+    public NpsController(CreateNpsUseCase createNps) {
+        this.createNps = createNps;
     }
 
     /** Registra o NPS de uma conversa com o chatbot e devolve 201. */
     @Override
     @PostMapping
     public ResponseEntity<NpsResponseDTO> create(@Valid @RequestBody NpsRequestDTO dto) {
-        NpsResponseDTO response = npsService.create(dto);
+        NpsResponseDTO response = createNps.execute(dto);
         return ResponseEntity.created(URI.create("/messaging/nps/" + response.getId())).body(response);
     }
 }

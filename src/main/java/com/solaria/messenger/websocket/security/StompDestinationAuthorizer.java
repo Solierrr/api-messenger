@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 
 import com.solaria.messenger.websocket.dto.response.WsErrorPayload;
 import com.solaria.messenger.core.exception.BusinessException;
-import com.solaria.messenger.core.service.ConversationAuthorizationService;
+import com.solaria.messenger.core.helper.ConversationAccessHelper;
 import com.solaria.messenger.websocket.event.StompFrameDenied;
 
 /**
@@ -35,10 +35,10 @@ public class StompDestinationAuthorizer {
     /** Headers de SUBSCRIBE com que o RabbitMQ declara a fila (os {@code x-*} também são removidos). */
     private static final Set<String> QUEUE_OPTION_HEADERS = Set.of("durable", "persistent", "auto-delete", "exclusive");
 
-    private final ConversationAuthorizationService authorization;
+    private final ConversationAccessHelper authorization;
     private final ApplicationEventPublisher events;
 
-    public StompDestinationAuthorizer(ConversationAuthorizationService authorization, ApplicationEventPublisher events) {
+    public StompDestinationAuthorizer(ConversationAccessHelper authorization, ApplicationEventPublisher events) {
         this.authorization = authorization;
         this.events = events;
     }

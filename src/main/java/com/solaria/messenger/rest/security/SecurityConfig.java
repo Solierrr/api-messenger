@@ -21,7 +21,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import tools.jackson.databind.ObjectMapper;
 
 import com.solaria.messenger.rest.error.ProblemDetailFactory;
-import com.solaria.messenger.core.service.UserAccessService;
+import com.solaria.messenger.core.helper.UserAccessHelper;
 
 /**
  * Fronteiras de segurança HTTP do Messenger
@@ -54,7 +54,7 @@ public class SecurityConfig {
         /** Cria o filtro de usuário ativo com o registro servlet desabilitado, para que ele rode só dentro da chain de segurança. */
         @Bean
         public FilterRegistrationBean<ActiveUserFilter> activeUserFilterRegistration(
-                        UserAccessService userAccessService,
+                        UserAccessHelper userAccessService,
                         ProblemDetailFactory problemDetailFactory,
                         ObjectMapper objectMapper) {
                 FilterRegistrationBean<ActiveUserFilter> registration = new FilterRegistrationBean<>(
