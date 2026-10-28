@@ -7,11 +7,11 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import com.solaria.messenger.core.exception.UnauthorizedAccessException;
 
-@Component
+@Service
 public class AdminAccessService {
 
     private static final Pattern UUID_PATTERN = Pattern.compile(

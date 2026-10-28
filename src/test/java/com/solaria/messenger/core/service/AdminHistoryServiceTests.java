@@ -100,6 +100,18 @@ class AdminHistoryServiceTests {
     }
 
     @Test
+    void filtraPeloTextoDasMensagensSemDistinguirCaixaNemInterpretarRegex() {
+        givenConversation("c1", Map.of("assistant", "assistant"));
+        givenMessages(List.of(message("c1", "user", "Preciso de um eletricista (urgente)", 1, T0)));
+        givenSteps(List.of());
+        given(mongoTemplate.find(any(Query.class), eq(Nps.class))).willReturn(List.of());
+
+        assertThat(service.list(null, null, null, null, null, "ELETRICISTA", null).items()).hasSize(1);
+        assertThat(service.list(null, null, null, null, null, "(urgente)", null).items()).hasSize(1);
+        assertThat(service.list(null, null, null, null, null, ".*", null).items()).isEmpty();
+    }
+
+    @Test
     void detalheSeparaOsPassosDeCadaResposta() {
         Conversation conversation = conversation("c1", Map.of("assistant", "assistant", "threadId", "debug:u:abc"));
         given(mongoTemplate.findById("c1", Conversation.class)).willReturn(conversation);

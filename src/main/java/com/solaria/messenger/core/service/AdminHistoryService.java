@@ -40,6 +40,7 @@ public class AdminHistoryService {
     static final String UNKNOWN_ASSISTANT = "desconhecido";
     private static final String ROLE_USER = "user";
     private static final String ROLE_ASSISTANT = "assistant";
+    private static final String KEY_ASSISTANT = "assistant";
     private static final String STATUS_OK = "ok";
     private static final String CONVERSATION_ID = "conversationId";
 
@@ -70,14 +71,14 @@ public class AdminHistoryService {
         Set<String> ids = candidates.stream().map(Conversation::getId).collect(Collectors.toCollection(HashSet::new));
         Map<String, List<Message>> messages = messagesOf(ids);
         if (isInformed(text)) {
-            Set<String> matching = idsWithText(ids, text.trim());
+            Set<String> matching = idsWithText(messages, text.trim());
             candidates = candidates.stream().filter(conversation -> matching.contains(conversation.getId())).toList();
             ids = matching;
         }
         Map<String, List<LlmObservability>> steps = stepsOf(ids);
         Map<String, Integer> scores = scoresOf(ids);
 
-        int size = Math.max(1, Math.min(limit != null ? limit : DEFAULT_LIMIT, MAX_SCAN));
+        int size = Math.clamp(limit != null ? limit : DEFAULT_LIMIT, 1, MAX_SCAN);
         List<AdminConversationSummaryDTO> items = candidates.stream()
                 .limit(size)
                 .map(conversation -> summarize(conversation, messages.getOrDefault(conversation.getId(), List.of()),
@@ -100,27 +101,39 @@ public class AdminHistoryService {
         int turn = 0;
         for (Message message : messages) {
             if (!ROLE_ASSISTANT.equals(message.getRole())) {
-                result.add(new AdminMessageDTO(message.getRole(), message.getContent(), message.getTimestamp(),
-                        null, null, null, List.of(), List.of(), 0, 0, List.of()));
+                result.add(userMessage(message));
                 continue;
             }
             turn++;
             List<LlmObservabilityResponseDTO> slice = stepsBetween(steps, previous, message.getTimestamp());
             previous = message.getTimestamp();
-            MessageMetadata metadata = message.getMetadata();
-            result.add(new AdminMessageDTO(message.getRole(), message.getContent(), message.getTimestamp(), turn,
-                    metadata != null ? metadata.getThreadTurn() : null,
-                    metadata != null ? metadata.getTurnId() : null,
-                    metadata != null && metadata.getSpecialistsUsed() != null ? metadata.getSpecialistsUsed() : List.of(),
-                    metadata != null && metadata.getWorkflowSteps() != null ? metadata.getWorkflowSteps() : List.of(),
-                    slice.stream().mapToDouble(step -> orZero(step.getLatencyMs())).sum(),
-                    slice.stream().mapToDouble(step -> orZero(step.getCostUsd())).sum(),
-                    slice));
+            result.add(assistantMessage(message, turn, slice));
         }
-        Map<String, Object> details = conversation.getUserDetails() != null ? conversation.getUserDetails() : Map.of();
+        Map<String, Object> details = detailsOf(conversation);
         Object thread = details.get("threadId");
         return new AdminConversationDetailDTO(summarize(conversation, messages, steps, score),
                 thread != null ? thread.toString() : null, details, result);
+    }
+
+    private static AdminMessageDTO userMessage(Message message) {
+        return new AdminMessageDTO(message.getRole(), message.getContent(), message.getTimestamp(),
+                null, null, null, List.of(), List.of(), 0, 0, List.of());
+    }
+
+    private static AdminMessageDTO assistantMessage(Message message, int turn,
+            List<LlmObservabilityResponseDTO> slice) {
+        MessageMetadata metadata = message.getMetadata() != null ? message.getMetadata() : new MessageMetadata();
+        List<String> specialists = metadata.getSpecialistsUsed() != null ? metadata.getSpecialistsUsed() : List.of();
+        List<String> workflowSteps = metadata.getWorkflowSteps() != null ? metadata.getWorkflowSteps() : List.of();
+        return new AdminMessageDTO(message.getRole(), message.getContent(), message.getTimestamp(), turn,
+                metadata.getThreadTurn(), metadata.getTurnId(), specialists, workflowSteps,
+                slice.stream().mapToDouble(step -> orZero(step.getLatencyMs())).sum(),
+                slice.stream().mapToDouble(step -> orZero(step.getCostUsd())).sum(),
+                slice);
+    }
+
+    private static Map<String, Object> detailsOf(Conversation conversation) {
+        return conversation.getUserDetails() != null ? conversation.getUserDetails() : Map.of();
     }
 
     private List<LlmObservabilityResponseDTO> stepsBetween(List<LlmObservability> steps, Instant after,
@@ -135,8 +148,8 @@ public class AdminHistoryService {
 
     private AdminConversationSummaryDTO summarize(Conversation conversation, List<Message> messages,
             List<LlmObservability> steps, Integer score) {
-        Map<String, Object> details = conversation.getUserDetails() != null ? conversation.getUserDetails() : Map.of();
-        Object assistant = details.get("assistant");
+        Map<String, Object> details = detailsOf(conversation);
+        Object assistant = details.get(KEY_ASSISTANT);
         Object source = details.get("source");
         String first = messages.stream()
                 .filter(message -> ROLE_USER.equals(message.getRole()))
@@ -186,15 +199,13 @@ public class AdminHistoryService {
                 .collect(Collectors.toMap(Nps::getConversationId, Nps::getScore, (a, b) -> a));
     }
 
-    private Set<String> idsWithText(Collection<String> ids, String text) {
-        if (ids.isEmpty()) {
-            return Set.of();
-        }
-        String pattern = text.replaceAll("[\\\\^$.|?*+()\\[\\]{}]", "\\\\$0");
-        Query query = Query.query(Criteria.where(CONVERSATION_ID).in(ids).and("deleted").ne(true)
-                .and("content").regex(pattern, "i"));
-        return mongoTemplate.find(query, Message.class).stream()
-                .map(Message::getConversationId)
+    private static Set<String> idsWithText(Map<String, List<Message>> messages, String text) {
+        String needle = text.toLowerCase();
+        return messages.entrySet().stream()
+                .filter(entry -> entry.getValue().stream()
+                        .anyMatch(message -> message.getContent() != null
+                                && message.getContent().toLowerCase().contains(needle)))
+                .map(Map.Entry::getKey)
                 .collect(Collectors.toSet());
     }
 
