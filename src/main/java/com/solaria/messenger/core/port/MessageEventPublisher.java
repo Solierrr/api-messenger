@@ -3,8 +3,12 @@ package com.solaria.messenger.core.port;
 import com.solaria.messenger.core.model.Message;
 
 /**
- * Porta de saída para eventos de mensagem já persistida. O núcleo não conhece o transporte:
- * a implementação entrega em tempo real e nunca propaga falha de entrega, que não desfaz a escrita.
+ * Porta de saída para eventos de mensagem já persistida.
+ *
+ * <p>
+ * O núcleo não conhece o transporte. A implementação entrega em tempo real e nunca propaga falha de entrega, que não
+ * desfaz a escrita.
+ * </p>
  */
 public interface MessageEventPublisher {
 

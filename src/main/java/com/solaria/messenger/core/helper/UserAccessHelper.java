@@ -16,6 +16,31 @@ import com.solaria.messenger.core.integration.user.UserAccessClient;
 import com.solaria.messenger.core.integration.user.dto.UserActivityBatchResponseDTO;
 import com.solaria.messenger.core.integration.user.dto.UserActivityResponseDTO;
 
+/**
+ * Confere na Auth se os users estão cadastrados e ativos.
+ *
+ * <p>
+ * A Auth é a fonte da situação do user. Falha técnica ao consultar a Auth continua bloqueando a operação. Só
+ * respostas válidas permitem seleção parcial.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link UserAccessClient} -> consulta a situação dos users na Auth.</li>
+ * </ul>
+ *
+ * <p>
+ * Principais operações disponibilizadas:
+ * </p>
+ * <ul>
+ *     <li>{@link #requireActiveActor(UUID)} -> exige que o ator esteja ativo.</li>
+ *     <li>{@link #requireActiveUsers(Collection)} -> exige que todos os usuários informados estejam ativos.</li>
+ *     <li>{@link #eligibleUsers(Collection)} -> devolve só os usuários ativos.</li>
+ *     <li>{@link #requireSuccessorsActive(Collection)} -> exige que os sucessores estejam ativos.</li>
+ * </ul>
+ */
 @Component
 public class UserAccessHelper {
 
@@ -25,7 +50,17 @@ public class UserAccessHelper {
         this.userAccessClient = userAccessClient;
     }
 
-    /** Usado no CONNECT/reconnect e pelo filtro HTTP; falha técnica continua impedindo a operação. */
+    /**
+     * Confere que o ator está cadastrado e ativo na Auth.
+     *
+     * <p>
+     * Usado no CONNECT, no reconnect e pelo filtro HTTP. Falha técnica ao consultar a Auth não é tratada aqui, e a
+     * operação para.
+     * </p>
+     *
+     * @param authId identificador do ator na Auth.
+     * @throws UnauthorizedAccessException caso o ator não esteja cadastrado ou esteja inativo.
+     */
     public void requireActiveActor(UUID authId) {
         UserActivityResponseDTO activity;
         try {
@@ -38,7 +73,17 @@ public class UserAccessHelper {
         }
     }
 
-    /** Comandos administrativos mantêm validação integral dos convidados. */
+    /**
+     * Confere que todos os usuários informados existem e estão ativos na Auth.
+     *
+     * <p>
+     * Usado nos comandos administrativos, que validam todos os convidados. Ids repetidos contam uma vez só.
+     * </p>
+     *
+     * @param authIds identificadores na Auth. Lista vazia não faz consulta.
+     * @throws ResourceNotFoundException caso algum usuário não exista na Auth.
+     * @throws UnauthorizedAccessException caso algum usuário esteja inativo.
+     */
     public void requireActiveUsers(Collection<UUID> authIds) {
         Objects.requireNonNull(authIds, "authIds");
         List<UUID> distinctAuthIds = List.copyOf(new LinkedHashSet<>(authIds));
@@ -52,7 +97,17 @@ public class UserAccessHelper {
         }
     }
 
-    /** Só respostas válidas permitem seleção parcial; falhas técnicas da Auth continuam abortando o comando. */
+    /**
+     * Devolve os usuários ativos entre os informados.
+     *
+     * <p>
+     * Usuários inativos ou inexistentes ficam de fora, sem gerar erro. Falha técnica na Auth continua abortando o
+     * comando.
+     * </p>
+     *
+     * @param authIds identificadores na Auth.
+     * @return conjunto com os usuários ativos.
+     */
     public Set<UUID> eligibleUsers(Collection<UUID> authIds) {
         Set<UUID> requested = new LinkedHashSet<>(authIds);
         if (requested.isEmpty()) return Set.of();
@@ -63,7 +118,16 @@ public class UserAccessHelper {
         return Set.copyOf(eligible);
     }
 
-    /** Sucessor inexistente ou inativo na Auth vira sucessor inelegível */
+    /**
+     * Confere que os sucessores estão ativos, convertendo a falha em erro de sucessor.
+     *
+     * <p>
+     * Sucessor inexistente ou inativo na Auth vira {@link SuccessorIneligibleException}.
+     * </p>
+     *
+     * @param successors identificadores dos sucessores.
+     * @throws SuccessorIneligibleException caso algum sucessor não esteja ativo ou não exista na Auth.
+     */
     public void requireSuccessorsActive(Collection<UUID> successors) {
         try {
             requireActiveUsers(successors);

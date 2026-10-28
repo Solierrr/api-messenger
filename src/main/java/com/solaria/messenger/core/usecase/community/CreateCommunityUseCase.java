@@ -24,6 +24,31 @@ import com.solaria.messenger.core.security.rbac.RbacAuthorizationService;
 
 import static com.solaria.messenger.core.mapper.CommunityMapper.toResponse;
 
+/**
+ * Caso de uso que cria a comunidade de um projeto.
+ *
+ * <p>
+ * Só o demandante do projeto pode criar, e cada projeto tem uma comunidade só. O criador entra como {@code OWNER}.
+ * Os membros iniciais entram como {@code MEMBER}, sem nulos e sem o próprio criador, e todos precisam estar ativos.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link CommunityRepository} -> verifica se o projeto já tem comunidade e grava a nova.</li>
+ *     <li>{@link RbacAuthorizationService} -> identifica o criador.</li>
+ *     <li>{@link ProjectAuthorityClient} -> confirma que o user é o demandante do projeto.</li>
+ *     <li>{@link UserAccessHelper} -> confere os membros iniciais ativos.</li>
+ * </ul>
+ *
+ * <p>
+ * Principal operação disponibilizada:
+ * </p>
+ * <ul>
+ *     <li>{@link #execute(CommunityRequestDTO)} -> cria a comunidade do projeto.</li>
+ * </ul>
+ */
 @Service
 public class CreateCommunityUseCase {
 
@@ -40,7 +65,13 @@ public class CreateCommunityUseCase {
         this.users = users;
     }
 
-    /** Cria a comunidade do projeto com o demandante como OWNER e os membros iniciais como MEMBER */
+    /**
+     * Cria a comunidade do projeto.
+     *
+     * @param dto projeto e membros iniciais da comunidade.
+     * @return comunidade criada.
+     * @throws DuplicateResourceException caso o projeto já tenha uma comunidade.
+     */
     public CommunityResponseDTO execute(CommunityRequestDTO dto) {
         UUID currentUserId = rbac.currentUserId();
 

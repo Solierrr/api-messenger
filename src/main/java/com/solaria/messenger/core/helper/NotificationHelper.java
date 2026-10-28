@@ -21,6 +21,41 @@ import com.solaria.messenger.core.repository.ConversationRepository;
 import com.solaria.messenger.core.support.ConversationMutationGuard;
 import com.solaria.messenger.core.support.ConversationSyncClock;
 
+/**
+ * Avisa os clientes sobre mudanças em conversas e mensagens.
+ *
+ * <p>
+ * Monta a projeção da lista de conversas dentro da fronteira do guard e entrega fora dela. Antes de entregar,
+ * confere a autorização de novo, para que quem perdeu acesso no caminho não receba. Falha na publicação só gera log,
+ * porque a gravação já aconteceu.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link ConversationRepository} -> carrega as conversas afetadas.</li>
+ *     <li>{@link ConversationAccessHelper} -> carrega as comunidades e confere quem pode ver cada conversa.</li>
+ *     <li>{@link ConversationProjectionHelper} -> monta os itens da lista.</li>
+ *     <li>{@link ConversationSyncClock} -> fornece a versão do evento.</li>
+ *     <li>{@link ConversationMutationGuard} -> garante que a entrega sai fora da fronteira local.</li>
+ *     <li>{@link ConversationEventPublisher} -> envia eventos de conversa.</li>
+ *     <li>{@link MessageEventPublisher} -> envia eventos de mensagem.</li>
+ * </ul>
+ *
+ * <p>
+ * Principais operações disponibilizadas:
+ * </p>
+ * <ul>
+ *     <li>{@link #publishConversationChanged(String)} -> avisa a mudança a todos os participantes.</li>
+ *     <li>{@link #publishConversationChanged(String, Set)} -> avisa só os usuários informados.</li>
+ *     <li>{@link #publishConversationsChanged(Set)} -> avisa várias conversas num lote.</li>
+ *     <li>{@link #publishRemovedConversation(UUID, String)} -> avisa que o user perdeu a conversa.</li>
+ *     <li>{@link #notifyMessageCreated(Message)} -> avisa a criação de mensagem.</li>
+ *     <li>{@link #notifyMessageEdited(Message)} -> avisa a edição de mensagem.</li>
+ *     <li>{@link #notifyMessageDeleted(Message)} -> avisa a exclusão de mensagem.</li>
+ * </ul>
+ */
 @Component
 public class NotificationHelper {
 
@@ -47,22 +82,56 @@ public class NotificationHelper {
 
     // conversa
 
-    /** Avisa o estado atual da conversa a todos os participantes, mesmo os que não estão com ela aberta */
+    /**
+     * Avisa o estado atual da conversa a todos os participantes.
+     *
+     * <p>
+     * Mesmo quem não está com a conversa aberta recebe o aviso.
+     * </p>
+     *
+     * @param id identificador da conversa.
+     */
     public void publishConversationChanged(String id) {
         publishConversationsChanged(Set.of(id), null);
     }
 
-    /** Avisa só os users informados, como no PATCH do estado pessoal */
+    /**
+     * Avisa a mudança da conversa só aos usuários informados.
+     *
+     * <p>
+     * Usado no PATCH do estado pessoal, em que só o próprio user precisa saber.
+     * </p>
+     *
+     * @param id identificador da conversa.
+     * @param only usuários que devem receber o aviso.
+     */
     public void publishConversationChanged(String id, Set<UUID> only) {
         publishConversationsChanged(Set.of(id), only);
     }
 
-    /** Avisa várias conversas num lote só (usado pela cascata da comunidade) */
+    /**
+     * Avisa a mudança de várias conversas num lote só.
+     *
+     * <p>
+     * Usado pela cascata de comunidade, que mexe em vários subgrupos de uma vez.
+     * </p>
+     *
+     * @param ids identificadores das conversas.
+     */
     public void publishConversationsChanged(Set<String> ids) {
         publishConversationsChanged(ids, null);
     }
 
-    /** Aviso mínimo, sem dados da conversa, para quem acabou de perder o acesso */
+    /**
+     * Avisa que o user perdeu acesso à conversa.
+     *
+     * <p>
+     * O aviso é mínimo: traz só o identificador, sem dados da conversa.
+     * </p>
+     *
+     * @param recipient user que perdeu o acesso.
+     * @param conversationId identificador da conversa.
+     */
     public void publishRemovedConversation(UUID recipient, String conversationId) {
         events.conversationRemoved(recipient, conversationId, clock.epoch(), clock.nextVersion());
     }
@@ -116,25 +185,37 @@ public class NotificationHelper {
 
     // mensagem
 
-    /** Anuncia uma mensagem nova e atualiza preview e não lidas da conversa. */
+    /**
+     * Avisa a criação de uma mensagem e atualiza a prévia e as não lidas da conversa.
+     *
+     * @param message mensagem gravada.
+     */
     public void notifyMessageCreated(Message message) {
         messageEvents.messageCreated(message);
         publishConversationState(message.getConversationId());
     }
 
-    /** Anuncia a edição efetiva e atualiza o preview da conversa. */
+    /**
+     * Avisa a edição de uma mensagem e atualiza a prévia da conversa.
+     *
+     * @param message mensagem editada.
+     */
     public void notifyMessageEdited(Message message) {
         messageEvents.messageEdited(message);
         publishConversationState(message.getConversationId());
     }
 
-    /** Anuncia o tombstone e atualiza preview e não lidas da conversa. */
+    /**
+     * Avisa a exclusão de uma mensagem e atualiza a prévia e as não lidas da conversa.
+     *
+     * @param message mensagem excluída.
+     */
     public void notifyMessageDeleted(Message message) {
         messageEvents.messageDeleted(message);
         publishConversationState(message.getConversationId());
     }
 
-    /** A mensagem já foi persistida; uma falha ao invalidar a lista nunca vira erro do comando. */
+    /** A mensagem já foi persistida; uma falha ao invalidar a lista nunca vira erro do comando */
     private void publishConversationState(String conversationId) {
         try {
             publishConversationChanged(conversationId);

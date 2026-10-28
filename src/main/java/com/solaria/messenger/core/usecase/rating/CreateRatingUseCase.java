@@ -15,6 +15,28 @@ import com.solaria.messenger.core.security.rbac.RbacAuthorizationService;
 
 import static com.solaria.messenger.core.mapper.RatingMapper.toResponse;
 
+/**
+ * Caso de uso que cria uma avaliação feita pelo user atual.
+ *
+ * <p>
+ * A avaliação entra sempre como ativa. Ninguém pode avaliar a si mesmo.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link RatingRepository} -> grava a avaliação.</li>
+ *     <li>{@link RbacAuthorizationService} -> identifica o avaliador.</li>
+ * </ul>
+ *
+ * <p>
+ * Principal operação disponibilizada:
+ * </p>
+ * <ul>
+ *     <li>{@link #execute(RatingRequestDTO)} -> cria a avaliação.</li>
+ * </ul>
+ */
 @Service
 public class CreateRatingUseCase {
 
@@ -26,7 +48,13 @@ public class CreateRatingUseCase {
         this.rbac = rbac;
     }
 
-    /** Cria uma avaliação ativa; ninguém pode avaliar a si mesmo. */
+    /**
+     * Cria uma avaliação ativa do user atual para outro user.
+     *
+     * @param dto avaliado, tipo, nota e comentário da avaliação.
+     * @return avaliação criada.
+     * @throws BusinessRuleException caso o avaliador tente avaliar a si mesmo.
+     */
     public RatingResponseDTO execute(RatingRequestDTO dto) {
         UUID evaluatorId = rbac.currentUserId();
         if (evaluatorId.equals(dto.getEvaluatedId())) {

@@ -17,12 +17,17 @@ import jakarta.validation.Valid;
 /**
  * Controller REST interno que recebe a resposta do chatbot e a grava na conversa.
  *
- * <p>Exposto em {@code /internal/messages}, sem autenticação de aplicação, pois o isolamento é feito
- * pela rede. Delega a ingestão a {@link MessageSendService}.</p>
+ * <p>
+ * Exposto em {@code /internal/messages}, sem autenticação de aplicação, pois o isolamento é feito
+ * pela rede. Delega a ingestão a {@link IngestChatbotMessageUseCase}.
+ * </p>
  *
- * <p>Principais operações disponibilizadas:</p>
+ * <p>
+ * Principais operações disponibilizadas:
+ * </p>
  * <ul>
- *     <li>{@link #ingestChatbotMessage(ChatbotMessageRequestDTO)} -> grava a resposta numa conversa com o chatbot e devolve 201.</li>
+ *     <li>{@link #ingestChatbotMessage(ChatbotMessageRequestDTO)} -> grava a resposta numa conversa com o chatbot e
+ *         devolve 201.</li>
  * </ul>
  */
 @RestController

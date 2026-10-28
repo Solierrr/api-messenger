@@ -40,9 +40,12 @@ import com.solaria.messenger.websocket.exception.StompAuthenticationException;
  * </p>
  * <ul>
  *     <li>{@link #preSend(Message, MessageChannel)} -> autentica o CONNECT ou valida os frames seguintes.</li>
- *     <li>{@link #beforeHandle(Message, MessageChannel, MessageHandler)} -> revalida token, sessão e destino na thread do handler.</li>
- *     <li>{@link #afterMessageHandled(Message, MessageChannel, MessageHandler, Exception)} -> avisa a inscrição já registrada no broker.</li>
- *     <li>{@link #afterSendCompletion(Message, MessageChannel, boolean, Exception)} -> limpa o contexto de segurança.</li>
+ *     <li>{@link #beforeHandle(Message, MessageChannel, MessageHandler)} -> revalida token, sessão e destino na thread
+ *         do handler.</li>
+ *     <li>{@link #afterMessageHandled(Message, MessageChannel, MessageHandler, Exception)} -> avisa a inscrição já
+ *         registrada no broker.</li>
+ *     <li>{@link #afterSendCompletion(Message, MessageChannel, boolean, Exception)} -> limpa o contexto de
+ *         segurança.</li>
  * </ul>
  */
 @Component

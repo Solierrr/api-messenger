@@ -25,6 +25,31 @@ import com.solaria.messenger.core.repository.projection.LatestMessage;
 import com.solaria.messenger.core.state.OwnedState;
 import com.solaria.messenger.core.support.ConversationSyncClock;
 
+/**
+ * Monta a lista de conversas de cada destinatário, com prévia e não lidas.
+ *
+ * <p>
+ * Trabalha em lote para evitar uma consulta por conversa. Cada item mostra o estado pessoal do destinatário, a
+ * última mensagem como prévia e a contagem de não lidas. Cursor de leitura depois da última mensagem gravada é tratado
+ * como erro. Conversa do tipo {@code CHAT_BOT} não tem estado pessoal, então os campos pessoais saem nulos.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link ConversationStateHelper} -> carrega o estado pessoal em lote.</li>
+ *     <li>{@link MessageRepository} -> carrega a última mensagem e as não lidas.</li>
+ *     <li>{@link ConversationSyncClock} -> fornece a época da sincronização.</li>
+ * </ul>
+ *
+ * <p>
+ * Principal operação disponibilizada:
+ * </p>
+ * <ul>
+ *     <li>{@link #project(List, Map, Map, Boolean, long)} -> monta os itens por destinatário.</li>
+ * </ul>
+ */
 @Component
 public class ConversationProjectionHelper {
 
@@ -40,8 +65,21 @@ public class ConversationProjectionHelper {
     }
 
     /**
-     * Monta os itens por destinatário; {@code archivedFilter} nulo não filtra pelo archive pessoal.
-     * {@code version} vem do chamador, alocada antes de ele ler as conversas.
+     * Monta os itens por destinatário.
+     *
+     * <p>
+     * {@code archivedFilter} nulo não filtra pelo arquivamento pessoal. Um valor booleano mantém só os destinatários
+     * com o mesmo estado de arquivamento. Conversa de chatbot, sem estado pessoal, só passa quando o filtro pede os não
+     * arquivados.
+     * </p>
+     *
+     * @param conversations conversas a projetar.
+     * @param authorized destinatários autorizados por conversa.
+     * @param parents comunidades do lote, por id.
+     * @param archivedFilter filtro de arquivamento, ou nulo para não filtrar.
+     * @param version versão da sincronização, alocada pelo chamador antes da leitura das conversas.
+     * @return mapa de id do destinatário para os itens da lista dele.
+     * @throws BaselineUnavailableException caso o estado pessoal esteja ausente ou o cursor passe da última mensagem.
      */
     public Map<UUID, List<ConversationListItemResponseDTO>> project(List<Conversation> conversations,
             Map<String, Set<UUID>> authorized, Map<String, ProjectCommunity> parents, Boolean archivedFilter, long version) {

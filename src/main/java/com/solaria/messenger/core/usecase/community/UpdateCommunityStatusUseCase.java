@@ -28,6 +28,33 @@ import static com.solaria.messenger.core.helper.PureRulesHelper.requireMember;
 import static com.solaria.messenger.core.helper.PureRulesHelper.requireOwner;
 import static com.solaria.messenger.core.mapper.CommunityMapper.toResponse;
 
+/**
+ * Caso de uso que arquiva ou reativa uma comunidade.
+ *
+ * <p>
+ * Arquivar exige ser {@code OWNER}. Reativar exige papel {@code ADMIN} ou {@code OWNER}. A gravação usa CAS e tenta
+ * de novo se a versão mudou. Os subgrupos só recebem o aviso de mudança se o status realmente mudou.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link CommunityRepository} -> grava o status com CAS.</li>
+ *     <li>{@link RbacAuthorizationService} -> identifica o ator.</li>
+ *     <li>{@link LookupHelper} -> carrega a comunidade.</li>
+ *     <li>{@link CommunityHelper} -> aplica a escrita com nova tentativa e lista os subgrupos.</li>
+ *     <li>{@link NotificationHelper} -> avisa os subgrupos.</li>
+ *     <li>{@link ConversationMutationGuard} -> serializa a operação na JVM.</li>
+ * </ul>
+ *
+ * <p>
+ * Principal operação disponibilizada:
+ * </p>
+ * <ul>
+ *     <li>{@link #execute(String, CommunityUpdateRequestDTO)} -> altera o status da comunidade.</li>
+ * </ul>
+ */
 @Service
 public class UpdateCommunityStatusUseCase {
 
@@ -50,7 +77,15 @@ public class UpdateCommunityStatusUseCase {
         this.guard = guard;
     }
 
-    /** Arquiva ou reativa a comunidade e avisa os subgrupos só se o status mudou */
+    /**
+     * Altera o status da comunidade.
+     *
+     * @param id identificador da comunidade.
+     * @param dto status desejado.
+     * @return comunidade com o status atualizado.
+     * @throws InvalidFieldException caso o status não seja informado.
+     * @throws UnauthorizedAccessException caso o ator não tenha o papel exigido pelo status pedido.
+     */
     public CommunityResponseDTO execute(String id, CommunityUpdateRequestDTO dto) {
         if (dto == null || dto.getStatus() == null) {
             throw new InvalidFieldException("status é obrigatório.");

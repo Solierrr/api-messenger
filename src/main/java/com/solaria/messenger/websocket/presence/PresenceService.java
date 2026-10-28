@@ -30,12 +30,15 @@ import com.solaria.messenger.websocket.event.SessionPresenceChanged;
  * Service de presença do usuário (online/offline)
  *
  * <p>
- * A partir de eventos da sessão webscoket, publica um STOMP para os participantes autorizados, mostrando presença do user.
+ * A partir de eventos da sessão webscoket, publica um STOMP para os participantes autorizados, mostrando presença do
+ * user.
  * falhas não derrubam a sessão.
  * </p>
  * <ul>
- *     <li>{@link #onSubscriptionRegistered(ConversationSubscriptionRegistered)} -> envia o atual estado de presença dos user para uma nova sessão.</li>
- *     <li>{@link #onPresenceChanged(SessionPresenceChanged)} -> anuncia USER_ONLINE/USER_OFFLINE nas conversas do usuário.</li>
+ *     <li>{@link #onSubscriptionRegistered(ConversationSubscriptionRegistered)} -> envia o atual estado de presença dos
+ *         user para uma nova sessão.</li>
+ *     <li>{@link #onPresenceChanged(SessionPresenceChanged)} -> anuncia USER_ONLINE/USER_OFFLINE nas conversas do
+ *         usuário.</li>
  * </ul>
  */
 @Service

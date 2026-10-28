@@ -27,11 +27,15 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Filtro que valida o usuário do JWT antes de a requisição chegar ao controller
  *
- * <p>Confere se o subject do token é um UUID canônico e se o usuário está ativo na api-auth, consultando
- * {@link UserAccessService} a cada requisição. Usuário inativo ou inexistente recebe erro no formato
- * {@code ProblemDetail}, escrito diretamente na resposta, pois o filtro roda antes do Spring MVC.</p>
+ * <p>
+ * Confere se o subject do token é um UUID canônico e se o usuário está ativo na api-auth, consultando
+ * {@link UserAccessHelper} a cada requisição. Usuário inativo ou inexistente recebe erro no formato
+ * {@code ProblemDetail}, escrito diretamente na resposta, pois o filtro roda antes do Spring MVC.
+ * </p>
  *
- * <p>Não se aplica à documentação OpenAPI nem ao handshake WebSocket.</p>
+ * <p>
+ * Não se aplica à documentação OpenAPI nem ao handshake WebSocket.
+ * </p>
  */
 public class ActiveUserFilter extends OncePerRequestFilter {
 

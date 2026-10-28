@@ -18,10 +18,14 @@ import jakarta.validation.Valid;
 /**
  * Controller REST do NPS (Net Promoter Score), exposto em {@code /messaging/nps}.
  *
- * <p>Recebe a resposta, valida o corpo ({@code @Valid}) e delega o registro a {@link NpsService}. O
- * contrato da API é declarado em {@link NpsOpenApi}.</p>
+ * <p>
+ * Recebe a resposta, valida o corpo ({@code @Valid}) e delega o registro a {@link CreateNpsUseCase}. O
+ * contrato da API é declarado em {@link NpsOpenApi}.
+ * </p>
  *
- * <p>Principais operações disponibilizadas:</p>
+ * <p>
+ * Principais operações disponibilizadas:
+ * </p>
  * <ul>
  *     <li>{@link #create(NpsRequestDTO)} -> registra o NPS de uma conversa com o chatbot (201).</li>
  * </ul>

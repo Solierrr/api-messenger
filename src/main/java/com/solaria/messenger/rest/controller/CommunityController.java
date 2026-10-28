@@ -38,11 +38,15 @@ import jakarta.validation.Valid;
 /**
  * Controller REST dos recursos de comunidade, exposto em {@code /messaging/communities}.
  *
- * <p>Atua na camada de entrada HTTP: valida o corpo ({@code @Valid}) e delega a regra de negócio aos
+ * <p>
+ * Atua na camada de entrada HTTP: valida o corpo ({@code @Valid}) e delega a regra de negócio aos
  * serviços de comunidade, de membros e de criação de conversas. O contrato da API é declarado em
- * {@link CommunityOpenApi}.</p>
+ * {@link CommunityOpenApi}.
+ * </p>
  *
- * <p>Principais operações disponibilizadas:</p>
+ * <p>
+ * Principais operações disponibilizadas:
+ * </p>
  * <ul>
  *     <li>{@link #createCommunity(CommunityRequestDTO)} -> cria a comunidade de um projeto (201).</li>
  *     <li>{@link #findMine()} -> lista as comunidades do usuário autenticado.</li>

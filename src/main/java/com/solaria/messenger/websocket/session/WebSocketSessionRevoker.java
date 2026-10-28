@@ -14,8 +14,11 @@ import com.solaria.messenger.core.port.SessionRevoker;
 
 /**
  * Encerra as conexões do user em todos os pods depois que o domínio registra a perda de participação.
- * Fecha as deste pod na hora e avisa os outros pelo canal Redis {@code messenger:revoke}; sem Redis, nos outros pods
+ *
+ * <p>
+ * Fecha as deste pod na hora e avisa os outros pelo canal Redis {@code messenger:revoke}. Sem Redis, nos outros pods
  * o filtro de saída ainda descarta os frames das conversas perdidas.
+ * </p>
  */
 @Component
 public class WebSocketSessionRevoker implements SessionRevoker, MessageListener {

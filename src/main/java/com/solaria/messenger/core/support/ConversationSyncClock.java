@@ -11,7 +11,11 @@ import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Component;
 
 /**
- * Época e versão monotônica da sincronização de conversas, compartilhadas por REST e eventos e por todos os pods
+ * Época e versão monotônica da sincronização de conversas.
+ *
+ * <p>
+ * São compartilhadas por REST e eventos e por todos os pods.
+ * </p>
  */
 @Component
 public class ConversationSyncClock {

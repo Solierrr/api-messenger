@@ -28,10 +28,14 @@ import jakarta.validation.Valid;
 /**
  * Controller REST dos recursos de mensagem, exposto em {@code /messaging/messages}.
  *
- * <p>Atua na camada de entrada HTTP: valida o corpo ({@code @Valid}) e delega envio, edição, remoção
- * e consulta aos serviços de mensagem. O contrato da API é declarado em {@link MessageOpenApi}.</p>
+ * <p>
+ * Atua na camada de entrada HTTP: valida o corpo ({@code @Valid}) e delega envio, edição, remoção
+ * e consulta aos serviços de mensagem. O contrato da API é declarado em {@link MessageOpenApi}.
+ * </p>
  *
- * <p>Principais operações disponibilizadas:</p>
+ * <p>
+ * Principais operações disponibilizadas:
+ * </p>
  * <ul>
  *     <li>{@link #sendMessage(MessageRequestDTO)} -> envia uma mensagem (201).</li>
  *     <li>{@link #editMessage(String, MessageEditRequestDTO)} -> edita o texto de uma mensagem própria.</li>

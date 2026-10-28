@@ -27,6 +27,35 @@ import com.solaria.messenger.core.support.ConversationSyncClock;
 
 import static com.solaria.messenger.core.helper.ConversationStateHelper.toOwnedState;
 
+/**
+ * Caso de uso que altera o estado pessoal do user em uma conversa: cursor de leitura, silenciar e arquivar.
+ *
+ * <p>
+ * Cada participante tem o seu próprio estado. O cursor de leitura só anda para frente e nunca passa da última
+ * mensagem gravada. Se nenhum campo muda, nada é gravado nem avisado. Conversa do tipo {@code CHAT_BOT} não tem estado
+ * pessoal.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link RbacAuthorizationService} -> identifica o user atual.</li>
+ *     <li>{@link ConversationAccessHelper} -> confere a participação.</li>
+ *     <li>{@link ConversationUserStateRepository} -> lê e grava o estado pessoal.</li>
+ *     <li>{@link MessageRepository} -> consulta a última sequência e as não lidas.</li>
+ *     <li>{@link ConversationSyncClock} -> fornece a época e a versão.</li>
+ *     <li>{@link NotificationHelper} -> avisa só o próprio user.</li>
+ *     <li>{@link ConversationMutationGuard} -> serializa a escrita na JVM.</li>
+ * </ul>
+ *
+ * <p>
+ * Principal operação disponibilizada:
+ * </p>
+ * <ul>
+ *     <li>{@link #execute(String, ConversationStatePatchRequestDTO)} -> aplica o PATCH de estado.</li>
+ * </ul>
+ */
 @Service
 public class PatchConversationStateUseCase {
 
@@ -50,7 +79,16 @@ public class PatchConversationStateUseCase {
         this.guard = guard;
     }
 
-    /** Aplica o PATCH; se nada mudou, não grava nem avisa */
+    /**
+     * Aplica o PATCH de estado pessoal na conversa.
+     *
+     * @param id identificador da conversa.
+     * @param patch campos a alterar. Campo ausente fica como está.
+     * @return estado pessoal resultante, com a contagem de não lidas.
+     * @throws BusinessRuleException caso a conversa seja do tipo {@code CHAT_BOT}.
+     * @throws InvalidFieldException caso o PATCH esteja vazio, tenha campo nulo, ou o cursor seja negativo ou maior que
+     *     a última sequência gravada.
+     */
     public ConversationStateResponseDTO execute(String id, ConversationStatePatchRequestDTO patch) {
         UUID actor = rbac.currentUserId();
         boolean[] changed = { false };

@@ -19,6 +19,34 @@ import com.solaria.messenger.core.security.rbac.RbacAuthorizationService;
 import com.solaria.messenger.core.support.ConversationMutationGuard;
 import com.solaria.messenger.core.support.ConversationSyncClock;
 
+/**
+ * Caso de uso que lista as conversas do user atual.
+ *
+ * <p>
+ * Devolve um snapshot com a época e a versão da sincronização. O app usa a versão para reconciliar a lista,
+ * inclusive quando a lista vem vazia. Os itens saem da interação mais recente para a mais antiga. Cada item traz só os
+ * dados visíveis para o próprio user.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link ConversationRepository} -> busca as conversas do user.</li>
+ *     <li>{@link RbacAuthorizationService} -> identifica o user atual.</li>
+ *     <li>{@link ConversationAccessHelper} -> carrega as comunidades e quem está autorizado.</li>
+ *     <li>{@link ConversationProjectionHelper} -> monta os itens da lista.</li>
+ *     <li>{@link ConversationSyncClock} -> fornece a época e a versão.</li>
+ *     <li>{@link ConversationMutationGuard} -> serializa a leitura na JVM.</li>
+ * </ul>
+ *
+ * <p>
+ * Principal operação disponibilizada:
+ * </p>
+ * <ul>
+ *     <li>{@link #execute(boolean)} -> lista as conversas com época e versão.</li>
+ * </ul>
+ */
 @Service
 public class ListMyConversationsUseCase {
 
@@ -40,7 +68,12 @@ public class ListMyConversationsUseCase {
         this.guard = guard;
     }
 
-    /** Lista as conversas do user com época e versão, para o app reconciliar mesmo quando a lista vem vazia */
+    /**
+     * Lista as conversas do user com época e versão.
+     *
+     * @param archived repassado à projeção, para filtrar pelo estado de arquivamento.
+     * @return snapshot com época, versão e itens ordenados pela última interação, do mais recente para o mais antigo.
+     */
     public ConversationListSnapshotDTO execute(boolean archived) {
         long version = clock.nextVersion();
         return guard.execute(() -> {

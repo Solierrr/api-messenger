@@ -21,6 +21,33 @@ import com.solaria.messenger.core.support.ConversationMutationGuard;
 import static com.solaria.messenger.core.helper.PureRulesHelper.requireConversationActive;
 import static com.solaria.messenger.core.mapper.MessageMapper.toResponse;
 
+/**
+ * Caso de uso que envia uma mensagem do user em uma conversa.
+ *
+ * <p>
+ * Confere se a conversa está ativa, se o tipo da mensagem combina com o tipo da conversa e se a comunidade está
+ * ativa. Só depois disso grava. Cada chamada grava uma mensagem nova, sem reaproveitar outra. Mensagens do tipo
+ * {@code CHATBOT_TO_USER} só podem vir do pipeline de LLM.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link RbacAuthorizationService} -> identifica o remetente.</li>
+ *     <li>{@link ConversationAccessHelper} -> confere a participação e a comunidade.</li>
+ *     <li>{@link MessageWriteHelper} -> grava a mensagem e atualiza a última interação.</li>
+ *     <li>{@link NotificationHelper} -> avisa a criação da mensagem.</li>
+ *     <li>{@link ConversationMutationGuard} -> serializa a operação na JVM.</li>
+ * </ul>
+ *
+ * <p>
+ * Principal operação disponibilizada:
+ * </p>
+ * <ul>
+ *     <li>{@link #execute(MessageRequestDTO)} -> grava a mensagem do user.</li>
+ * </ul>
+ */
 @Service
 public class SendUserMessageUseCase {
 
@@ -40,7 +67,14 @@ public class SendUserMessageUseCase {
         this.guard = guard;
     }
 
-    /** Grava a mensagem do user; cada chamada é um insert novo, nunca reaproveita um anterior */
+    /**
+     * Grava a mensagem do user e avisa a mudança.
+     *
+     * @param dto conteúdo, tipo da mensagem, identificador da conversa e clientMessageId opcional.
+     * @return mensagem gravada.
+     * @throws InvalidFieldException caso o tipo seja {@code CHATBOT_TO_USER}, o clientMessageId não seja um UUID
+     *     canônico, ou o tipo não combine com a conversa.
+     */
     public MessageResponseDTO execute(MessageRequestDTO dto) {
         UUID clientMessageId = parseClientMessageId(dto.getClientMessageId());
         if (dto.getMessageType() == MessageType.CHATBOT_TO_USER) {
@@ -81,7 +115,10 @@ public class SendUserMessageUseCase {
         return UUID.fromString(value);
     }
 
-    /** O tipo da mensagem precisa combinar com a conversa: GROUP -> USER_TO_GROUP, DIRECT -> USER_TO_USER, CHAT_BOT -> USER_TO_CHATBOT */
+    /**
+     * O tipo da mensagem precisa combinar com a conversa: GROUP -> USER_TO_GROUP, DIRECT -> USER_TO_USER, CHAT_BOT ->
+     * USER_TO_CHATBOT
+     */
     private void requireMessageTypeMatchesConversation(MessageType messageType, ConversationType conversationType) {
         MessageType expected = switch (conversationType) {
             case GROUP -> MessageType.USER_TO_GROUP;

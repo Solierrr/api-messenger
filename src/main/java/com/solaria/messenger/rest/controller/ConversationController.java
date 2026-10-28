@@ -45,18 +45,24 @@ import jakarta.validation.Valid;
 /**
  * Controller REST dos recursos de conversa, exposto em {@code /messaging/conversations}.
  *
- * <p>Atua na camada de entrada HTTP: valida o corpo ({@code @Valid}) e delega a regra de negócio aos
+ * <p>
+ * Atua na camada de entrada HTTP: valida o corpo ({@code @Valid}) e delega a regra de negócio aos
  * serviços de criação, consulta, estado pessoal e gestão de grupos. O contrato da API é declarado em
- * {@link ConversationOpenApi}.</p>
+ * {@link ConversationOpenApi}.
+ * </p>
  *
- * <p>Principais operações disponibilizadas:</p>
+ * <p>
+ * Principais operações disponibilizadas:
+ * </p>
  * <ul>
  *     <li>{@link #createDirectConversation(DirectConversationRequestDTO)} -> cria ou reaproveita uma direta (201).</li>
  *     <li>{@link #createGroupConversation(GroupConversationRequestDTO)} -> cria um grupo (201).</li>
- *     <li>{@link #createChatbotConversation(ChatbotConversationRequestDTO)} -> cria uma conversa com o chatbot (201).</li>
+ *     <li>{@link #createChatbotConversation(ChatbotConversationRequestDTO)} -> cria uma conversa com o chatbot
+ *         (201).</li>
  *     <li>{@link #findById(String)} -> busca uma conversa da qual o usuário participa.</li>
  *     <li>{@link #findMine(boolean)} >- lista as conversas do usuário com os cabeçalhos de sincronização.</li>
- *     <li>{@link #patchOwnedState(String, ConversationStatePatchRequestDTO)} -> altera leitura, mute ou arquivamento.</li>
+ *     <li>{@link #patchOwnedState(String, ConversationStatePatchRequestDTO)} -> altera leitura, mute ou
+ *         arquivamento.</li>
  *     <li>{@link #addParticipants(String, ParticipantsRequestDTO)} -> adiciona participantes a um grupo.</li>
  *     <li>{@link #transferManager(String, TransferManagerRequestDTO)} -> transfere a gestão do grupo.</li>
  *     <li>{@link #removeParticipant(String, UUID, String)} -> remove um participante.</li>

@@ -21,6 +21,31 @@ import com.solaria.messenger.core.security.rbac.RbacAuthorizationService;
 
 import static com.solaria.messenger.core.mapper.NpsMapper.toResponse;
 
+/**
+ * Caso de uso que registra a avaliação NPS de uma conversa com o chatbot.
+ *
+ * <p>
+ * Cada conversa aceita só um NPS. Só conversas {@code CHAT_BOT} podem ser avaliadas, e só por um participante. A
+ * classificação sai do score informado. Se duas requisições chegam ao mesmo tempo, o índice único do banco barra a
+ * segunda.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link NpsRepository} -> grava o NPS e confere se a conversa já foi avaliada.</li>
+ *     <li>{@link ConversationRepository} -> carrega a conversa.</li>
+ *     <li>{@link RbacAuthorizationService} -> identifica o usuário e confere a participação.</li>
+ * </ul>
+ *
+ * <p>
+ * Principal operação disponibilizada:
+ * </p>
+ * <ul>
+ *     <li>{@link #execute(NpsRequestDTO)} -> registra o NPS da conversa.</li>
+ * </ul>
+ */
 @Service
 public class CreateNpsUseCase {
 
@@ -36,7 +61,15 @@ public class CreateNpsUseCase {
         this.rbac = rbac;
     }
 
-    /** Registra o NPS único de uma conversa CHAT_BOT da qual o usuário participa. */
+    /**
+     * Registra o NPS da conversa.
+     *
+     * @param dto conversa, nota e ambiente da avaliação.
+     * @return NPS registrado.
+     * @throws ResourceNotFoundException caso a conversa não exista.
+     * @throws BusinessRuleException caso a conversa não seja do tipo {@code CHAT_BOT}.
+     * @throws DuplicateResourceException caso a conversa já tenha um NPS.
+     */
     public NpsResponseDTO execute(NpsRequestDTO dto) {
         UUID userId = rbac.currentUserId();
 

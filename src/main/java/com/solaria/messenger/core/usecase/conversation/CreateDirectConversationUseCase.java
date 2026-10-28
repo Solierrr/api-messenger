@@ -34,6 +34,38 @@ import static com.solaria.messenger.core.helper.PureRulesHelper.newConversation;
 import static com.solaria.messenger.core.helper.PureRulesHelper.nextVersion;
 import static com.solaria.messenger.core.mapper.ConversationMapper.toResponse;
 
+/**
+ * Caso de uso que cria a conversa direta entre dois usuários, ou reaproveita a que já existe.
+ *
+ * <p>
+ * A direta é única por par. A chave {@code directKey} vem dos dois ids ordenados, então a ordem do pedido não muda o
+ * resultado. Se a direta já existe e está ativa, ela volta sem trocar histórico nem preferências. Se estiver
+ * desativada, é reativada com CAS (compare-and-set sobre a versão). Se duas requisições criam o mesmo par ao mesmo
+ * tempo, a que perde usa a direta criada pela outra.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link ConversationRepository} -> busca e grava a conversa.</li>
+ *     <li>{@link RbacAuthorizationService} -> identifica o user atual.</li>
+ *     <li>{@link UserAccessHelper} -> confere se os dois users estão ativos.</li>
+ *     <li>{@link LookupHelper} -> recarrega a conversa quando o CAS não aplica.</li>
+ *     <li>{@link ConversationStateHelper} -> valida o estado pessoal dos participantes.</li>
+ *     <li>{@link ConversationAdmissionHelper} -> grava conversa e estados na mesma transação.</li>
+ *     <li>{@link MessageRepository} -> consulta a última sequência gravada.</li>
+ *     <li>{@link NotificationHelper} -> avisa os clientes quando algo muda.</li>
+ *     <li>{@link ConversationMutationGuard} -> serializa a operação na JVM.</li>
+ * </ul>
+ *
+ * <p>
+ * Principal operação disponibilizada:
+ * </p>
+ * <ul>
+ *     <li>{@link #execute(DirectConversationRequestDTO)} -> cria a direta do par ou reaproveita a existente.</li>
+ * </ul>
+ */
 @Service
 public class CreateDirectConversationUseCase {
 
@@ -62,7 +94,20 @@ public class CreateDirectConversationUseCase {
         this.guard = guard;
     }
 
-    /** Cria a direta do par ou reaproveita a existente, sem trocar histórico nem preferências */
+    /**
+     * Cria a direta do par ou reaproveita a existente.
+     *
+     * <p>
+     * A gravação roda dentro do {@link ConversationMutationGuard}. O aviso aos clientes sai depois, e só se algo foi
+     * gravado.
+     * </p>
+     *
+     * @param dto identificador do destinatário da direta.
+     * @return direta criada ou reaproveitada.
+     * @throws InvalidFieldException caso o destinatário seja nulo ou seja o próprio user.
+     * @throws DirectIdentityInconsistentException caso a direta encontrada não seja exatamente o par.
+     * @throws ConcurrentUpdateException caso a direta esteja em um estado que não pode ser reativado.
+     */
     public ConversationResponseDTO execute(DirectConversationRequestDTO dto) {
         // o array guarda, de dentro da lambda, se algo foi gravado e precisa ser avisado
         boolean[] changed = { false };

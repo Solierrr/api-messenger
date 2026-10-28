@@ -10,6 +10,28 @@ import com.solaria.messenger.core.mapper.LlmObservabilityMapper;
 import com.solaria.messenger.core.model.LlmObservability;
 import com.solaria.messenger.core.repository.LlmObservabilityRepository;
 
+/**
+ * Caso de uso que busca etapas de observabilidade do LLM.
+ *
+ * <p>
+ * Aceita no máximo um filtro por chamada: {@code conversationId}, {@code node} ou {@code status}. Sem filtro, traz
+ * os 100 registros mais recentes pelo horário. Filtro vazio ou em branco conta como não informado.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link LlmObservabilityRepository} -> busca os registros.</li>
+ * </ul>
+ *
+ * <p>
+ * Principal operação disponibilizada:
+ * </p>
+ * <ul>
+ *     <li>{@link #execute(String, String, String)} -> busca as etapas pelo filtro informado.</li>
+ * </ul>
+ */
 @Service
 public class SearchLlmObservationsUseCase {
 
@@ -19,7 +41,15 @@ public class SearchLlmObservationsUseCase {
         this.llmObservabilityRepository = llmObservabilityRepository;
     }
 
-    /** Aplica no máximo um filtro | sem filtro retorna os cem eventos mais recentes */
+    /**
+     * Busca as etapas de observabilidade pelo filtro informado.
+     *
+     * @param conversationId filtro pelo identificador da conversa.
+     * @param node filtro pelo nó do pipeline.
+     * @param status filtro pelo status da etapa.
+     * @return registros encontrados, no formato de resposta.
+     * @throws InvalidFieldException caso mais de um filtro seja informado.
+     */
     public List<LlmObservabilityResponseDTO> execute(String conversationId, String node, String status) {
         int informedFilterCount = countInformedFilters(conversationId, node, status);
         if (informedFilterCount > 1) {

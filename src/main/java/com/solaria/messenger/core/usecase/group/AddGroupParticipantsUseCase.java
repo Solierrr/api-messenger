@@ -24,6 +24,34 @@ import com.solaria.messenger.core.support.ConversationMutationGuard;
 import static com.solaria.messenger.core.helper.PureRulesHelper.requireNoNullParticipants;
 import static com.solaria.messenger.core.mapper.ConversationMapper.toResponse;
 
+/**
+ * Caso de uso que adiciona participantes a um grupo.
+ *
+ * <p>
+ * Só o gestor ativo de um grupo ativo consegue adicionar. Os convidados precisam estar ativos e, em subgrupo, ser
+ * membros da comunidade. A participação e os estados pessoais dos novos entram juntos, na mesma transação do
+ * {@link ConversationAdmissionHelper}. O erro de persistência incerta indica que o resultado não é conhecido.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link ConversationAdmissionHelper} -> grava a admissão na transação.</li>
+ *     <li>{@link RbacAuthorizationService} -> identifica o ator.</li>
+ *     <li>{@link UserAccessHelper} -> confere os usuários ativos.</li>
+ *     <li>{@link GroupHelper} -> valida o gestor e o grupo.</li>
+ *     <li>{@link NotificationHelper} -> avisa os participantes.</li>
+ *     <li>{@link ConversationMutationGuard} -> serializa a operação na JVM.</li>
+ * </ul>
+ *
+ * <p>
+ * Principal operação disponibilizada:
+ * </p>
+ * <ul>
+ *     <li>{@link #execute(String, Set)} -> adiciona os participantes ao grupo.</li>
+ * </ul>
+ */
 @Service
 public class AddGroupParticipantsUseCase {
 
@@ -44,7 +72,14 @@ public class AddGroupParticipantsUseCase {
         this.guard = guard;
     }
 
-    /** Adiciona participantes; elegibilidade é checada antes, e participação + estados são gravados juntos */
+    /**
+     * Adiciona os participantes ao grupo e avisa a mudança.
+     *
+     * @param id identificador do grupo.
+     * @param userIds usuários a adicionar.
+     * @return grupo com a lista de participantes atualizada.
+     * @throws PersistenceUncertainException caso a gravação falhe e não se saiba se ela ocorreu.
+     */
     public ConversationResponseDTO execute(String id, Set<UUID> userIds) {
         boolean[] changed = { false };
 

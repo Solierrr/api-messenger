@@ -13,6 +13,31 @@ import com.solaria.messenger.core.model.Message;
 import com.solaria.messenger.core.repository.MessageRepository;
 import com.solaria.messenger.core.security.rbac.RbacAuthorizationService;
 
+/**
+ * Caso de uso que lista o histórico de mensagens de uma conversa.
+ *
+ * <p>
+ * Aceita um cursor por vez. {@code sinceSequence} traz as mensagens depois de uma sequência. {@code beforeSequence}
+ * traz as anteriores a ela. Sem cursor, traz as mensagens mais recentes. A página vai de 1 a 500 mensagens, com 100 por
+ * padrão. A consulta não altera mensagens nem estado pessoal.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link MessageRepository} -> busca as páginas de mensagens.</li>
+ *     <li>{@link RbacAuthorizationService} -> identifica o user atual.</li>
+ *     <li>{@link ConversationAccessHelper} -> confere a participação antes da leitura.</li>
+ * </ul>
+ *
+ * <p>
+ * Principal operação disponibilizada:
+ * </p>
+ * <ul>
+ *     <li>{@link #execute(String, Integer, Integer, Integer)} -> consulta a página de mensagens.</li>
+ * </ul>
+ */
 @Service
 public class ListConversationMessagesUseCase {
 
@@ -29,14 +54,23 @@ public class ListConversationMessagesUseCase {
         this.access = access;
     }
 
-    /** Consulta o histórico autorizado sem reconstruir estado pessoal ou alterar mensagens. */
+    /**
+     * Consulta o histórico autorizado da conversa.
+     *
+     * @param conversationId identificador da conversa.
+     * @param sinceSequence sequência a partir da qual buscar. Não pode vir junto com beforeSequence.
+     * @param beforeSequence sequência limite. Traz as mensagens anteriores a ela.
+     * @param limit tamanho da página. Sem valor, usa 100. Valores fora de 1 a 500 são ajustados para o limite.
+     * @return mensagens em ordem crescente de sequência.
+     * @throws InvalidFieldException caso os cursores sejam inválidos ou venham juntos.
+     */
     public List<MessageResponseDTO> execute(String conversationId, Integer sinceSequence,
             Integer beforeSequence, Integer limit) {
         return access.withAccess(conversationId, rbac.currentUserId(),
                 conversation -> getMessagesAuthorized(conversationId, sinceSequence, beforeSequence, limit));
     }
 
-    /** Valida o cursor único e busca a página na ordem crescente de sequência. */
+    /** Valida o cursor único e busca a página na ordem crescente de sequência */
     private List<MessageResponseDTO> getMessagesAuthorized(String conversationId, Integer sinceSequence,
             Integer beforeSequence, Integer limit) {
         if (sinceSequence != null && beforeSequence != null) {
@@ -67,7 +101,7 @@ public class ListConversationMessagesUseCase {
                 .toList();
     }
 
-    /** Limita a página entre 1 e 500, com 100 por padrão. */
+    /** Limita a página entre 1 e 500, com 100 por padrão */
     private int clampMessagePageSize(Integer requested) {
         if (requested == null) {
             return DEFAULT_MESSAGE_PAGE_SIZE;

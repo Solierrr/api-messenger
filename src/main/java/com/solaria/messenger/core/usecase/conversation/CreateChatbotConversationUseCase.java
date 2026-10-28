@@ -17,6 +17,30 @@ import com.solaria.messenger.core.security.rbac.RbacAuthorizationService;
 import static com.solaria.messenger.core.helper.PureRulesHelper.newConversation;
 import static com.solaria.messenger.core.mapper.ConversationMapper.toResponse;
 
+/**
+ * Caso de uso que cria a conversa do user com o chatbot.
+ *
+ * <p>
+ * Cria uma conversa do tipo {@code CHAT_BOT} com o user atual como único participante. A conversa guarda o tipo de
+ * usuário e os detalhes enviados no pedido. Ela não tem estado pessoal de leitura.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link ConversationRepository} -> grava a conversa.</li>
+ *     <li>{@link RbacAuthorizationService} -> identifica o user atual.</li>
+ *     <li>{@link NotificationHelper} -> avisa os clientes que a conversa mudou.</li>
+ * </ul>
+ *
+ * <p>
+ * Principal operação disponibilizada:
+ * </p>
+ * <ul>
+ *     <li>{@link #execute(ChatbotConversationRequestDTO)} -> cria a conversa com o chatbot.</li>
+ * </ul>
+ */
 @Service
 public class CreateChatbotConversationUseCase {
 
@@ -31,7 +55,12 @@ public class CreateChatbotConversationUseCase {
         this.notifications = notifications;
     }
 
-    /** Cria a conversa do user com o chatbot, sem estado pessoal */
+    /**
+     * Cria a conversa do user com o chatbot.
+     *
+     * @param dto tipo de usuário e detalhes da conversa.
+     * @return conversa criada, sem estado pessoal.
+     */
     public ConversationResponseDTO execute(ChatbotConversationRequestDTO dto) {
         UUID currentUserId = rbac.currentUserId();
 

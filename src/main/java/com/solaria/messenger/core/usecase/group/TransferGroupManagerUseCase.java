@@ -15,6 +15,33 @@ import com.solaria.messenger.core.support.ConversationMutationGuard;
 
 import static com.solaria.messenger.core.mapper.ConversationMapper.toResponse;
 
+/**
+ * Caso de uso que transfere a gestão de um grupo para outro participante.
+ *
+ * <p>
+ * O gestor atual perde a autoridade assim que a transferência é gravada. O sucessor passa pela validação do
+ * {@link GroupHelper} e precisa estar ativo. A gravação usa CAS, e as regras são revalidadas na versão mais recente do
+ * grupo.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link RbacAuthorizationService} -> identifica o gestor atual.</li>
+ *     <li>{@link UserAccessHelper} -> confere o gestor e o sucessor ativos.</li>
+ *     <li>{@link GroupHelper} -> valida o gestor e grava o novo gestor com CAS.</li>
+ *     <li>{@link NotificationHelper} -> avisa os clientes da mudança.</li>
+ *     <li>{@link ConversationMutationGuard} -> serializa a operação na JVM.</li>
+ * </ul>
+ *
+ * <p>
+ * Principal operação disponibilizada:
+ * </p>
+ * <ul>
+ *     <li>{@link #execute(String, UUID)} -> transfere a gestão para o sucessor.</li>
+ * </ul>
+ */
 @Service
 public class TransferGroupManagerUseCase {
 
@@ -33,7 +60,13 @@ public class TransferGroupManagerUseCase {
         this.guard = guard;
     }
 
-    /** Passa a gestão para o sucessor; o antigo gestor perde a autoridade na hora */
+    /**
+     * Transfere a gestão do grupo para o sucessor informado.
+     *
+     * @param id identificador do grupo.
+     * @param successorUserId participante que passa a ser o gestor.
+     * @return grupo com o novo gestor.
+     */
     public ConversationResponseDTO execute(String id, UUID successorUserId) {
         ConversationResponseDTO response = guard.execute(() -> {
             // ator ativo, gestor do grupo, e sucessor válido e ativo

@@ -11,6 +11,28 @@ import com.solaria.messenger.core.repository.LlmObservabilityRepository;
 
 import static com.solaria.messenger.core.mapper.LlmObservabilityMapper.toResponse;
 
+/**
+ * Caso de uso que grava uma etapa de observabilidade do LLM.
+ *
+ * <p>
+ * Quando o cliente não envia {@code timestamp}, usa o horário atual. Quando não envia {@code costUsd}, grava zero.
+ * Cada chamada cria um registro novo.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link LlmObservabilityRepository} -> grava o registro.</li>
+ * </ul>
+ *
+ * <p>
+ * Principal operação disponibilizada:
+ * </p>
+ * <ul>
+ *     <li>{@link #execute(LlmObservabilityRequestDTO)} -> grava a nova etapa.</li>
+ * </ul>
+ */
 @Service
 public class IngestLlmObservationUseCase {
 
@@ -20,7 +42,12 @@ public class IngestLlmObservationUseCase {
         this.llmObservabilityRepository = llmObservabilityRepository;
     }
 
-    /** Persiste uma nova etapa e preserva os defaults de timestamp e custo quando omitidos. */
+    /**
+     * Grava uma nova etapa de observabilidade.
+     *
+     * @param dto dados da etapa, como nó, tokens, latência e status.
+     * @return registro gravado.
+     */
     public LlmObservabilityResponseDTO execute(LlmObservabilityRequestDTO dto) {
         LlmObservability observability = new LlmObservability();
         observability.setNode(dto.getNode());

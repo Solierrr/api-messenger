@@ -29,6 +29,35 @@ import static com.solaria.messenger.core.helper.PureRulesHelper.requireCommunity
 import static com.solaria.messenger.core.helper.PureRulesHelper.requireOwner;
 import static com.solaria.messenger.core.mapper.CommunityMapper.toResponse;
 
+/**
+ * Caso de uso que adiciona membros a uma comunidade ou altera o papel dos que já são membros.
+ *
+ * <p>
+ * O papel padrão é {@code MEMBER}. O papel {@code OWNER} nunca pode ser atribuído por aqui. Dar {@code ADMIN} exige
+ * ser {@code OWNER}. Os outros papéis exigem papel {@code ADMIN} ou {@code OWNER}. A comunidade precisa estar ativa.
+ * Quem já é membro só tem o papel atualizado, exceto o {@code OWNER}. Quem é novo precisa estar ativo e não pode ter
+ * resíduo nos subgrupos. Tudo é revalidado a cada tentativa do CAS.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link CommunityRepository} -> grava os membros com CAS.</li>
+ *     <li>{@link CommunityHelper} -> confere resíduos nos subgrupos e grava a comunidade.</li>
+ *     <li>{@link LookupHelper} -> carrega a comunidade.</li>
+ *     <li>{@link ConversationMutationGuard} -> serializa a operação na JVM.</li>
+ *     <li>{@link RbacAuthorizationService} -> identifica o ator.</li>
+ *     <li>{@link UserAccessHelper} -> confere os novos membros ativos.</li>
+ * </ul>
+ *
+ * <p>
+ * Principal operação disponibilizada:
+ * </p>
+ * <ul>
+ *     <li>{@link #execute(String, CommunityMembersRequestDTO)} -> adiciona membros ou troca papéis.</li>
+ * </ul>
+ */
 @Service
 public class AddCommunityMembersUseCase {
 
@@ -49,7 +78,17 @@ public class AddCommunityMembersUseCase {
         this.users = users;
     }
 
-    /** Adiciona membros ou altera o papel deles, dentro do guard local */
+    /**
+     * Adiciona membros à comunidade ou altera o papel dos que já são membros.
+     *
+     * @param id identificador da comunidade.
+     * @param dto usuários e papel desejado.
+     * @return comunidade com os membros atualizados.
+     * @throws InvalidFieldException caso o papel pedido seja {@code OWNER}.
+     * @throws UnauthorizedAccessException caso o ator não tenha papel suficiente para o papel pedido.
+     * @throws ConcurrentUpdateException caso a comunidade mude durante a operação e o CAS não consiga gravar depois das
+     *     tentativas.
+     */
     public CommunityResponseDTO execute(String id, CommunityMembersRequestDTO dto) {
         return guard.execute(() -> addMembersLocked(id, dto));
     }

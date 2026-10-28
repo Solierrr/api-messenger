@@ -30,10 +30,14 @@ import jakarta.validation.Valid;
 /**
  * Controller REST das avaliações, exposto em {@code /messaging/ratings}.
  *
- * <p>Atua na camada de entrada HTTP: valida o corpo ({@code @Valid}) e delega a regra de negócio a
- * {@link RatingService}. O contrato da API é declarado em {@link RatingOpenApi}.</p>
+ * <p>
+ * Atua na camada de entrada HTTP: valida o corpo ({@code @Valid}) e delega a regra de negócio aos
+ * use cases de avaliação. O contrato da API é declarado em {@link RatingOpenApi}.
+ * </p>
  *
- * <p>Principais operações disponibilizadas:</p>
+ * <p>
+ * Principais operações disponibilizadas:
+ * </p>
  * <ul>
  *     <li>{@link #create(RatingRequestDTO)} -> cria uma avaliação do usuário autenticado (201).</li>
  *     <li>{@link #findById(String)} -> busca uma avaliação pelo identificador.</li>

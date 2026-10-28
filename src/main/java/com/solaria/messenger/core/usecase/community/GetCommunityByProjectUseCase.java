@@ -13,6 +13,28 @@ import com.solaria.messenger.core.security.rbac.RbacAuthorizationService;
 import static com.solaria.messenger.core.helper.PureRulesHelper.requireMember;
 import static com.solaria.messenger.core.mapper.CommunityMapper.toResponse;
 
+/**
+ * Caso de uso que busca a comunidade de um projeto.
+ *
+ * <p>
+ * A comunidade só é devolvida se o user atual for membro dela.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link CommunityRepository} -> busca a comunidade pelo projeto.</li>
+ *     <li>{@link RbacAuthorizationService} -> identifica o user atual.</li>
+ * </ul>
+ *
+ * <p>
+ * Principal operação disponibilizada:
+ * </p>
+ * <ul>
+ *     <li>{@link #execute(UUID)} -> busca a comunidade do projeto.</li>
+ * </ul>
+ */
 @Service
 public class GetCommunityByProjectUseCase {
 
@@ -24,7 +46,14 @@ public class GetCommunityByProjectUseCase {
         this.rbac = rbac;
     }
 
-    /** Busca a comunidade de um projeto da qual o user é membro */
+    /**
+     * Busca a comunidade do projeto.
+     *
+     * @param projectId identificador do projeto.
+     * @return comunidade encontrada.
+     * @throws ResourceNotFoundException caso o projeto não tenha comunidade.
+     * @throws UnauthorizedAccessException caso o user atual não seja membro da comunidade.
+     */
     public CommunityResponseDTO execute(UUID projectId) {
         ProjectCommunity community = communityRepository.findByProjectId(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comunidade não encontrada para o projeto: " + projectId));

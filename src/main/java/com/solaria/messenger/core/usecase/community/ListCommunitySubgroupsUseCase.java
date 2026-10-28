@@ -16,6 +16,31 @@ import com.solaria.messenger.core.security.rbac.RbacAuthorizationService;
 
 import static com.solaria.messenger.core.helper.PureRulesHelper.requireMember;
 
+/**
+ * Caso de uso que lista os subgrupos de uma comunidade.
+ *
+ * <p>
+ * {@code OWNER} e {@code ADMIN} veem todos os subgrupos. Um membro comum vê só os grupos de que participa. As duas
+ * listas saem da interação mais recente para a mais antiga.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link LookupHelper} -> carrega a comunidade.</li>
+ *     <li>{@link RbacAuthorizationService} -> identifica o user atual.</li>
+ *     <li>{@link ConversationRepository} -> lista os grupos de que o user participa.</li>
+ *     <li>{@link CommunityHelper} -> lista todos os subgrupos para administradores.</li>
+ * </ul>
+ *
+ * <p>
+ * Principal operação disponibilizada:
+ * </p>
+ * <ul>
+ *     <li>{@link #execute(String)} -> lista os subgrupos visíveis para o user.</li>
+ * </ul>
+ */
 @Service
 public class ListCommunitySubgroupsUseCase {
 
@@ -32,7 +57,13 @@ public class ListCommunitySubgroupsUseCase {
         this.communities = communities;
     }
 
-    /** OWNER/ADMIN veem todos os subgrupos; membro comum vê só os que participa */
+    /**
+     * Lista os subgrupos da comunidade visíveis para o user atual.
+     *
+     * @param id identificador da comunidade.
+     * @return subgrupos em formato de listagem.
+     * @throws UnauthorizedAccessException caso o user atual não seja membro da comunidade.
+     */
     public List<SubgroupMetadataResponseDTO> execute(String id) {
         ProjectCommunity community = lookup.requireCommunity(id);
         UUID actor = rbac.currentUserId();

@@ -30,6 +30,34 @@ import com.solaria.messenger.core.support.ConversationMutationGuard;
 
 import static com.solaria.messenger.core.helper.PureRulesHelper.requireConversationActive;
 
+/**
+ * Grava, edita e exclui mensagens, com as regras de envio e de autoria.
+ *
+ * <p>
+ * O envio usa a sequência alocada pelo repository. Edição e exclusão usam o contador {@code mutationEpoch} como CAS:
+ * a escrita só vale se o contador ainda for o lido. Falha técnica com resultado incerto vira erro de persistência
+ * incerta. Falha ao atualizar a última interação só gera log, porque a mensagem já foi gravada.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link MessageRepository} -> insere, edita e exclui mensagens.</li>
+ *     <li>{@link ConversationRepository} -> atualiza a última interação.</li>
+ *     <li>{@link RbacAuthorizationService} -> identifica o autor e confere a autoria.</li>
+ *     <li>{@link ConversationAccessHelper} -> confere participação, conversa e comunidade.</li>
+ *     <li>{@link ConversationMutationGuard} -> serializa a operação na JVM.</li>
+ * </ul>
+ *
+ * <p>
+ * Principais operações disponibilizadas:
+ * </p>
+ * <ul>
+ *     <li>{@link #appendAndTouch(Conversation, Message)} -> grava a mensagem e atualiza a última interação.</li>
+ *     <li>{@link #mutate(String, String, boolean)} -> edita ou exclui uma mensagem própria.</li>
+ * </ul>
+ */
 @Component
 public class MessageWriteHelper {
 
@@ -53,7 +81,15 @@ public class MessageWriteHelper {
 
     // envio
 
-    /** Grava a mensagem e atualiza a última interação da conversa */
+    /**
+     * Grava a mensagem com a próxima sequência e atualiza a última interação da conversa.
+     *
+     * @param conversation conversa da mensagem.
+     * @param message mensagem a gravar.
+     * @return mensagem gravada, com a sequência alocada.
+     * @throws MessageSendFailedException caso a sequência não possa ser alocada, a consulta falhe ou o banco rejeite a
+     *     escrita. Traz o status e o código do erro.
+     */
     public Message appendAndTouch(Conversation conversation, Message message) {
         Message saved = append(message);
         updateInteractionAfterInsert(conversation, saved);
@@ -103,7 +139,24 @@ public class MessageWriteHelper {
 
     // edição e exclusão
 
-    /** Exclusão tenta até 3 vezes quando o CAS não grava; edição tenta só uma */
+    /**
+     * Edita ou exclui uma mensagem do próprio user.
+     *
+     * <p>
+     * A exclusão tenta até três vezes quando o CAS não aplica. A edição tenta uma vez só. Se a mensagem já está no
+     * estado pedido, nada é gravado e o resultado traz {@code changed} como falso.
+     * </p>
+     *
+     * @param messageId identificador da mensagem.
+     * @param content novo conteúdo. Ignorado na exclusão.
+     * @param delete {@code true} para excluir, {@code false} para editar.
+     * @return resultado com a mensagem e a indicação de alteração efetiva.
+     * @throws ResourceNotFoundException caso a mensagem não exista.
+     * @throws BusinessRuleException caso a conversa seja do tipo CHAT_BOT, esteja inativa, ou a mensagem excluída seja
+     *     editada.
+     * @throws MessageMutationNotAppliedException caso o CAS não aplique em todas as tentativas.
+     * @throws MessageMutationUncertainException caso falha técnica deixe incerto se a mudança foi gravada.
+     */
     public MessageMutationResult mutate(String messageId, String content, boolean delete) {
         int attempts = delete ? MAX_DELETE_MUTATION_ATTEMPTS : 1;
         for (int attempt = 0; attempt < attempts; attempt++) {

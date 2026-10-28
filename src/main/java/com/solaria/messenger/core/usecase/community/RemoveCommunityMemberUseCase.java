@@ -34,6 +34,38 @@ import static com.solaria.messenger.core.helper.PureRulesHelper.copyMembers;
 import static com.solaria.messenger.core.helper.PureRulesHelper.nextVersion;
 import static com.solaria.messenger.core.helper.PureRulesHelper.requireRemovalAuthority;
 
+/**
+ * Caso de uso que remove um membro de uma comunidade e dos subgrupos.
+ *
+ * <p>
+ * A remoção segue quatro passos, nesta ordem: passa a gestão dos subgrupos para os sucessores; tira o user da
+ * comunidade; avisa o user que ele perdeu os subgrupos; e tira o user dos subgrupos. Se a comunidade já não tem o user,
+ * a operação só limpa os resíduos, então pode ser repetida. Se uma falha técnica acontece no meio da cascata, o erro é
+ * de remoção incompleta, e o DELETE pode ser repetido. Ao final, as sessões do user são derrubadas se ele estava
+ * afetado.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link CommunityRepository} -> tira o user da lista de membros com CAS.</li>
+ *     <li>{@link CommunityHelper} -> valida o plano e executa a cascata nos subgrupos.</li>
+ *     <li>{@link LookupHelper} -> carrega a comunidade.</li>
+ *     <li>{@link NotificationHelper} -> avisa a saída e as conversas afetadas.</li>
+ *     <li>{@link ConversationMutationGuard} -> serializa a operação na JVM.</li>
+ *     <li>{@link RbacAuthorizationService} -> identifica o ator.</li>
+ *     <li>{@link SessionRevoker} -> derruba as sessões do user removido.</li>
+ *     <li>{@link UserAccessHelper} -> confere o ator ativo.</li>
+ * </ul>
+ *
+ * <p>
+ * Principal operação disponibilizada:
+ * </p>
+ * <ul>
+ *     <li>{@link #execute(String, UUID, CommunityMemberRemovalRequestDTO)} -> remove o membro da comunidade.</li>
+ * </ul>
+ */
 @Service
 public class RemoveCommunityMemberUseCase {
 
@@ -61,8 +93,15 @@ public class RemoveCommunityMemberUseCase {
     }
 
     /**
-     * Remove o membro da comunidade e dos subgrupos, retomando do estado atual se for repetido.
-     * Não devolve a lista de membros, porque quem chama pode ter acabado de sair.
+     * Remove o membro da comunidade e dos subgrupos.
+     *
+     * @param id identificador da comunidade.
+     * @param userId membro a remover.
+     * @param dto sucessores dos subgrupos em que o user é gestor. Pode vir nulo.
+     * @throws InvalidFieldException caso um sucessor venha incompleto ou repetido.
+     * @throws BusinessRuleException caso o dono da comunidade seja removido, ou a comunidade esteja arquivada na
+     *     remoção de terceiros.
+     * @throws RemovalIncompleteException caso uma falha técnica interrompa a cascata.
      */
     public void execute(String id, UUID userId, CommunityMemberRemovalRequestDTO dto) {
         Map<String, UUID> successors = successorMap(dto);

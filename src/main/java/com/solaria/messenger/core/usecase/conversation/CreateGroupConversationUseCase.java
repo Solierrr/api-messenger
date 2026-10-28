@@ -26,6 +26,35 @@ import static com.solaria.messenger.core.helper.PureRulesHelper.requireCommunity
 import static com.solaria.messenger.core.helper.PureRulesHelper.requireNoNullParticipants;
 import static com.solaria.messenger.core.mapper.ConversationMapper.toResponse;
 
+/**
+ * Caso de uso que cria um grupo, dentro de uma comunidade ou fora dela.
+ *
+ * <p>
+ * Só entram no grupo os convidados ativos e elegíveis. Os demais voltam na resposta, marcados como rejeitados. Em
+ * subgrupo, o criador precisa participar da comunidade ativa, e só entram os convidados que são membros dela. Sem
+ * convidados em subgrupo, entram todos os membros da comunidade. Um grupo exige pelo menos dois participantes
+ * elegíveis, contando o criador.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link RbacAuthorizationService} -> identifica o criador.</li>
+ *     <li>{@link UserAccessHelper} -> filtra os convidados ativos.</li>
+ *     <li>{@link LookupHelper} -> carrega a comunidade pai.</li>
+ *     <li>{@link ConversationAdmissionHelper} -> grava o grupo com os estados iniciais.</li>
+ *     <li>{@link NotificationHelper} -> avisa os participantes.</li>
+ *     <li>{@link ConversationMutationGuard} -> serializa a criação na JVM.</li>
+ * </ul>
+ *
+ * <p>
+ * Principal operação disponibilizada:
+ * </p>
+ * <ul>
+ *     <li>{@link #execute(String, String, Set)} -> cria o grupo e devolve aceitos e rejeitados.</li>
+ * </ul>
+ */
 @Service
 public class CreateGroupConversationUseCase {
 
@@ -46,7 +75,20 @@ public class CreateGroupConversationUseCase {
         this.guard = guard;
     }
 
-    /** Cria o grupo dentro do guard e avisa os participantes depois, fora dele */
+    /**
+     * Cria o grupo e avisa os participantes.
+     *
+     * <p>
+     * A criação roda dentro do guard. O aviso sai depois, fora dele.
+     * </p>
+     *
+     * @param communityId comunidade do subgrupo, ou nulo para um grupo fora de comunidade.
+     * @param title título do grupo.
+     * @param requested convidados pedidos. Em subgrupo, vazio significa todos os membros da comunidade.
+     * @return grupo criado, com os participantes aceitos e os rejeitados.
+     * @throws UnauthorizedAccessException caso o criador não participe da comunidade.
+     * @throws BusinessRuleException caso sobrem menos de dois participantes elegíveis.
+     */
     public GroupCreationResponseDTO execute(String communityId, String title, Set<UUID> requested) {
         GroupCreationResponseDTO result = guard.execute(() ->
                 createSelectedGroup(communityId, title, rbac.currentUserId(), requested));

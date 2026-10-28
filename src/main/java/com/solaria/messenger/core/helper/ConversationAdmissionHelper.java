@@ -33,6 +33,35 @@ import static com.solaria.messenger.core.helper.PureRulesHelper.directKey;
 import static com.solaria.messenger.core.helper.PureRulesHelper.nextVersion;
 import static com.solaria.messenger.core.helper.PureRulesHelper.requireCommunityActive;
 
+/**
+ * Grava conversas e admissões de participantes junto com os estados pessoais.
+ *
+ * <p>
+ * É o único ponto com transação no módulo. A transação é criada aqui, e não como bean global. Conversa e estados são
+ * gravados juntos: se qualquer parte falha, tudo é desfeito. Erros de negócio e de concorrência passam como estão.
+ * Falha técnica com resultado incerto vira erro de persistência incerta.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link ConversationRepository} -> grava conversas e atualiza participantes com CAS.</li>
+ *     <li>{@link ConversationUserStateRepository} -> grava os estados pessoais.</li>
+ *     <li>{@link MessageRepository} -> consulta a última sequência da conversa.</li>
+ *     <li>{@link CommunityRepository} -> confere a comunidade do subgrupo.</li>
+ *     <li>{@link MongoDatabaseFactory} -> base para o gerenciador de transação.</li>
+ * </ul>
+ *
+ * <p>
+ * Principais operações disponibilizadas:
+ * </p>
+ * <ul>
+ *     <li>{@link #persistNew(Conversation)} -> grava uma conversa nova e traduz as falhas.</li>
+ *     <li>{@link #createWithInitialStates(Conversation)} -> cria a conversa e os estados iniciais na transação.</li>
+ *     <li>{@link #admitParticipants(String, Long, UUID, Set)} -> adiciona participantes a um grupo existente.</li>
+ * </ul>
+ */
 @Component
 public class ConversationAdmissionHelper {
 
@@ -55,7 +84,18 @@ public class ConversationAdmissionHelper {
         this.transaction = new TransactionTemplate(new MongoTransactionManager(databaseFactory));
     }
 
-    /** Grava conversa e estados juntos; erro de transação vira "persistência incerta" */
+    /**
+     * Grava uma conversa nova, com estados iniciais, e traduz as falhas.
+     *
+     * <p>
+     * Erro de negócio, chave duplicada e conflito de versão são repassados sem mudança. Erro de transação vira
+     * persistência incerta. Qualquer outra falha técnica vira indisponibilidade de dependência.
+     * </p>
+     *
+     * @param conversation conversa a criar.
+     * @return conversa gravada.
+     * @throws PersistenceUncertainException caso a transação falhe e o resultado não seja conhecido.
+     */
     public Conversation persistNew(Conversation conversation) {
         try {
             return createWithInitialStates(conversation);
@@ -68,7 +108,20 @@ public class ConversationAdmissionHelper {
         }
     }
 
-    /** Cria a conversa e o estado de cada participante; qualquer falha desfaz tudo */
+    /**
+     * Cria a conversa e o estado inicial de cada participante, na mesma transação.
+     *
+     * <p>
+     * Exige conversa ativa, com o criador e pelo menos dois participantes distintos. Grupo começa com o criador como
+     * gestor. Direta precisa ter exatamente dois participantes, fora de comunidade, com a chave canônica do par. Em
+     * comunidade, o criador e os participantes precisam ser membros. Cada participante começa com a sequência zero.
+     * </p>
+     *
+     * @param conversation conversa a criar.
+     * @return conversa gravada.
+     * @throws BusinessRuleException caso a conversa não atenda às regras de criação.
+     * @throws UnauthorizedAccessException caso o criador não participe da comunidade.
+     */
     public Conversation createWithInitialStates(Conversation conversation) {
         return Objects.requireNonNull(transaction.execute(status -> {
             ConversationType type = conversation.getConversationType();
@@ -102,7 +155,24 @@ public class ConversationAdmissionHelper {
         }));
     }
 
-    /** Adiciona participantes ao grupo sem mexer no cursor e nas preferências de quem já estava */
+    /**
+     * Adiciona participantes a um grupo, dentro de uma transação.
+     *
+     * <p>
+     * A versão lida pelo chamador precisa ser a atual. Quem já participa precisa ter estado válido. Os novos ganham
+     * estado a partir da última sequência, sem mexer no cursor nem nas preferências de quem já estava. Se ninguém novo
+     * entrar, nada é gravado.
+     * </p>
+     *
+     * @param id identificador do grupo.
+     * @param expectedVersion versão lida pelo chamador.
+     * @param actor identificador de quem adiciona. Precisa ser o gestor atual.
+     * @param requested participantes a adicionar.
+     * @return grupo depois da admissão.
+     * @throws OptimisticLockingFailureException caso a versão tenha mudado ou o CAS não aplique.
+     * @throws BusinessRuleException caso o grupo não aceite admissões ou a comunidade mude.
+     * @throws UnauthorizedAccessException caso o ator não seja o gestor atual.
+     */
     public Conversation admitParticipants(String id, Long expectedVersion, UUID actor, Set<UUID> requested) {
         return Objects.requireNonNull(transaction.execute(status -> {
             // a versão lida pelo chamador precisa ser a atual

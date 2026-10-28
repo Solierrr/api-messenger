@@ -21,34 +21,43 @@ import com.solaria.messenger.websocket.security.StompDestinations;
 import jakarta.validation.Valid;
 
 /**
- * entrada dos comandos STOMP enviados pelo cliente por websocket
- * rota exposta por prefixo {@code /app}
+ * Entrada dos comandos STOMP enviados pelo cliente por websocket.
+ * Rota exposta pelo prefixo {@code /app}.
  *
  * <p>
- *  funcionamento:
- * 1 - recebe o frame
- * 2 - valida o payload ({@code @Valid})
- * 3 - delega regras de negócio para services em {@code core}
+ * Funcionamento:
+ * </p>
+ * <ol>
+ *     <li>recebe o frame;</li>
+ *     <li>valida o payload ({@code @Valid});</li>
+ *     <li>delega as regras de negócio para os use cases em {@code core}.</li>
+ * </ol>
+ *
+ * <p>
+ * Os destinos aceitos são declarados em
+ * {@link com.solaria.messenger.websocket.security.StompDestinationAuthorizer}. Os erros são tratados em
+ * {@link com.solaria.messenger.websocket.error.StompErrorHandler} e devolvidos em
+ * {@code /topic/users.{userId}.errors}, sem encerrar a conexão.
  * </p>
  *
  * <p>
- * Os destinos aceitos são declarados em {@link com.solaria.messenger.websocket.security.StompDestinationAuthorizer}.
- * Os erros são tratados em {@link com.solaria.messenger.websocket.error.StompErrorHandler} 
- * e devolvidos em {@code /topic/users.{userId}.errors}, sem encerrar a conexão
+ * <b>Depende de:</b>
  * </p>
- *
- * <p><b>Depende de:</b></p>
  * <ul>
- *     <li>{@link MessageSendService} -> persiste a mensagem e dispara as notificações, igual ao REST.</li>
+ *     <li>{@link SendUserMessageUseCase} -> persiste a mensagem e dispara as notificações, igual ao REST.</li>
  *     <li>{@link TypingService} -> valida a participação e publica a indicação de digitação.</li>
  *     <li>{@link RbacAuthorizationService} -> fornece o id do usuário autenticado.</li>
  *     <li>{@link SimpMessagingTemplate} -> envia o ACK ao tópico privado do remetente.</li>
  * </ul>
  *
- * <p>Principais operações disponibilizadas:</p>
+ * <p>
+ * Principais operações disponibilizadas:
+ * </p>
  * <ul>
- *     <li>{@link #sendMessage(MessageRequestDTO)} -> {@code /app/messages.send}: envia a mensagem e confirma com {@code MESSAGE_ACK} em {@code /topic/users.{userId}.acks}.</li>
- *     <li>{@link #typingStarted(TypingRequest)} -> {@code /app/typing.started}: indica que o usuário começou a digitar.</li>
+ *     <li>{@link #sendMessage(MessageRequestDTO)} -> {@code /app/messages.send}: envia a mensagem e confirma com
+ *         {@code MESSAGE_ACK} em {@code /topic/users.{userId}.acks}.</li>
+ *     <li>{@link #typingStarted(TypingRequest)} -> {@code /app/typing.started}: indica que o usuário começou a
+ *         digitar.</li>
  *     <li>{@link #typingStopped(TypingRequest)} -> {@code /app/typing.stopped}: indica que parou de digitar.</li>
  *     <li>{@link #presencePing()} -> {@code /app/presence.ping}: mantém a conexão ativa, sem alterar a presença.</li>
  * </ul>

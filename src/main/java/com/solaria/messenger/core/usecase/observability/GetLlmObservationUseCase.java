@@ -9,6 +9,27 @@ import com.solaria.messenger.core.repository.LlmObservabilityRepository;
 
 import static com.solaria.messenger.core.mapper.LlmObservabilityMapper.toResponse;
 
+/**
+ * Caso de uso que consulta um registro de observabilidade de uma etapa do LLM.
+ *
+ * <p>
+ * Lê direto da coleção de telemetria e não altera o registro.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link LlmObservabilityRepository} -> busca o registro pelo identificador.</li>
+ * </ul>
+ *
+ * <p>
+ * Principal operação disponibilizada:
+ * </p>
+ * <ul>
+ *     <li>{@link #execute(String)} -> busca a etapa pelo identificador.</li>
+ * </ul>
+ */
 @Service
 public class GetLlmObservationUseCase {
 
@@ -18,7 +39,13 @@ public class GetLlmObservationUseCase {
         this.llmObservabilityRepository = llmObservabilityRepository;
     }
 
-    /** Consulta a etapa por ID usando o Repository da coleção de telemetria */
+    /**
+     * Busca a etapa de observabilidade pelo identificador.
+     *
+     * @param id identificador do registro.
+     * @return registro encontrado.
+     * @throws ResourceNotFoundException caso o registro não exista.
+     */
     public LlmObservabilityResponseDTO execute(String id) {
         LlmObservability observability = llmObservabilityRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(

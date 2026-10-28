@@ -17,6 +17,34 @@ import com.solaria.messenger.core.support.ConversationMutationGuard;
 
 import static com.solaria.messenger.core.helper.PureRulesHelper.withoutUser;
 
+/**
+ * Caso de uso que remove um participante de um grupo.
+ *
+ * <p>
+ * Remover outra pessoa exige ser o gestor do grupo. Sair por conta própria exige só participar, mesmo com o grupo
+ * arquivado. Quando o gestor sai, o sucessor informado assume a gestão. Um grupo que fica vazio fica sem gestor. Depois
+ * da remoção, o user removido recebe o aviso e suas sessões são derrubadas.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link RbacAuthorizationService} -> identifica o ator.</li>
+ *     <li>{@link UserAccessHelper} -> confere o ator e o sucessor.</li>
+ *     <li>{@link SessionRevoker} -> derruba as sessões do user removido.</li>
+ *     <li>{@link GroupHelper} -> valida a remoção e grava os participantes.</li>
+ *     <li>{@link NotificationHelper} -> avisa o user removido e os clientes.</li>
+ *     <li>{@link ConversationMutationGuard} -> serializa a operação na JVM.</li>
+ * </ul>
+ *
+ * <p>
+ * Principal operação disponibilizada:
+ * </p>
+ * <ul>
+ *     <li>{@link #execute(String, UUID, UUID)} -> remove o participante do grupo.</li>
+ * </ul>
+ */
 @Service
 public class RemoveGroupParticipantUseCase {
 
@@ -38,7 +66,14 @@ public class RemoveGroupParticipantUseCase {
         this.guard = guard;
     }
 
-    /** Remove um participante; sair por conta própria funciona até com o grupo arquivado */
+    /**
+     * Remove um participante do grupo.
+     *
+     * @param id identificador do grupo.
+     * @param userId participante a remover.
+     * @param successorUserId participante que assume a gestão, quando o gestor sai.
+     * @throws GroupManagerUnavailableException caso o gestor, já fora da comunidade, tente sair sozinho do grupo.
+     */
     public void execute(String id, UUID userId, UUID successorUserId) {
         boolean[] changed = { false };
         try {

@@ -20,6 +20,32 @@ import com.solaria.messenger.core.support.ConversationMutationGuard;
 import static com.solaria.messenger.core.helper.PureRulesHelper.requireConversationActive;
 import static com.solaria.messenger.core.mapper.MessageMapper.toResponse;
 
+/**
+ * Caso de uso que grava a resposta do chatbot em uma conversa {@code CHAT_BOT}.
+ *
+ * <p>
+ * É chamado pelo pipeline de LLM. A autorização é feita em nome do criador da conversa. A mensagem entra com papel
+ * {@code assistant}. Os clientes recebem o aviso de criação depois que a gravação termina.
+ * </p>
+ *
+ * <p>
+ * <b>Depende de:</b>
+ * </p>
+ * <ul>
+ *     <li>{@link LookupHelper} -> carrega a conversa.</li>
+ *     <li>{@link ConversationAccessHelper} -> confere a participação do criador.</li>
+ *     <li>{@link MessageWriteHelper} -> grava a mensagem e atualiza a última interação.</li>
+ *     <li>{@link NotificationHelper} -> avisa a criação da mensagem.</li>
+ *     <li>{@link ConversationMutationGuard} -> serializa a operação na JVM.</li>
+ * </ul>
+ *
+ * <p>
+ * Principal operação disponibilizada:
+ * </p>
+ * <ul>
+ *     <li>{@link #execute(ChatbotMessageRequestDTO)} -> grava a resposta do chatbot.</li>
+ * </ul>
+ */
 @Service
 public class IngestChatbotMessageUseCase {
 
@@ -39,7 +65,13 @@ public class IngestChatbotMessageUseCase {
         this.guard = guard;
     }
 
-    /** Grava a resposta do chatbot (pipeline interno) numa conversa CHAT_BOT */
+    /**
+     * Grava a resposta do chatbot na conversa.
+     *
+     * @param dto conteúdo, metadados e identificador da conversa.
+     * @return mensagem gravada.
+     * @throws InvalidFieldException caso a conversa não seja do tipo {@code CHAT_BOT}.
+     */
     public MessageResponseDTO execute(ChatbotMessageRequestDTO dto) {
         Message saved = guard.execute(() -> {
             Conversation conversation = lookup.requireConversation(dto.getConversationId());
