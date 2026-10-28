@@ -1,4 +1,4 @@
-package com.solaria.messenger.core.service.conversation;
+package com.solaria.messenger.core.helper;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -10,7 +10,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
 import com.solaria.messenger.core.contract.response.ConversationListItemResponseDTO;
 import com.solaria.messenger.core.contract.response.Preview;
@@ -22,28 +22,17 @@ import com.solaria.messenger.core.model.enums.ConversationType;
 import com.solaria.messenger.core.repository.MessageRepository;
 import com.solaria.messenger.core.repository.projection.ConversationMessageHead;
 import com.solaria.messenger.core.repository.projection.LatestMessage;
-import com.solaria.messenger.core.service.ConversationUserStateService;
-import com.solaria.messenger.core.service.state.OwnedState;
+import com.solaria.messenger.core.state.OwnedState;
+import com.solaria.messenger.core.support.ConversationSyncClock;
 
-/**
- * Service que monta os itens da lista de conversas
- *
- * <p>
- * Gera, em lote, o mesmo item usado na consulta REST e nos eventos privados: preview da última mensagem,
- * não lidas, mute e archive de cada user.
- * </p>
- * <ul>
- *     <li>{@link #project(List, Map, Map, Boolean, long)} -> monta os itens de cada destinatário autorizado.</li>
- * </ul>
- */
-@Service
-public class ConversationProjectionService {
+@Component
+public class ConversationProjectionHelper {
 
-    private final ConversationUserStateService personalStates;
+    private final ConversationStateHelper personalStates;
     private final MessageRepository messages;
     private final ConversationSyncClock clock;
 
-    public ConversationProjectionService(ConversationUserStateService states, MessageRepository messages,
+    public ConversationProjectionHelper(ConversationStateHelper states, MessageRepository messages,
             ConversationSyncClock clock) {
         this.personalStates = states;
         this.messages = messages;

@@ -1,4 +1,4 @@
-package com.solaria.messenger.core.service.conversation;
+package com.solaria.messenger.core.helper;
 
 import java.time.Instant;
 import java.util.Set;
@@ -12,44 +12,32 @@ import com.solaria.messenger.core.exception.ConcurrentUpdateException;
 import com.solaria.messenger.core.exception.GroupManagerUnavailableException;
 import com.solaria.messenger.core.exception.SuccessorIneligibleException;
 import com.solaria.messenger.core.exception.SuccessorRequiredException;
+import com.solaria.messenger.core.exception.UnauthorizedAccessException;
 import com.solaria.messenger.core.model.Conversation;
 import com.solaria.messenger.core.model.ProjectCommunity;
 import com.solaria.messenger.core.model.enums.ConversationType;
 import com.solaria.messenger.core.repository.ConversationRepository;
-import com.solaria.messenger.core.service.ConversationAuthorizationService;
-import com.solaria.messenger.core.service.OptimisticMutation;
 
-/**
- * Component com as regras de gestor/sucessor e as escritas de grupo
- *
- * <p>
- * Usado pela gestão do grupo ({@link GroupManagementService}) e pela cascata da comunidade.
- * As escritas usam CAS: só gravam se a versão lida ainda for a atual.
- * </p>
- * <ul>
- *     <li>{@link #managedConversation(String)} -> carrega a conversa e exige que seja grupo.</li>
- *     <li>{@link #communityFor(Conversation)} -> comunidade do grupo, ou null.</li>
- *     <li>{@link #validateSuccessor(Conversation, UUID, UUID)} -> valida o sucessor do gestor.</li>
- *     <li>{@link #validateRemoval(Conversation, UUID, UUID, UUID)} -> valida a remoção de um participante.</li>
- *     <li>{@link #writeParticipants(Conversation, Set, UUID)} -> grava participantes e gestor.</li>
- *     <li>{@link #writeManager(Conversation, UUID)} -> grava o novo gestor.</li>
- *     <li>{@link #mutateGroup(Conversation, Function)} -> aplica a escrita e tenta de novo se a versão mudou.</li>
- * </ul>
- */
+import static com.solaria.messenger.core.helper.PureRulesHelper.applyOptimistic;
+import static com.solaria.messenger.core.helper.PureRulesHelper.nextVersion;
+import static com.solaria.messenger.core.helper.PureRulesHelper.requireConversationActive;
+
 @Component
-public class GroupMutationSupport {
+public class GroupHelper {
 
     private final ConversationRepository conversationRepository;
-    private final ConversationAuthorizationService resourceAccess;
+    private final ConversationAccessHelper access;
+    private final LookupHelper lookup;
 
-    public GroupMutationSupport(ConversationRepository conversations, ConversationAuthorizationService authorization) {
+    public GroupHelper(ConversationRepository conversations, ConversationAccessHelper access, LookupHelper lookup) {
         this.conversationRepository = conversations;
-        this.resourceAccess = authorization;
+        this.access = access;
+        this.lookup = lookup;
     }
 
     /** Carrega a conversa e exige que seja um grupo */
     public Conversation managedConversation(String id) {
-        Conversation conversation = resourceAccess.requireEntityById(id);
+        Conversation conversation = lookup.requireConversation(id);
         if (conversation.getConversationType() != ConversationType.GROUP) {
             throw new BusinessRuleException("Só conversas em grupo aceitam gestão de participantes.");
         }
@@ -58,7 +46,22 @@ public class GroupMutationSupport {
 
     /** Comunidade atual do grupo, ou {@code null} fora de comunidade */
     public ProjectCommunity communityFor(Conversation conversation) {
-        return conversation.getCommunityId() == null ? null : resourceAccess.requireCommunity(conversation.getCommunityId());
+        return conversation.getCommunityId() == null ? null : lookup.requireParentCommunity(conversation.getCommunityId());
+    }
+
+    /** Gestor atual de um grupo ativo, numa comunidade ativa (se houver) */
+    public void requireManageable(Conversation conversation, UUID actor) {
+        authorizeManagement(conversation, actor);
+        requireConversationActive(conversation);
+        access.requireCommunityActive(conversation);
+    }
+
+    /** O ator precisa participar e ser o gestor do grupo */
+    private void authorizeManagement(Conversation conversation, UUID actor) {
+        access.requireParticipant(conversation.getId(), actor);
+        if (!actor.equals(conversation.getManagerUserId())) {
+            throw new UnauthorizedAccessException("A gestão exige o gestor atual do grupo.");
+        }
     }
 
     /** Sucessor precisa ser outro participante e, em subgrupo, membro da comunidade */
@@ -100,18 +103,18 @@ public class GroupMutationSupport {
             throw new GroupManagerUnavailableException();
         }
         return conversationRepository.updateParticipantsIfCurrent(current.getId(), current.getVersion(),
-                participants, manager, Instant.now(), OptimisticMutation.nextVersion(current.getVersion()));
+                participants, manager, Instant.now(), nextVersion(current.getVersion()));
     }
 
     /** Grava o novo gestor com CAS */
     public long writeManager(Conversation current, UUID manager) {
         return conversationRepository.updateManagerIfCurrent(current.getId(), current.getVersion(),
-                manager, Instant.now(), OptimisticMutation.nextVersion(current.getVersion()));
+                manager, Instant.now(), nextVersion(current.getVersion()));
     }
 
     /** Aplica a escrita; só tenta de novo quando o CAS confirmou que não gravou por mudança de versão */
     public Conversation mutateGroup(Conversation initial, Function<Conversation, Long> mutation) {
-        return OptimisticMutation.apply(initial, mutation, () -> managedConversation(initial.getId()),
+        return applyOptimistic(initial, mutation, () -> managedConversation(initial.getId()),
                 ConcurrentUpdateException::new);
     }
 }

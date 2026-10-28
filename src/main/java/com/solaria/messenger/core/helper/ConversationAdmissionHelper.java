@@ -1,4 +1,4 @@
-package com.solaria.messenger.core.service.conversation;
+package com.solaria.messenger.core.helper;
 
 import java.time.Instant;
 import java.util.LinkedHashSet;
@@ -6,41 +6,35 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.mongodb.MongoDatabaseFactory;
 import org.springframework.data.mongodb.MongoTransactionManager;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.solaria.messenger.core.exception.BusinessException;
 import com.solaria.messenger.core.exception.BusinessRuleException;
+import com.solaria.messenger.core.exception.PersistenceUncertainException;
 import com.solaria.messenger.core.exception.UnauthorizedAccessException;
 import com.solaria.messenger.core.model.Conversation;
 import com.solaria.messenger.core.model.ConversationUserState;
 import com.solaria.messenger.core.model.Message;
 import com.solaria.messenger.core.model.ProjectCommunity;
-import com.solaria.messenger.core.model.enums.CommunityStatus;
 import com.solaria.messenger.core.model.enums.ConversationStatus;
 import com.solaria.messenger.core.model.enums.ConversationType;
 import com.solaria.messenger.core.repository.CommunityRepository;
 import com.solaria.messenger.core.repository.ConversationRepository;
 import com.solaria.messenger.core.repository.ConversationUserStateRepository;
 import com.solaria.messenger.core.repository.MessageRepository;
-import com.solaria.messenger.core.service.OptimisticMutation;
 
-/**
- * Service que grava a conversa e a entrada de participantes numa transação Mongo
- *
- * <p>
- * A conversa e o estado pessoal de cada participante são salvos juntos: se um falhar, nada é gravado.
- * Não faz chamada HTTP nem publica eventos.
- * </p>
- * <ul>
- *     <li>{@link #createWithInitialStates(Conversation)} -> cria a conversa e o estado de cada participante.</li>
- *     <li>{@link #admitParticipants(String, Long, UUID, Set)} -> adiciona participantes a um grupo.</li>
- * </ul>
- */
-@Service
-public class ConversationAdmissionService {
+import static com.solaria.messenger.core.helper.PureRulesHelper.directKey;
+import static com.solaria.messenger.core.helper.PureRulesHelper.nextVersion;
+import static com.solaria.messenger.core.helper.PureRulesHelper.requireCommunityActive;
+
+@Component
+public class ConversationAdmissionHelper {
 
     private static final String CONCURRENT = "CONCURRENT_MODIFICATION";
 
@@ -50,7 +44,7 @@ public class ConversationAdmissionService {
     private final CommunityRepository communities;
     private final TransactionTemplate transaction;
 
-    public ConversationAdmissionService(ConversationRepository conversations, ConversationUserStateRepository userStates,
+    public ConversationAdmissionHelper(ConversationRepository conversations, ConversationUserStateRepository userStates,
             MessageRepository messages, CommunityRepository communities,
             MongoDatabaseFactory databaseFactory) {
         this.conversations = conversations;
@@ -59,6 +53,19 @@ public class ConversationAdmissionService {
         this.communities = communities;
         // único ponto com transação no módulo, por isso o gerenciador é criado aqui e não como bean global
         this.transaction = new TransactionTemplate(new MongoTransactionManager(databaseFactory));
+    }
+
+    /** Grava conversa e estados juntos; erro de transação vira "persistência incerta" */
+    public Conversation persistNew(Conversation conversation) {
+        try {
+            return createWithInitialStates(conversation);
+        } catch (BusinessException | DuplicateKeyException | OptimisticLockingFailureException rejected) {
+            throw rejected;
+        } catch (TransactionException uncertain) {
+            throw new PersistenceUncertainException("CONVERSATION_PERSISTENCE_UNCERTAIN", conversation.getId(), uncertain);
+        } catch (RuntimeException failure) {
+            throw new PersistenceUncertainException("DEPENDENCY_UNAVAILABLE", conversation.getId(), failure);
+        }
     }
 
     /** Cria a conversa e o estado de cada participante; qualquer falha desfaz tudo */
@@ -83,9 +90,7 @@ public class ConversationAdmissionService {
             }
 
             // a chave da direta são os dois ids ordenados e unidos por "|"
-            if (type == ConversationType.DIRECT
-                    && !String.join("|", conversation.getParticipantIds().stream().map(UUID::toString).sorted().toList())
-                            .equals(conversation.getDirectKey())) {
+            if (type == ConversationType.DIRECT && !directKey(conversation.getParticipantIds()).equals(conversation.getDirectKey())) {
                 throw new BusinessRuleException("A identidade canônica da direta é inválida.");
             }
             requireCommunity(conversation, conversation.getCreatedBy(), conversation.getParticipantIds());
@@ -121,7 +126,7 @@ public class ConversationAdmissionService {
 
             // grava os participantes com CAS e cria o estado dos novos
             if (conversations.updateParticipantsIfCurrent(id, current.getVersion(), participants,
-                    current.getManagerUserId(), Instant.now(), OptimisticMutation.nextVersion(current.getVersion())) != 1) {
+                    current.getManagerUserId(), Instant.now(), nextVersion(current.getVersion())) != 1) {
                 throw new OptimisticLockingFailureException(CONCURRENT);
             }
             requested.stream().filter(user -> !current.hasParticipant(user)).forEach(user -> requireState(id, user, head, true));
@@ -155,7 +160,7 @@ public class ConversationAdmissionService {
         if (parent == null || !parent.isMember(actor)) {
             throw new UnauthorizedAccessException("O criador ou gestor não participa da comunidade.");
         }
-        if (parent.getStatus() != CommunityStatus.ACTIVE) throw new BusinessRuleException("A comunidade está arquivada.");
+        requireCommunityActive(parent);
         if (participants.stream().anyMatch(user -> !parent.isMember(user))) {
             throw new BusinessRuleException("A participação na comunidade mudou antes da admissão.");
         }

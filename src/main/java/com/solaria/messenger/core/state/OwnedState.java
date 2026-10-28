@@ -1,4 +1,4 @@
-package com.solaria.messenger.core.service.state;
+package com.solaria.messenger.core.state;
 
 import java.util.UUID;
 

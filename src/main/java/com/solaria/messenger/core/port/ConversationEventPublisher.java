@@ -1,4 +1,4 @@
-package com.solaria.messenger.core.service.port;
+package com.solaria.messenger.core.port;
 
 import java.util.UUID;
 

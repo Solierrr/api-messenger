@@ -1,27 +1,27 @@
-package com.solaria.messenger.core.service;
+package com.solaria.messenger.core.helper;
 
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
-import com.solaria.messenger.core.integration.user.dto.UserActivityBatchResponseDTO;
-import com.solaria.messenger.core.integration.user.dto.UserActivityResponseDTO;
 import com.solaria.messenger.core.exception.ResourceNotFoundException;
+import com.solaria.messenger.core.exception.SuccessorIneligibleException;
 import com.solaria.messenger.core.exception.UnauthorizedAccessException;
 import com.solaria.messenger.core.integration.user.UserAccessClient;
+import com.solaria.messenger.core.integration.user.dto.UserActivityBatchResponseDTO;
+import com.solaria.messenger.core.integration.user.dto.UserActivityResponseDTO;
 
-/** Consulta atividade na Auth sem manter gerações ou controlar transportes WebSocket. */
-@Service
-public class UserAccessService {
+@Component
+public class UserAccessHelper {
 
     private final UserAccessClient userAccessClient;
 
-    public UserAccessService(UserAccessClient userAccessClient) {
+    public UserAccessHelper(UserAccessClient userAccessClient) {
         this.userAccessClient = userAccessClient;
     }
 
@@ -51,6 +51,7 @@ public class UserAccessService {
             throw new UnauthorizedAccessException("Um ou mais usuários estão inativos na Auth.");
         }
     }
+
     /** Só respostas válidas permitem seleção parcial; falhas técnicas da Auth continuam abortando o comando. */
     public Set<UUID> eligibleUsers(Collection<UUID> authIds) {
         Set<UUID> requested = new LinkedHashSet<>(authIds);
@@ -60,5 +61,14 @@ public class UserAccessService {
         result.users().stream().filter(user -> Boolean.TRUE.equals(user.active()))
                 .forEach(user -> eligible.add(user.authId()));
         return Set.copyOf(eligible);
+    }
+
+    /** Sucessor inexistente ou inativo na Auth vira sucessor inelegível */
+    public void requireSuccessorsActive(Collection<UUID> successors) {
+        try {
+            requireActiveUsers(successors);
+        } catch (ResourceNotFoundException | UnauthorizedAccessException unavailable) {
+            throw new SuccessorIneligibleException();
+        }
     }
 }

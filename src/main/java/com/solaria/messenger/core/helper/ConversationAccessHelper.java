@@ -1,4 +1,4 @@
-package com.solaria.messenger.core.service;
+package com.solaria.messenger.core.helper;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -9,48 +9,26 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
-import com.solaria.messenger.core.exception.BusinessException;
-import com.solaria.messenger.core.exception.BusinessRuleException;
-import com.solaria.messenger.core.exception.MessageMutationUncertainException;
 import com.solaria.messenger.core.exception.ResourceNotFoundException;
 import com.solaria.messenger.core.exception.UnauthorizedAccessException;
 import com.solaria.messenger.core.model.Conversation;
 import com.solaria.messenger.core.model.ProjectCommunity;
-import com.solaria.messenger.core.model.enums.CommunityStatus;
-import com.solaria.messenger.core.model.enums.ConversationStatus;
-import com.solaria.messenger.core.model.enums.ConversationType;
 import com.solaria.messenger.core.repository.CommunityRepository;
 import com.solaria.messenger.core.repository.ConversationRepository;
 
-/**
- * Service de autorização de conversas
- *
- * <p>
- * Decide quem pode acessar cada conversa olhando a participação gravada no banco, não o socket aberto.
- * Em subgrupo, o user também precisa ser membro da comunidade.
- * </p>
- * <ul>
- *     <li>{@link #requireParticipant(String, UUID)} -> carrega a conversa e exige que o user participe.</li>
- *     <li>{@link #authorizedParticipants(List)} -> quem pode ver cada conversa de um lote.</li>
- *     <li>{@link #communitiesFor(List)} -> carrega de uma vez as comunidades das conversas.</li>
- *     <li>{@link #withAccess(String, UUID, Function)} -> executa uma ação com a conversa já autorizada.</li>
- *     <li>{@link #withMessageMutation(String, UUID, Function)} -> autoriza e executa a edição/exclusão de mensagem.</li>
- *     <li>{@link #requireActive(Conversation)} / {@link #requireCommunityActive(Conversation)} -> bloqueiam escrita em conversa ou comunidade inativa.</li>
- * </ul>
- */
-@Service
-public class ConversationAuthorizationService {
+@Component
+public class ConversationAccessHelper {
 
     private final ConversationRepository conversations;
     private final CommunityRepository communities;
-    private final ConversationMutationGuard guard;
+    private final LookupHelper lookup;
 
-    public ConversationAuthorizationService(ConversationRepository conversations, CommunityRepository communities, ConversationMutationGuard guard) {
+    public ConversationAccessHelper(ConversationRepository conversations, CommunityRepository communities, LookupHelper lookup) {
         this.conversations = conversations;
         this.communities = communities;
-        this.guard = guard;
+        this.lookup = lookup;
     }
 
     /** Carrega a conversa e exige que o user participe dela (e da comunidade, se for subgrupo) */
@@ -74,11 +52,11 @@ public class ConversationAuthorizationService {
 
     /** Mesma checagem para quem já tem a conversa em mãos; relê do banco para usar a participação atual */
     public void requireParticipant(Conversation conversation, UUID actor) {
-        Conversation latest = conversation.getId() == null ? conversation : requireEntityById(conversation.getId());
+        Conversation latest = conversation.getId() == null ? conversation : lookup.requireConversation(conversation.getId());
         if (!latest.hasParticipant(actor)) {
             throw new UnauthorizedAccessException("O objeto da operação não foi encontrado.");
         }
-        ProjectCommunity community = latest.getCommunityId() == null ? null : requireCommunity(latest.getCommunityId());
+        ProjectCommunity community = latest.getCommunityId() == null ? null : lookup.requireParentCommunity(latest.getCommunityId());
         if (community != null && !community.isMember(actor)) {
             throw new UnauthorizedAccessException("O usuário não participa desta comunidade.");
         }
@@ -121,23 +99,6 @@ public class ConversationAuthorizationService {
         return action.apply(requireParticipant(conversationId, actor));
     }
 
-    public Conversation requireEntityById(String id) {
-        return conversations.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Conversa não encontrada com id: " + id));
-    }
-
-    public ProjectCommunity requireCommunity(String id) {
-        return communities.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Comunidade não encontrada: " + id));
-    }
-
-    /** Conversa desativada não aceita comandos, mas continua podendo ser lida */
-    public void requireActive(Conversation conversation) {
-        if (conversation.getStatus() != ConversationStatus.ACTIVE) {
-            throw new BusinessRuleException("A conversa está desativada e não aceita novas mensagens.");
-        }
-    }
-
     /** Comunidade arquivada bloqueia mensagens e administração dos subgrupos */
     public void requireCommunityActive(Conversation conversation) {
         if (conversation.getCommunityId() == null) return;
@@ -145,31 +106,7 @@ public class ConversationAuthorizationService {
         ProjectCommunity community = communities.findById(conversation.getCommunityId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Comunidade não encontrada para a conversa: " + conversation.getId()));
-        if (community.getStatus() != CommunityStatus.ACTIVE) {
-            throw new BusinessRuleException("A comunidade está arquivada.");
-        }
-    }
-
-    /** Autoriza e executa a edição/exclusão de mensagem dentro do guard */
-    public <T> T withMessageMutation(String conversationId, UUID actor, Function<Conversation, T> mutation) {
-        try {
-            return guard.execute(() -> {
-                // participante, conversa humana, ativa e com comunidade ativa
-                Conversation current = requireParticipant(conversationId, actor);
-                if (current.getConversationType() == ConversationType.CHAT_BOT) {
-                    throw new BusinessRuleException("A conversa não permite alterações de mensagens.");
-                }
-                requireActive(current);
-                requireCommunityActive(current);
-                return mutation.apply(current);
-            });
-        } catch (BusinessException business) {
-            throw business;
-        } catch (RuntimeException failure) {
-            // erro técnico: não dá para saber se a mudança foi gravada
-            BusinessException uncertain = new MessageMutationUncertainException();
-            uncertain.addSuppressed(failure);
-            throw uncertain;
-        }
+        // nome qualificado: o método desta classe esconde o import estático de mesmo nome
+        PureRulesHelper.requireCommunityActive(community);
     }
 }

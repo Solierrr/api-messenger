@@ -1,4 +1,4 @@
-package com.solaria.messenger.core.service;
+package com.solaria.messenger.core.support;
 
 import java.util.function.Supplier;
 

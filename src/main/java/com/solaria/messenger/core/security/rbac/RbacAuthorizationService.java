@@ -1,6 +1,5 @@
 package com.solaria.messenger.core.security.rbac;
 
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.Optional;
@@ -14,14 +13,17 @@ import org.springframework.stereotype.Component;
 import com.solaria.messenger.core.exception.UnauthorizedAccessException;
 
 /**
- * Classe responsável por resolver RBAC de usuário -> feito a partir de ownership(dono da entidade)
- * Usando a claim authId do JWT vindo de api-auth
+ * Resolve o RBAC do usuário a partir de ownership (dono da entidade).
+ *
+ * <p>
+ * Usa a claim {@code authId} do JWT vindo da api-auth.
+ * </p>
  */
 @Component("rbac")
 public class RbacAuthorizationService {
 
 
-    // métodos chamados pelas classes Services
+    // métodos chamados pelos use cases e helpers
 
     /** Exige que o usuário autenticado seja o dono do recurso; a recusa não revela se o recurso existe. */
     public void requireOwnResource(UUID resourceOwnerId) {
@@ -29,16 +31,6 @@ public class RbacAuthorizationService {
                 .map(currentUserId -> currentUserId.equals(resourceOwnerId))
                 .orElse(false);
         if (!isOwner) {
-            throw new UnauthorizedAccessException("O objeto da operação não foi encontrado.");
-        }
-    }
-    /** Exige que o usuário autenticado esteja entre os IDs informados. */
-    public void requireParticipant(UUID... participantIds) {
-        UUID currentUserId = currentUserId();
-        boolean isParticipant = Arrays.stream(participantIds)
-                .filter(Objects::nonNull)
-                .anyMatch(currentUserId::equals);
-        if (!isParticipant) {
             throw new UnauthorizedAccessException("O objeto da operação não foi encontrado.");
         }
     }
@@ -60,11 +52,6 @@ public class RbacAuthorizationService {
     public UUID currentUserId() {
         return currentUserIdOptional()
             .orElseThrow(() -> new UnauthorizedAccessException("Nenhum usuário autenticado na requisição."));
-    }
-
-    /** Indica se o ID informado é o do usuário autenticado. */
-    public boolean isCurrentUser(UUID userId) {
-        return currentUserIdOptional().map(id -> id.equals(userId)).orElse(false);
     }
 
     /** Subject do JWT do contexto de segurança atual, quando houver. */

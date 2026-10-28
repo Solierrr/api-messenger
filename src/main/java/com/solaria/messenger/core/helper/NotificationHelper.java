@@ -1,4 +1,4 @@
-package com.solaria.messenger.core.service.conversation;
+package com.solaria.messenger.core.helper;
 
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -9,51 +9,43 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
 import com.solaria.messenger.core.contract.response.ConversationListItemResponseDTO;
 import com.solaria.messenger.core.model.Conversation;
+import com.solaria.messenger.core.model.Message;
 import com.solaria.messenger.core.model.ProjectCommunity;
+import com.solaria.messenger.core.port.ConversationEventPublisher;
+import com.solaria.messenger.core.port.MessageEventPublisher;
 import com.solaria.messenger.core.repository.ConversationRepository;
-import com.solaria.messenger.core.service.ConversationAuthorizationService;
-import com.solaria.messenger.core.service.ConversationMutationGuard;
-import com.solaria.messenger.core.service.port.ConversationEventPublisher;
+import com.solaria.messenger.core.support.ConversationMutationGuard;
+import com.solaria.messenger.core.support.ConversationSyncClock;
 
-/**
- * Service que avisa os participantes quando uma conversa muda
- *
- * <p>
- * Para cada participante autorizado, monta o mesmo item da listagem REST e entrega pela porta de eventos.
- * Roda depois do commit e fora do guard; falhas só geram log.
- * </p>
- * <ul>
- *     <li>{@link #publishConversationChanged(String)} -> avisa todos os participantes de uma conversa.</li>
- *     <li>{@link #publishConversationChanged(String, Set)} -> avisa só os users informados.</li>
- *     <li>{@link #publishConversationsChanged(Set)} -> avisa várias conversas de uma vez.</li>
- *     <li>{@link #publishRemovedConversation(UUID, String)} -> avisa o user que ele perdeu a conversa.</li>
- * </ul>
- */
-@Service
-public class ConversationChangeNotifier {
+@Component
+public class NotificationHelper {
 
-    private static final Logger log = LoggerFactory.getLogger(ConversationChangeNotifier.class);
+    private static final Logger log = LoggerFactory.getLogger(NotificationHelper.class);
     private final ConversationRepository conversationRepository;
-    private final ConversationAuthorizationService resources;
-    private final ConversationProjectionService projections;
+    private final ConversationAccessHelper resources;
+    private final ConversationProjectionHelper projections;
     private final ConversationSyncClock clock;
     private final ConversationMutationGuard guard;
     private final ConversationEventPublisher events;
+    private final MessageEventPublisher messageEvents;
 
-    public ConversationChangeNotifier(ConversationRepository conversations, ConversationAuthorizationService resources,
-            ConversationProjectionService projections, ConversationSyncClock clock, ConversationMutationGuard guard,
-            ConversationEventPublisher events) {
+    public NotificationHelper(ConversationRepository conversations, ConversationAccessHelper resources,
+            ConversationProjectionHelper projections, ConversationSyncClock clock, ConversationMutationGuard guard,
+            ConversationEventPublisher events, MessageEventPublisher messageEvents) {
         this.conversationRepository = conversations;
         this.resources = resources;
         this.projections = projections;
         this.clock = clock;
         this.guard = guard;
         this.events = events;
+        this.messageEvents = messageEvents;
     }
+
+    // conversa
 
     /** Avisa o estado atual da conversa a todos os participantes, mesmo os que não estão com ela aberta */
     public void publishConversationChanged(String id) {
@@ -120,5 +112,35 @@ public class ConversationChangeNotifier {
                 }
             }
         });
+    }
+
+    // mensagem
+
+    /** Anuncia uma mensagem nova e atualiza preview e não lidas da conversa. */
+    public void notifyMessageCreated(Message message) {
+        messageEvents.messageCreated(message);
+        publishConversationState(message.getConversationId());
+    }
+
+    /** Anuncia a edição efetiva e atualiza o preview da conversa. */
+    public void notifyMessageEdited(Message message) {
+        messageEvents.messageEdited(message);
+        publishConversationState(message.getConversationId());
+    }
+
+    /** Anuncia o tombstone e atualiza preview e não lidas da conversa. */
+    public void notifyMessageDeleted(Message message) {
+        messageEvents.messageDeleted(message);
+        publishConversationState(message.getConversationId());
+    }
+
+    /** A mensagem já foi persistida; uma falha ao invalidar a lista nunca vira erro do comando. */
+    private void publishConversationState(String conversationId) {
+        try {
+            publishConversationChanged(conversationId);
+        } catch (RuntimeException publicationFailure) {
+            log.warn("Falha ao invalidar lista da conversa {} após alteração persistida", conversationId,
+                    publicationFailure);
+        }
     }
 }

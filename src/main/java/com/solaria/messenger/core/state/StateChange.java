@@ -1,4 +1,4 @@
-package com.solaria.messenger.core.service.state;
+package com.solaria.messenger.core.state;
 
 
 /** Resultado do PATCH pessoal, incluindo a distinção entre mudança e no-op. */
