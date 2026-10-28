@@ -29,10 +29,15 @@ import com.solaria.messenger.core.contract.response.GroupCreationResponseDTO;
 import com.solaria.messenger.rest.dto.response.ManagerTransferResponse;
 import com.solaria.messenger.core.exception.InvalidFieldException;
 import com.solaria.messenger.rest.openapi.ConversationOpenApi;
-import com.solaria.messenger.core.service.conversation.ConversationCreationService;
-import com.solaria.messenger.core.service.conversation.ConversationQueryService;
-import com.solaria.messenger.core.service.conversation.ConversationStatePatchService;
-import com.solaria.messenger.core.service.conversation.GroupManagementService;
+import com.solaria.messenger.core.usecase.conversation.CreateChatbotConversationUseCase;
+import com.solaria.messenger.core.usecase.conversation.CreateDirectConversationUseCase;
+import com.solaria.messenger.core.usecase.conversation.CreateGroupConversationUseCase;
+import com.solaria.messenger.core.usecase.conversation.GetConversationUseCase;
+import com.solaria.messenger.core.usecase.conversation.ListMyConversationsUseCase;
+import com.solaria.messenger.core.usecase.conversation.PatchConversationStateUseCase;
+import com.solaria.messenger.core.usecase.group.AddGroupParticipantsUseCase;
+import com.solaria.messenger.core.usecase.group.RemoveGroupParticipantUseCase;
+import com.solaria.messenger.core.usecase.group.TransferGroupManagerUseCase;
 
 import jakarta.validation.Valid;
 
@@ -61,17 +66,30 @@ import jakarta.validation.Valid;
 @RequestMapping("/messaging/conversations")
 public class ConversationController implements ConversationOpenApi {
 
-    private final ConversationCreationService creations;
-    private final ConversationQueryService queries;
-    private final ConversationStatePatchService statePatches;
-    private final GroupManagementService groups;
+    private final CreateDirectConversationUseCase createDirect;
+    private final CreateGroupConversationUseCase createGroup;
+    private final CreateChatbotConversationUseCase createChatbot;
+    private final GetConversationUseCase getConversation;
+    private final ListMyConversationsUseCase listMine;
+    private final PatchConversationStateUseCase patchState;
+    private final AddGroupParticipantsUseCase addParticipants;
+    private final TransferGroupManagerUseCase transferManager;
+    private final RemoveGroupParticipantUseCase removeParticipant;
 
-    public ConversationController(ConversationCreationService creations, ConversationQueryService queries,
-            ConversationStatePatchService statePatches, GroupManagementService groups) {
-        this.creations = creations;
-        this.queries = queries;
-        this.statePatches = statePatches;
-        this.groups = groups;
+    public ConversationController(CreateDirectConversationUseCase createDirect, CreateGroupConversationUseCase createGroup,
+            CreateChatbotConversationUseCase createChatbot, GetConversationUseCase getConversation,
+            ListMyConversationsUseCase listMine, PatchConversationStateUseCase patchState,
+            AddGroupParticipantsUseCase addParticipants, TransferGroupManagerUseCase transferManager,
+            RemoveGroupParticipantUseCase removeParticipant) {
+        this.createDirect = createDirect;
+        this.createGroup = createGroup;
+        this.createChatbot = createChatbot;
+        this.getConversation = getConversation;
+        this.listMine = listMine;
+        this.patchState = patchState;
+        this.addParticipants = addParticipants;
+        this.transferManager = transferManager;
+        this.removeParticipant = removeParticipant;
     }
 
     /** Cria ou reaproveita a direta com o destinatário e devolve 201. */
@@ -79,7 +97,7 @@ public class ConversationController implements ConversationOpenApi {
     @PostMapping("/direct")
     public ResponseEntity<ConversationResponseDTO> createDirectConversation(
             @Valid @RequestBody DirectConversationRequestDTO dto) {
-        ConversationResponseDTO response = creations.createDirectConversation(dto);
+        ConversationResponseDTO response = createDirect.execute(dto);
         return ResponseEntity.created(URI.create("/messaging/conversations/" + response.getId())).body(response);
     }
 
@@ -88,7 +106,7 @@ public class ConversationController implements ConversationOpenApi {
     @PostMapping("/group")
     public ResponseEntity<GroupCreationResponseDTO> createGroupConversation(
             @Valid @RequestBody GroupConversationRequestDTO dto) {
-        GroupCreationResponseDTO response = creations.createGroupConversation(dto);
+        GroupCreationResponseDTO response = createGroup.execute(null, dto.getTitle(), dto.getParticipantIds());
         return ResponseEntity.created(URI.create("/messaging/conversations/" + response.conversation().getId())).body(response);
     }
 
@@ -97,7 +115,7 @@ public class ConversationController implements ConversationOpenApi {
     @PostMapping("/chatbot-conversations")
     public ResponseEntity<ConversationResponseDTO> createChatbotConversation(
             @Valid @RequestBody ChatbotConversationRequestDTO dto) {
-        ConversationResponseDTO response = creations.createChatbotConversation(dto);
+        ConversationResponseDTO response = createChatbot.execute(dto);
         return ResponseEntity.created(URI.create("/messaging/conversations/" + response.getId())).body(response);
     }
 
@@ -105,7 +123,7 @@ public class ConversationController implements ConversationOpenApi {
     @Override
     @GetMapping("/{id}")
     public ResponseEntity<ConversationResponseDTO> findById(@PathVariable String id) {
-        return ResponseEntity.ok(queries.findById(id));
+        return ResponseEntity.ok(getConversation.execute(id));
     }
 
     /** Lista as conversas do usuário com os cabeçalhos de sincronização (época e versão). */
@@ -113,7 +131,7 @@ public class ConversationController implements ConversationOpenApi {
     @GetMapping("/me")
     public ResponseEntity<List<ConversationListItemResponseDTO>> findMine(
             @RequestParam(defaultValue = "false") boolean archived) {
-        var snapshot = queries.findMineSnapshot(archived);
+        var snapshot = listMine.execute(archived);
         return ResponseEntity.ok().header("X-Conversation-Sync-Epoch", snapshot.syncEpoch())
                 .header("X-Conversation-Sync-Version", Long.toString(snapshot.syncVersion())).body(snapshot.items());
     }
@@ -123,7 +141,7 @@ public class ConversationController implements ConversationOpenApi {
     @PatchMapping("/{id}/state")
     public ResponseEntity<ConversationStateResponseDTO> patchOwnedState(@PathVariable String id,
             @Valid @RequestBody(required = false) ConversationStatePatchRequestDTO patch) {
-        return ResponseEntity.ok(statePatches.patchOwnedState(id, patch));
+        return ResponseEntity.ok(patchState.execute(id, patch));
     }
 
     /** Adiciona participantes a um grupo gerido pelo usuário. */
@@ -132,7 +150,7 @@ public class ConversationController implements ConversationOpenApi {
     public ResponseEntity<ConversationResponseDTO> addParticipants(
             @PathVariable String id,
             @Valid @RequestBody ParticipantsRequestDTO dto) {
-        return ResponseEntity.ok(groups.addParticipants(id, dto.getUserIds()));
+        return ResponseEntity.ok(addParticipants.execute(id, dto.getUserIds()));
     }
 
     /** Transfere a gestão do grupo para outro participante. */
@@ -141,7 +159,7 @@ public class ConversationController implements ConversationOpenApi {
     public ResponseEntity<ManagerTransferResponse> transferManager(
             @PathVariable String id,
             @Valid @RequestBody TransferManagerRequestDTO dto) {
-        ConversationResponseDTO conversation = groups.transferManager(id, dto.successorUserIdValue());
+        ConversationResponseDTO conversation = transferManager.execute(id, dto.successorUserIdValue());
         return ResponseEntity.ok(new ManagerTransferResponse(
                 conversation.getId(), conversation.getManagerUserId()));
     }
@@ -161,7 +179,7 @@ public class ConversationController implements ConversationOpenApi {
                 throw new InvalidFieldException(exception.getMessage());
             }
         }
-        groups.removeParticipant(id, userId, successor);
+        removeParticipant.execute(id, userId, successor);
         return ResponseEntity.noContent().build();
     }
 }

@@ -1,4 +1,4 @@
-package com.solaria.messenger.core.service.message;
+package com.solaria.messenger.core.usecase.message;
 
 import java.util.List;
 
@@ -7,33 +7,32 @@ import org.springframework.stereotype.Service;
 
 import com.solaria.messenger.core.contract.response.MessageResponseDTO;
 import com.solaria.messenger.core.exception.InvalidFieldException;
+import com.solaria.messenger.core.helper.ConversationAccessHelper;
 import com.solaria.messenger.core.mapper.MessageMapper;
 import com.solaria.messenger.core.model.Message;
 import com.solaria.messenger.core.repository.MessageRepository;
 import com.solaria.messenger.core.security.rbac.RbacAuthorizationService;
-import com.solaria.messenger.core.service.ConversationAuthorizationService;
 
-/** Consulta e pagina o histórico persistido, sem executar comandos de mensagem. */
 @Service
-public class MessageQueryService {
+public class ListConversationMessagesUseCase {
 
     private static final int DEFAULT_MESSAGE_PAGE_SIZE = 100;
     private static final int MAX_MESSAGE_PAGE_SIZE = 500;
     private final MessageRepository messageRepository;
     private final RbacAuthorizationService rbac;
-    private final ConversationAuthorizationService resourceAccess;
+    private final ConversationAccessHelper access;
 
-    public MessageQueryService(MessageRepository messages, RbacAuthorizationService rbac,
-            ConversationAuthorizationService authorization) {
+    public ListConversationMessagesUseCase(MessageRepository messages, RbacAuthorizationService rbac,
+            ConversationAccessHelper access) {
         this.messageRepository = messages;
         this.rbac = rbac;
-        this.resourceAccess = authorization;
+        this.access = access;
     }
 
     /** Consulta o histórico autorizado sem reconstruir estado pessoal ou alterar mensagens. */
-    public List<MessageResponseDTO> getMessagesByConversationId(String conversationId, Integer sinceSequence,
+    public List<MessageResponseDTO> execute(String conversationId, Integer sinceSequence,
             Integer beforeSequence, Integer limit) {
-        return resourceAccess.withAccess(conversationId, rbac.currentUserId(),
+        return access.withAccess(conversationId, rbac.currentUserId(),
                 conversation -> getMessagesAuthorized(conversationId, sinceSequence, beforeSequence, limit));
     }
 

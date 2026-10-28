@@ -12,7 +12,7 @@ import org.springframework.stereotype.Controller;
 import com.solaria.messenger.core.contract.request.MessageRequestDTO;
 import com.solaria.messenger.core.contract.response.MessageResponseDTO;
 import com.solaria.messenger.core.security.rbac.RbacAuthorizationService;
-import com.solaria.messenger.core.service.message.MessageSendService;
+import com.solaria.messenger.core.usecase.message.SendUserMessageUseCase;
 import com.solaria.messenger.websocket.dto.request.TypingRequest;
 import com.solaria.messenger.websocket.dto.response.WsEventEnvelope;
 import com.solaria.messenger.websocket.presence.TypingService;
@@ -58,16 +58,16 @@ public class MessageWebSocketController {
 
     private static final Logger log = LoggerFactory.getLogger(MessageWebSocketController.class);
 
-    private final MessageSendService messageService;
+    private final SendUserMessageUseCase sendUserMessage;
     private final TypingService typing;
     private final RbacAuthorizationService rbac;
     private final SimpMessagingTemplate simpMessagingTemplate;
 
-    public MessageWebSocketController(MessageSendService messageService,
+    public MessageWebSocketController(SendUserMessageUseCase sendUserMessage,
             TypingService typing,
             RbacAuthorizationService rbac,
             SimpMessagingTemplate simpMessagingTemplate) {
-        this.messageService = messageService;
+        this.sendUserMessage = sendUserMessage;
         this.typing = typing;
         this.rbac = rbac;
         this.simpMessagingTemplate = simpMessagingTemplate;
@@ -78,7 +78,7 @@ public class MessageWebSocketController {
     public void sendMessage(@Valid @Payload MessageRequestDTO dto) {
 
         // valida regra de negócios e insere no MongoDB
-        MessageResponseDTO response = messageService.sendUserMessage(dto);
+        MessageResponseDTO response = sendUserMessage.execute(dto);
 
         // tenta enviar o ACK no tópico de acks do remetente
         WsEventEnvelope ack = WsEventEnvelope.builder()
