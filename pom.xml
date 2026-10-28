@@ -49,9 +49,19 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-websocket</artifactId>
 		</dependency>
+		<!-- cliente TCP do relay STOMP para o RabbitMQ (ReactorNettyTcpClient) -->
+		<dependency>
+			<groupId>io.projectreactor.netty</groupId>
+			<artifactId>reactor-netty-core</artifactId>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-mongodb</artifactId>
+		</dependency>
+		<!-- presença e revogação entre pods (Upstash) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -80,6 +90,16 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-mongodb-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-test</artifactId>
 			<scope>test</scope>
 		</dependency>
 
