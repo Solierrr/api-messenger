@@ -2,6 +2,8 @@ package com.solaria.messenger.websocket.event;
 
 import java.util.UUID;
 
-/** Transição de presença produzida pela primeira ou pela última sessão admitida. */
-public record SessionPresenceChanged(UUID userId, boolean online, long presenceVersion) {
+/**
+ * Presença do user depois que a primeira ou a última sessão deste pod mudou
+ */
+public record SessionPresenceChanged(UUID userId, boolean online, String presenceEpoch, long presenceVersion) {
 }

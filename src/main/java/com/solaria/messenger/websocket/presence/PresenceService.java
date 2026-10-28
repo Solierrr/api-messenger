@@ -22,6 +22,7 @@ import com.solaria.messenger.core.repository.ConversationRepository;
 import com.solaria.messenger.core.service.ConversationAuthorizationService;
 import com.solaria.messenger.websocket.dto.response.WsEventEnvelope;
 import com.solaria.messenger.websocket.event.ConversationSubscriptionRegistered;
+import com.solaria.messenger.websocket.security.StompDestinations;
 import com.solaria.messenger.websocket.session.LocalWebSocketSessionRegistry;
 import com.solaria.messenger.websocket.event.SessionPresenceChanged;
 
@@ -41,8 +42,6 @@ import com.solaria.messenger.websocket.event.SessionPresenceChanged;
 public class PresenceService {
 
     private static final Logger log = LoggerFactory.getLogger(PresenceService.class);
-    private static final String TOPIC = "/topic/conversations/";
-
     private final ConversationRepository conversations;
     private final ConversationAuthorizationService authorization;
     private final LocalWebSocketSessionRegistry sessions;
@@ -85,7 +84,7 @@ public class PresenceService {
             var headers = SimpMessageHeaderAccessor.create(SimpMessageType.MESSAGE);
             headers.setSessionId(subscription.sessionId());
             headers.setSubscriptionId(subscription.subscriptionId());
-            headers.setDestination(TOPIC + current.getId());
+            headers.setDestination(StompDestinations.conversationTopic(current.getId()));
             var message = converter.toMessage(envelope("PRESENCE_SNAPSHOT", current.getId(), snapshot),
                     headers.getMessageHeaders());
 
@@ -102,23 +101,23 @@ public class PresenceService {
     @EventListener
     public void onPresenceChanged(SessionPresenceChanged change) {
         try {
+            // estado já mudou de novo: o evento mais novo (versão maior) é que vale
+            if (sessions.isOnlineAnywhere(change.userId()) != change.online()) return;
+
             // procura as conversas que o user participa
             List<Conversation> current = conversations.findByParticipantIdsContainingOrderByLastInteractionAtDesc(change.userId());
             // verifica se o user está apto a conversa
             Map<String, Set<UUID>> authorized = authorization.authorizedParticipants(current);
 
             for (Conversation conversation : current) {
-                // confere se o estado anunciado para mudança de presença continua igual
-                if (sessions.isOnline(change.userId()) != change.online()) return;
-            
                 // verifica se o user ainda está na conversa
                 if (!authorized.getOrDefault(conversation.getId(), Set.of()).contains(change.userId())) continue;
 
                 // monta e envia mensagem
-                var payload = Map.of("userId", change.userId().toString(), "presenceEpoch", sessions.presenceEpoch(),
+                var payload = Map.of("userId", change.userId().toString(), "presenceEpoch", change.presenceEpoch(),
                         "presenceVersion", change.presenceVersion());
                         
-                messaging.convertAndSend(TOPIC + conversation.getId(),
+                messaging.convertAndSend(StompDestinations.conversationTopic(conversation.getId()),
                         envelope(change.online() ? "USER_ONLINE" : "USER_OFFLINE", conversation.getId(), payload));
             }
 

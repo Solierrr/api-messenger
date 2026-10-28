@@ -11,7 +11,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHandler;
-import org.springframework.messaging.simp.broker.SimpleBrokerMessageHandler;
+import org.springframework.messaging.simp.broker.AbstractBrokerMessageHandler;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ExecutorChannelInterceptor;
@@ -111,7 +111,7 @@ public class StompAuthChannelInterceptor implements ExecutorChannelInterceptor {
         try {
             // só interessa SUBSCRIBE processado sem erro pelo broker
             StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
-            if (ex != null || !(handler instanceof SimpleBrokerMessageHandler)
+            if (ex != null || !(handler instanceof AbstractBrokerMessageHandler)
                     || accessor.getCommand() != StompCommand.SUBSCRIBE) return;
 
             // inscrição num tópico de conversa, com subscriptionId e sessão ainda ativa
@@ -193,6 +193,9 @@ public class StompAuthChannelInterceptor implements ExecutorChannelInterceptor {
         authenticate(jwt);
         String userId = canonicalUserId(jwt);
         StompCommand command = accessor.getCommand();
+
+        // o DISCONNECT é marcado antes de o relay encaminhá-lo; o ERROR de broker fechado que vem depois é esperado
+        if (StompCommand.DISCONNECT.equals(command)) sessions.markDisconnecting(accessor.getSessionId());
 
         // heartbeat, UNSUBSCRIBE e DISCONNECT passam direto
         if (command == null || StompCommand.UNSUBSCRIBE.equals(command) || StompCommand.DISCONNECT.equals(command)) {

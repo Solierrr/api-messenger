@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 
 import com.solaria.messenger.websocket.event.StompFrameDenied;
 import com.solaria.messenger.websocket.error.StompErrorHandler;
+import com.solaria.messenger.websocket.security.StompDestinations;
 
 /** Entrega ao usuário as recusas de frame feitas pelos interceptores, que não alcançam o {@link StompErrorHandler} */
 @Component
@@ -24,7 +25,7 @@ public class StompFrameDeniedListener {
     @EventListener
     public void onFrameDenied(StompFrameDenied denied) {
         try {
-            messaging.convertAndSendToUser(denied.userId().toString(), "/queue/errors", denied.error());
+            messaging.convertAndSend(StompDestinations.userTopic(denied.userId(), "errors"), denied.error());
         } catch (RuntimeException failure) {
             log.warn("Falha ao publicar erro STOMP (userId={})", denied.userId(), failure);
         }

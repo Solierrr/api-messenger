@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import com.solaria.messenger.core.model.Conversation;
 import com.solaria.messenger.core.service.ConversationAuthorizationService;
 import com.solaria.messenger.websocket.dto.response.WsEventEnvelope;
+import com.solaria.messenger.websocket.security.StompDestinations;
 import com.solaria.messenger.websocket.session.LocalWebSocketSessionRegistry;
 import com.solaria.messenger.websocket.event.SessionPresenceChanged;
 
@@ -69,10 +70,13 @@ public class TypingService {
         publish(conversation.getId(), userId, "TYPING_STOPPED");
     }
 
-    /** Encerra o typing só quando a última sessão do user cai; outra sessão aberta mantém ele digitando */
+    /**
+     * Encerra o typing quando a última sessão do user neste pod cai; o typing nasce no pod da sessão,
+     * então vale a visão local mesmo com o user online em outro pod
+     */
     @EventListener
     public void onPresenceChanged(SessionPresenceChanged change) {
-        if (change.online() || sessions.isOnline(change.userId())) return;
+        if (sessions.isOnline(change.userId())) return;
 
         // para o typing em todas as conversas; falha numa não impede as outras
         String userId = change.userId().toString();
@@ -92,6 +96,6 @@ public class TypingService {
                 .serverTimestamp(Instant.now())
                 .payload(Map.of("userId", userId))
                 .build();
-        messaging.convertAndSend("/topic/conversations/" + conversationId, envelope);
+        messaging.convertAndSend(StompDestinations.conversationTopic(conversationId), envelope);
     }
 }

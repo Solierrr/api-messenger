@@ -33,7 +33,7 @@ import com.solaria.messenger.core.service.state.OwnedState;
  * não lidas, mute e archive de cada user.
  * </p>
  * <ul>
- *     <li>{@link #project(List, Map, Map, Boolean)} -> monta os itens de cada destinatário autorizado.</li>
+ *     <li>{@link #project(List, Map, Map, Boolean, long)} -> monta os itens de cada destinatário autorizado.</li>
  * </ul>
  */
 @Service
@@ -50,9 +50,12 @@ public class ConversationProjectionService {
         this.clock = clock;
     }
 
-    /** Monta os itens por destinatário; {@code archivedFilter} nulo não filtra pelo archive pessoal */
+    /**
+     * Monta os itens por destinatário; {@code archivedFilter} nulo não filtra pelo archive pessoal.
+     * {@code version} vem do chamador, alocada antes de ele ler as conversas.
+     */
     public Map<UUID, List<ConversationListItemResponseDTO>> project(List<Conversation> conversations,
-            Map<String, Set<UUID>> authorized, Map<String, ProjectCommunity> parents, Boolean archivedFilter) {
+            Map<String, Set<UUID>> authorized, Map<String, ProjectCommunity> parents, Boolean archivedFilter, long version) {
         // carrega de uma vez o estado pessoal de todos os users nas conversas humanas (chatbot não tem estado)
         Set<UUID> users = authorized.values().stream().flatMap(Set::stream).collect(Collectors.toSet());
         Set<String> humanIds = conversations.stream().filter(c -> c.getConversationType() != ConversationType.CHAT_BOT)
@@ -79,7 +82,6 @@ public class ConversationProjectionService {
         // última mensagem e contagem de não lidas em consultas de lote
         Map<String, ConversationMessageHead> heads = messages.findLatestByConversationIds(selected.keySet());
         Map<String, Map<UUID, Long>> unread = messages.countUnreadByConversationAndUser(cursors);
-        long version = clock.nextVersion();
 
         // monta o item de cada destinatário
         Map<UUID, List<ConversationListItemResponseDTO>> result = new LinkedHashMap<>();

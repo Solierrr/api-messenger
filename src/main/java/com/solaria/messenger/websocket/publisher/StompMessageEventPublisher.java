@@ -11,10 +11,11 @@ import org.springframework.stereotype.Component;
 import com.solaria.messenger.core.model.Message;
 import com.solaria.messenger.core.service.port.MessageEventPublisher;
 import com.solaria.messenger.websocket.dto.response.WsEventEnvelope;
+import com.solaria.messenger.websocket.security.StompDestinations;
 
 import static com.solaria.messenger.core.mapper.MessageMapper.toResponse;
 
-/** Publica eventos de mensagem no tópico {@code /topic/conversations/{conversationId}}. */
+/** Publica eventos de mensagem no tópico {@code /topic/conversations.{conversationId}}. */
 @Component
 public class StompMessageEventPublisher implements MessageEventPublisher {
 
@@ -53,7 +54,7 @@ public class StompMessageEventPublisher implements MessageEventPublisher {
                 .payload(toResponse(message))
                 .build();
         try {
-            messaging.convertAndSend("/topic/conversations/" + message.getConversationId(), envelope);
+            messaging.convertAndSend(StompDestinations.conversationTopic(message.getConversationId()), envelope);
         } catch (RuntimeException ex) {
             log.warn("Falha ao publicar {} da mensagem {} (conversationId={});",
                     type, message.getId(), message.getConversationId(), ex);

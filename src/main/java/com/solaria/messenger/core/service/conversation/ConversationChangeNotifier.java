@@ -82,6 +82,8 @@ public class ConversationChangeNotifier {
         if (ids.isEmpty()) return;
 
         try {
+            // versão antes de qualquer leitura: é ela que ordena os eventos entre pods
+            long version = clock.nextVersion();
             Map<UUID, List<ConversationListItemResponseDTO>> projected = guard.execute(() -> {
                 // carrega as conversas, as comunidades e quem pode ver cada uma
                 List<Conversation> current = conversationRepository.findAllById(ids);
@@ -95,7 +97,7 @@ public class ConversationChangeNotifier {
                     return selected;
                 });
 
-                return projections.project(current, authorized, parents, null);
+                return projections.project(current, authorized, parents, null, version);
             });
 
             deliver(projected);
