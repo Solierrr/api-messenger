@@ -21,14 +21,16 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import tools.jackson.databind.ObjectMapper;
 
 import com.solaria.messenger.rest.error.ProblemDetailFactory;
-import com.solaria.messenger.core.service.UserAccessService;
+import com.solaria.messenger.core.helper.UserAccessHelper;
 
 /**
- * Fronteiras de segurança HTTP do Messenger
- * Actuator é restrito em sua configuração própria;
- * /internal/** usa isolamento de rede e a chain de usuário valida o JWT com o decoder comum de
- * {@link com.solaria.messenger.core.security.jwt.JwtDecoderConfig}. 
- * O proxy /dev/login e sua chain só existem no perfil dev.
+ * Fronteiras de segurança HTTP do Messenger.
+ *
+ * <p>
+ * Actuator é restrito em sua configuração própria. {@code /internal/**} usa isolamento de rede, e a chain de usuário
+ * valida o JWT com o decoder comum de {@link com.solaria.messenger.core.security.jwt.JwtDecoderConfig}.
+ * O proxy {@code /dev/login} e sua chain só existem no perfil dev.
+ * </p>
  */
 
 @Configuration
@@ -51,10 +53,13 @@ public class SecurityConfig {
                 this.problemDetailAccessDeniedHandler = problemDetailAccessDeniedHandler;
         }
 
-        /** Cria o filtro de usuário ativo com o registro servlet desabilitado, para que ele rode só dentro da chain de segurança. */
+        /**
+         * Cria o filtro de usuário ativo com o registro servlet desabilitado, para que ele rode só dentro da chain de
+         * segurança.
+         */
         @Bean
         public FilterRegistrationBean<ActiveUserFilter> activeUserFilterRegistration(
-                        UserAccessService userAccessService,
+                        UserAccessHelper userAccessService,
                         ProblemDetailFactory problemDetailFactory,
                         ObjectMapper objectMapper) {
                 FilterRegistrationBean<ActiveUserFilter> registration = new FilterRegistrationBean<>(

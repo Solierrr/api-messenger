@@ -16,7 +16,7 @@ import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.MessageBuilder;
 
-import com.solaria.messenger.core.service.ConversationAuthorizationService;
+import com.solaria.messenger.core.helper.ConversationAccessHelper;
 import com.solaria.messenger.websocket.event.StompFrameDenied;
 
 /**
@@ -51,7 +51,7 @@ class StompDestinationsTests {
     @Test
     void subscribesOnlyToTheOwnUserTopicAndDropsQueueOptions() {
         ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
-        var authorizer = new StompDestinationAuthorizer(mock(ConversationAuthorizationService.class), events);
+        var authorizer = new StompDestinationAuthorizer(mock(ConversationAccessHelper.class), events);
 
         Message<byte[]> own = subscribe(StompDestinations.userTopic(USER, "errors"));
         Message<byte[]> allowed = authorizer.authorizeSubscribe(own, StompHeaderAccessor.wrap(own), USER.toString());

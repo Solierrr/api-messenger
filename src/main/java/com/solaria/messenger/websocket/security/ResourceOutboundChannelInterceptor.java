@@ -8,7 +8,7 @@ import org.springframework.messaging.simp.SimpMessageType;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 
 import com.solaria.messenger.core.exception.BusinessException;
-import com.solaria.messenger.core.service.ConversationAuthorizationService;
+import com.solaria.messenger.core.helper.ConversationAccessHelper;
 import com.solaria.messenger.websocket.session.LocalWebSocketSessionRegistry;
 
 /** Verifica novas saídas pelo estado atual, sem interceptar escrita física ou drenar buffers. */
@@ -18,10 +18,10 @@ public class ResourceOutboundChannelInterceptor implements ChannelInterceptor {
     private static final String BROKER_CLOSED = "Connection to broker closed.";
 
     private final LocalWebSocketSessionRegistry sessions;
-    private final ConversationAuthorizationService authorization;
+    private final ConversationAccessHelper authorization;
 
     public ResourceOutboundChannelInterceptor(LocalWebSocketSessionRegistry sessions,
-            ConversationAuthorizationService authorization) {
+            ConversationAccessHelper authorization) {
         this.sessions = sessions;
         this.authorization = authorization;
     }

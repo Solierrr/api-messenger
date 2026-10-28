@@ -10,11 +10,13 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
 import com.solaria.messenger.core.contract.response.ConversationListItemResponseDTO;
-import com.solaria.messenger.core.service.port.ConversationEventPublisher;
+import com.solaria.messenger.core.port.ConversationEventPublisher;
 import com.solaria.messenger.websocket.dto.response.WsEventEnvelope;
 import com.solaria.messenger.websocket.security.StompDestinations;
 
-/** Entrega o estado das conversas no tópico privado {@code /topic/users.{userId}.conversations} de cada destinatário. */
+/**
+ * Entrega o estado das conversas no tópico privado {@code /topic/users.{userId}.conversations} de cada destinatário.
+ */
 @Component
 public class StompConversationEventPublisher implements ConversationEventPublisher {
 

@@ -26,7 +26,7 @@ import com.solaria.messenger.core.repository.projection.ConversationMessageHead;
 import com.solaria.messenger.core.repository.projection.LatestMessage;
 
 /**
- * Repositório Spring Data MongoDB da entidade {@link Message}.
+ * Repositório da entidade {@link Message}.
  *
  * <p>Concentra a paginação por cursor de sequência, a alocação de sequência por conversa com nova
  * tentativa sobre o índice único {@code conversation_sequence_idx}, as mutações condicionais (edição e

@@ -14,7 +14,7 @@ import com.solaria.messenger.core.model.CommunityMember;
 import com.solaria.messenger.core.model.enums.CommunityStatus;
 
 /**
- * Repositório Spring Data MongoDB da comunidade de projeto ({@link ProjectCommunity}).
+ * Repositório da entidade {@link ProjectCommunity}.
  *
  * <p>Concentra as consultas por projeto e por membro, e as atualizações condicionais por versão (CAS)
  * de membros e status, que impedem sobrescrever alterações concorrentes.</p>

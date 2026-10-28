@@ -9,7 +9,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
 import com.solaria.messenger.core.model.Message;
-import com.solaria.messenger.core.service.port.MessageEventPublisher;
+import com.solaria.messenger.core.port.MessageEventPublisher;
 import com.solaria.messenger.websocket.dto.response.WsEventEnvelope;
 import com.solaria.messenger.websocket.security.StompDestinations;
 

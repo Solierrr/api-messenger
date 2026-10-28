@@ -16,7 +16,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import com.solaria.messenger.core.exception.BusinessException;
 import com.solaria.messenger.rest.error.ProblemDetailFactory;
 import com.solaria.messenger.rest.observability.HttpObservationErrors;
-import com.solaria.messenger.core.service.UserAccessService;
+import com.solaria.messenger.core.helper.UserAccessHelper;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -27,11 +27,15 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Filtro que valida o usuário do JWT antes de a requisição chegar ao controller
  *
- * <p>Confere se o subject do token é um UUID canônico e se o usuário está ativo na api-auth, consultando
- * {@link UserAccessService} a cada requisição. Usuário inativo ou inexistente recebe erro no formato
- * {@code ProblemDetail}, escrito diretamente na resposta, pois o filtro roda antes do Spring MVC.</p>
+ * <p>
+ * Confere se o subject do token é um UUID canônico e se o usuário está ativo na api-auth, consultando
+ * {@link UserAccessHelper} a cada requisição. Usuário inativo ou inexistente recebe erro no formato
+ * {@code ProblemDetail}, escrito diretamente na resposta, pois o filtro roda antes do Spring MVC.
+ * </p>
  *
- * <p>Não se aplica à documentação OpenAPI nem ao handshake WebSocket.</p>
+ * <p>
+ * Não se aplica à documentação OpenAPI nem ao handshake WebSocket.
+ * </p>
  */
 public class ActiveUserFilter extends OncePerRequestFilter {
 
@@ -39,12 +43,12 @@ public class ActiveUserFilter extends OncePerRequestFilter {
     private static final Pattern CANONICAL_UUID = Pattern.compile(
             "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
 
-    private final UserAccessService userAccessService;
+    private final UserAccessHelper userAccessService;
     private final ProblemDetailAuthenticationEntryPoint authenticationEntryPoint;
     private final ProblemDetailFactory problemDetailFactory;
     private final ObjectMapper objectMapper;
 
-    public ActiveUserFilter(UserAccessService userAccessService,
+    public ActiveUserFilter(UserAccessHelper userAccessService,
             ProblemDetailAuthenticationEntryPoint authenticationEntryPoint,
             ProblemDetailFactory problemDetailFactory,
             ObjectMapper objectMapper) {

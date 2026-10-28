@@ -14,18 +14,25 @@ import com.solaria.messenger.core.model.Conversation;
 import com.solaria.messenger.core.model.enums.ConversationType;
 
 /**
- * Repositório Spring Data MongoDB da entidade {@link Conversation}
+ * Repositório da entidade {@link Conversation}
  *
- * <p>Concentra as consultas de conversas por participante, por comunidade e por tipo, além das
+ * <p>
+ * Concentra as consultas de conversas por participante, por comunidade e por tipo, além das
  * atualizações condicionais por versão que alteram apenas os campos informados: participantes,
- * gestor, reativação e última interação.</p>
+ * gestor, reativação e última interação.
+ * </p>
  *
- * <p>Principais consultas e atualizações disponibilizadas:</p>
+ * <p>
+ * Principais consultas e atualizações disponibilizadas:
+ * </p>
  * <ul>
- *     <li>{@link #findByConversationTypeAndDirectKey(ConversationType, String)} -> conversa direta pelo par canônico.</li>
+ *     <li>{@link #findByConversationTypeAndDirectKey(ConversationType, String)} -> conversa direta pelo par
+ *         canônico.</li>
  *     <li>{@link #findByParticipantIdsContainingOrderByLastInteractionAtDesc(UUID)} -> conversas do participante.</li>
- *     <li>{@link #updateParticipantsIfCurrent(String, Long, Set, UUID, Instant, Long)} -> altera participação e gestor na versão observada.</li>
- *     <li>{@link #updateManagerIfCurrent(String, Long, UUID, Instant, Long)} -> transfere a gestão na versão observada.</li>
+ *     <li>{@link #updateParticipantsIfCurrent(String, Long, Set, UUID, Instant, Long)} -> altera participação e gestor
+ *         na versão observada.</li>
+ *     <li>{@link #updateManagerIfCurrent(String, Long, UUID, Instant, Long)} -> transfere a gestão na versão
+ *         observada.</li>
  *     <li>{@link #updateLastInteraction(String, Instant)} -> avança a última interação sem regredir o valor.</li>
  * </ul>
  */
@@ -42,10 +49,6 @@ public interface ConversationRepository extends MongoRepository<Conversation, St
 
     /** Conversas em que o user participa */
     List<Conversation> findByParticipantIdsContainingOrderByLastInteractionAtDesc(UUID userId);
-
-    /** Conversas de uma comunidade das quais o usuário participa, da interação mais recente para a mais antiga. */
-    List<Conversation> findByCommunityIdAndParticipantIdsContainingOrderByLastInteractionAtDesc(
-            String communityId, UUID userId);
 
     /** Conversas de um tipo dentro da comunidade, da interação mais recente para a mais antiga. */
     List<Conversation> findByCommunityIdAndConversationTypeOrderByLastInteractionAtDesc(
