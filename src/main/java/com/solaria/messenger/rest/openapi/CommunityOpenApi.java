@@ -1,0 +1,174 @@
+package com.solaria.messenger.rest.openapi;
+
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.http.ResponseEntity;
+
+import com.solaria.messenger.rest.dto.request.CommunityConversationRequestDTO;
+import com.solaria.messenger.core.contract.request.CommunityMembersRequestDTO;
+import com.solaria.messenger.core.contract.request.CommunityMemberRemovalRequestDTO;
+import com.solaria.messenger.core.contract.request.CommunityRequestDTO;
+import com.solaria.messenger.core.contract.request.CommunityUpdateRequestDTO;
+import com.solaria.messenger.core.contract.response.CommunityResponseDTO;
+import com.solaria.messenger.core.contract.response.GroupCreationResponseDTO;
+import com.solaria.messenger.core.contract.response.SubgroupMetadataResponseDTO;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+/**
+ * Contrato Swagger/OpenAPI dos recursos de comunidade, em {@code /messaging/communities}.
+ *
+ * <p>Declara as operações e os códigos de resposta. A implementação fica em
+ * {@link com.solaria.messenger.rest.controller.CommunityController}.</p>
+ *
+ * <p>Principais operações disponibilizadas:</p>
+ * <ul>
+ *     <li>{@link #createCommunity(CommunityRequestDTO)} - cria a comunidade de um projeto.</li>
+ *     <li>{@link #findMine()} - lista as comunidades do usuário autenticado.</li>
+ *     <li>{@link #updateCommunity(String, CommunityUpdateRequestDTO)} - altera o status da comunidade.</li>
+ *     <li>{@link #addMembers(String, CommunityMembersRequestDTO)} - adiciona membros ou altera papéis.</li>
+ *     <li>{@link #removeMember(String, UUID, CommunityMemberRemovalRequestDTO)} - remove um membro ou registra a saída.</li>
+ *     <li>{@link #startConversation(String, CommunityConversationRequestDTO)} - inicia um subgrupo.</li>
+ *     <li>{@link #listConversations(String)} - lista os subgrupos da comunidade.</li>
+ * </ul>
+ */
+@Tag(name = "Comunidades", description = "Comunidade do projeto, espaço tipo slack")
+public interface CommunityOpenApi {
+
+    /** Contrato OpenAPI: cria a comunidade de um projeto. */
+    @Operation(
+        summary = "Cria a comunidade de um projeto",
+        description = "Quem cria vira OWNER | memberIds opcionais entram como MEMBER | Uma comunidade por projeto. "
+        + "Só o demandante do projeto pode criar "
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Comunidade criada"),
+            @ApiResponse(responseCode = "400", description = "Dados de entrada inválidos"),
+            @ApiResponse(responseCode = "403", description = "Usuário autenticado não é o demandante ou um membro inicial está inativo"),
+            @ApiResponse(responseCode = "404", description = "Projeto ou membro inicial não encontrado"),
+            @ApiResponse(responseCode = "409", description = "Já existe uma comunidade para o projeto"),
+            @ApiResponse(responseCode = "503", description = "Dependência indisponível para validar o demandante ou os membros")
+    })
+    ResponseEntity<CommunityResponseDTO> createCommunity(CommunityRequestDTO dto);
+
+    /** Contrato OpenAPI: lista as comunidades das quais o usuário é membro. */
+    @Operation(summary = "Lista as comunidades das quais o usuário autenticado é membro")
+    @ApiResponses(@ApiResponse(responseCode = "200", description = "Lista retornada com sucesso"))
+    ResponseEntity<List<CommunityResponseDTO>> findMine();
+
+    /** Contrato OpenAPI: busca uma comunidade pelo identificador. */
+    @Operation(summary = "Busca uma comunidade pelo identificador (só membros)")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Comunidade encontrada"),
+            @ApiResponse(responseCode = "403", description = "O usuário autenticado não participa desta comunidade"),
+            @ApiResponse(responseCode = "404", description = "Comunidade não encontrada")
+    })
+    ResponseEntity<CommunityResponseDTO> findById(String id);
+
+    /** Contrato OpenAPI: busca a comunidade de um projeto. */
+    @Operation(summary = "Busca a comunidade de um projeto (só membros)")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Comunidade encontrada"),
+            @ApiResponse(responseCode = "403", description = "O usuário autenticado não participa desta comunidade"),
+            @ApiResponse(responseCode = "404", description = "Comunidade não encontrada para o projeto")
+    })
+    ResponseEntity<CommunityResponseDTO> findByProjectId(UUID projectId);
+
+    /** Contrato OpenAPI: altera somente o status da comunidade. */
+    @Operation(
+        summary = "Altera somente o status da comunidade",
+        description = "status é obrigatório; pedido vazio ou status nulo é 400 INVALID_FIELD, sem efeitos. "
+                + "Arquivar exige OWNER; reativar ARCHIVED exige OWNER/ADMIN atual. Mesmo status é no-op autorizado. "
+                + "ARCHIVED bloqueia mensagens e administração ordinária, preservando leitura, estado pessoal e saída. "
+                + "Não há cleanup de typing nem metadados descritivos editáveis."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Status atualizado ou no-op autorizado"),
+            @ApiResponse(responseCode = "400", description = "INVALID_FIELD; status obrigatório, não nulo e válido"),
+            @ApiResponse(responseCode = "403", description = "OWNER para arquivar; OWNER/ADMIN para ativar ou repetir a ativação"),
+            @ApiResponse(responseCode = "404", description = "Comunidade não encontrada"),
+            @ApiResponse(responseCode = "409", description = "CONCURRENT_MODIFICATION"),
+            @ApiResponse(responseCode = "503", description = "Falha técnica de persistência ou de dependência")
+    })
+    ResponseEntity<CommunityResponseDTO> updateCommunity(String id, CommunityUpdateRequestDTO dto);
+
+    /** Contrato OpenAPI: adiciona membros ou altera seus papéis. */
+    @Operation(
+        summary = "Adiciona/altera papel de membros",
+        description = "Adicionar MEMBER exige ADMIN | conceder ADMIN exige OWNER"
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Membros adicionados"),
+            @ApiResponse(responseCode = "403", description = "Papel insuficiente ou novo membro inativo"),
+            @ApiResponse(responseCode = "404", description = "Comunidade ou novo membro não encontrado"),
+            @ApiResponse(responseCode = "409", description = "CONCURRENT_MODIFICATION ou MEMBERSHIP_CLEANUP_REQUIRED antes da readmissão"),
+            @ApiResponse(responseCode = "503", description = "Core indisponível para validar novos membros"),
+            @ApiResponse(responseCode = "422", description = "Comunidade arquivada ou papel OWNER solicitado")
+    })
+    ResponseEntity<CommunityResponseDTO> addMembers(String id, CommunityMembersRequestDTO dto);
+
+    /** Contrato OpenAPI: remove um membro ou registra a saída do próprio usuário. */
+    @Operation(
+        summary = "Remove um membro | sair da comunidade",
+        description = "Cada um pode sair | remover outros exige OWNER/ADMIN | OWNER não pode ser removido nem sair. "
+                + "A remoção também revoga participação nos subgrupos. Informe sucessor por conversa quando necessário; "
+                + "Somente remoção administrativa pode esvaziar um grupo sem sucessor. Retorna 204 sem roster. "
+                + "Após revogar no pai, repetição explícita só limpa resíduos; readmissão aguarda essa limpeza. "
+                + "Saída voluntária é permitida em comunidade arquivada; remoção ordinária de terceiros é bloqueada."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Membro e participações residuais removidos; sem corpo"),
+            @ApiResponse(responseCode = "400", description = "Sucessor duplicado/alheio, UUID ou corpo inválido"),
+            @ApiResponse(responseCode = "403", description = "Sem permissão para remover esse membro"),
+            @ApiResponse(responseCode = "404", description = "Comunidade não encontrada"),
+            @ApiResponse(responseCode = "409", description = "SUCCESSOR_REQUIRED, SUCCESSOR_INELIGIBLE, GROUP_MANAGER_UNAVAILABLE ou CONCURRENT_MODIFICATION"),
+            @ApiResponse(responseCode = "422", description = "Tentativa de remover o OWNER ou administrar terceiros em comunidade arquivada"),
+            @ApiResponse(responseCode = "503", description = "REMOVAL_INCOMPLETE; repetir DELETE revalida o estado atual e conclui a limpeza")
+    })
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = false,
+            content = @Content(schema = @Schema(implementation = CommunityMemberRemovalRequestDTO.class)))
+    ResponseEntity<Void> removeMember(
+            String id, UUID userId, CommunityMemberRemovalRequestDTO dto);
+
+    /** Remoção sem corpo, sem sucessores explícitos. */
+    default ResponseEntity<Void> removeMember(String id, UUID userId) {
+        return removeMember(id, userId, null);
+    }
+
+    /** Contrato OpenAPI: inicia um subgrupo entre membros da comunidade. */
+    @Operation(
+        summary = "Inicia uma conversa em grupo entre membros da comunidade",
+        description = "participantIds omitido ou vazio seleciona os membros atuais; se informado, seleciona os IDs pedidos. "
+                + "O criador autorizado entra sempre, com ao menos outro participante elegível. "
+                + "Convidados individualmente inelegíveis são excluídos e retornados com motivo genérico. "
+                + "Falhas técnicas abortam o comando; conversa e estados pessoais são atômicos, sem retry de criação."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Subgrupo criado, participantes admitidos e rejeições genéricas",
+                    content = @Content(schema = @Schema(implementation = GroupCreationResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Dados de entrada inválidos"),
+            @ApiResponse(responseCode = "403", description = "Criador não participa da comunidade ou está inativo"),
+            @ApiResponse(responseCode = "404", description = "Comunidade não encontrada"),
+            @ApiResponse(responseCode = "422", description = "Comunidade arquivada ou menos de dois participantes distintos elegíveis"),
+            @ApiResponse(responseCode = "503", description = "Auth/banco indisponível ou resultado da transação não confirmado")
+    })
+    ResponseEntity<GroupCreationResponseDTO> startConversation(String id, CommunityConversationRequestDTO dto);
+
+    /** Contrato OpenAPI: lista os metadados dos subgrupos da comunidade. */
+    @Operation(summary = "Lista metadados dos subgrupos da comunidade",
+            description = "OWNER/ADMIN atuais veem todos os GROUPs; MEMBER vê apenas os GROUPs de que participa. "
+                    + "Disponível em ARCHIVED, com sete campos e nulos explícitos; não concede acesso ao conteúdo.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso"),
+            @ApiResponse(responseCode = "403", description = "O usuário autenticado não participa desta comunidade"),
+            @ApiResponse(responseCode = "404", description = "Comunidade não encontrada")
+    })
+    ResponseEntity<List<SubgroupMetadataResponseDTO>> listConversations(String id);
+}
