@@ -5,5 +5,9 @@ folders:
   - /auth
   - /service-urls
   - /otel
+  - /broker
+  - /redis
 # Variáveis do .env.example que não vêm do Infisical.
-ignore: []
+ignore:
+  - SERVICE_KEY
+  - OTEL_EXPORTER_OTLP_ENDPOINT
