@@ -21,27 +21,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
-/**
- * Contrato Swagger/OpenAPI dos recursos de comunidade, em {@code /messaging/communities}.
- *
- * <p>Declara as operações e os códigos de resposta. A implementação fica em
- * {@link com.solaria.messenger.rest.controller.CommunityController}.</p>
- *
- * <p>Principais operações disponibilizadas:</p>
- * <ul>
- *     <li>{@link #createCommunity(CommunityRequestDTO)} - cria a comunidade de um projeto.</li>
- *     <li>{@link #findMine()} - lista as comunidades do usuário autenticado.</li>
- *     <li>{@link #updateCommunity(String, CommunityUpdateRequestDTO)} - altera o status da comunidade.</li>
- *     <li>{@link #addMembers(String, CommunityMembersRequestDTO)} - adiciona membros ou altera papéis.</li>
- *     <li>{@link #removeMember(String, UUID, CommunityMemberRemovalRequestDTO)} - remove um membro ou registra a saída.</li>
- *     <li>{@link #startConversation(String, CommunityConversationRequestDTO)} - inicia um subgrupo.</li>
- *     <li>{@link #listConversations(String)} - lista os subgrupos da comunidade.</li>
- * </ul>
- */
 @Tag(name = "Comunidades", description = "Comunidade do projeto, espaço tipo slack")
 public interface CommunityOpenApi {
-
-    /** Contrato OpenAPI: cria a comunidade de um projeto. */
     @Operation(
         summary = "Cria a comunidade de um projeto",
         description = "Quem cria vira OWNER | memberIds opcionais entram como MEMBER | Uma comunidade por projeto. "
@@ -57,12 +38,10 @@ public interface CommunityOpenApi {
     })
     ResponseEntity<CommunityResponseDTO> createCommunity(CommunityRequestDTO dto);
 
-    /** Contrato OpenAPI: lista as comunidades das quais o usuário é membro. */
     @Operation(summary = "Lista as comunidades das quais o usuário autenticado é membro")
     @ApiResponses(@ApiResponse(responseCode = "200", description = "Lista retornada com sucesso"))
     ResponseEntity<List<CommunityResponseDTO>> findMine();
 
-    /** Contrato OpenAPI: busca uma comunidade pelo identificador. */
     @Operation(summary = "Busca uma comunidade pelo identificador (só membros)")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Comunidade encontrada"),
@@ -71,7 +50,6 @@ public interface CommunityOpenApi {
     })
     ResponseEntity<CommunityResponseDTO> findById(String id);
 
-    /** Contrato OpenAPI: busca a comunidade de um projeto. */
     @Operation(summary = "Busca a comunidade de um projeto (só membros)")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Comunidade encontrada"),
@@ -80,7 +58,6 @@ public interface CommunityOpenApi {
     })
     ResponseEntity<CommunityResponseDTO> findByProjectId(UUID projectId);
 
-    /** Contrato OpenAPI: altera somente o status da comunidade. */
     @Operation(
         summary = "Altera somente o status da comunidade",
         description = "status é obrigatório; pedido vazio ou status nulo é 400 INVALID_FIELD, sem efeitos. "
@@ -98,7 +75,6 @@ public interface CommunityOpenApi {
     })
     ResponseEntity<CommunityResponseDTO> updateCommunity(String id, CommunityUpdateRequestDTO dto);
 
-    /** Contrato OpenAPI: adiciona membros ou altera seus papéis. */
     @Operation(
         summary = "Adiciona/altera papel de membros",
         description = "Adicionar MEMBER exige ADMIN | conceder ADMIN exige OWNER"
@@ -113,7 +89,6 @@ public interface CommunityOpenApi {
     })
     ResponseEntity<CommunityResponseDTO> addMembers(String id, CommunityMembersRequestDTO dto);
 
-    /** Contrato OpenAPI: remove um membro ou registra a saída do próprio usuário. */
     @Operation(
         summary = "Remove um membro | sair da comunidade",
         description = "Cada um pode sair | remover outros exige OWNER/ADMIN | OWNER não pode ser removido nem sair. "
@@ -137,12 +112,10 @@ public interface CommunityOpenApi {
     ResponseEntity<Void> removeMember(
             String id, UUID userId, CommunityMemberRemovalRequestDTO dto);
 
-    /** Remoção sem corpo, sem sucessores explícitos. */
     default ResponseEntity<Void> removeMember(String id, UUID userId) {
         return removeMember(id, userId, null);
     }
 
-    /** Contrato OpenAPI: inicia um subgrupo entre membros da comunidade. */
     @Operation(
         summary = "Inicia uma conversa em grupo entre membros da comunidade",
         description = "participantIds omitido ou vazio seleciona os membros atuais; se informado, seleciona os IDs pedidos. "
@@ -161,7 +134,6 @@ public interface CommunityOpenApi {
     })
     ResponseEntity<GroupCreationResponseDTO> startConversation(String id, CommunityConversationRequestDTO dto);
 
-    /** Contrato OpenAPI: lista os metadados dos subgrupos da comunidade. */
     @Operation(summary = "Lista metadados dos subgrupos da comunidade",
             description = "OWNER/ADMIN atuais veem todos os GROUPs; MEMBER vê apenas os GROUPs de que participa. "
                     + "Disponível em ARCHIVED, com sete campos e nulos explícitos; não concede acesso ao conteúdo.")

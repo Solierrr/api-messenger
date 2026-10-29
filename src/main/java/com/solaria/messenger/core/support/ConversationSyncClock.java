@@ -39,6 +39,11 @@ public class ConversationSyncClock {
         return advance(1);
     }
 
+    /** Versão atual, sem avançar o relógio. */
+    public long currentVersion() {
+        return advance(0);
+    }
+
     private long advance(int step) {
         Update update = new Update().inc("version", step).setOnInsert("epoch", UUID.randomUUID().toString());
         Document clock = mongo.findAndModify(CLOCK, update, FindAndModifyOptions.options().upsert(true).returnNew(true),

@@ -40,11 +40,13 @@ import com.solaria.messenger.core.repository.ConversationRepository;
  * </p>
  * <ul>
  *     <li>{@link #requireParticipant(String, UUID)} -> carrega a conversa e exige participação.</li>
- *     <li>{@link #requireParticipant(Conversation, UUID)} -> exige participação a partir de uma conversa já carregada.</li>
+ *     <li>{@link #requireParticipant(Conversation, UUID)} -> exige participação a partir de uma conversa já
+ *         carregada.</li>
  *     <li>{@link #withAccess(String, UUID, Function)} -> executa uma ação com a conversa já autorizada.</li>
  *     <li>{@link #requireCommunityActive(Conversation)} -> exige comunidade ativa nos subgrupos.</li>
  *     <li>{@link #communitiesFor(List)} -> carrega as comunidades de um lote de conversas.</li>
  *     <li>{@link #authorizedParticipants(List)} -> devolve quem pode ver cada conversa do lote.</li>
+ *     <li>{@link #readableConversationIds(UUID)} -> devolve os ids das conversas que o user pode ler hoje.</li>
  *     <li>{@link #authorizedParticipants(Set)} -> recarrega as conversas pelos ids e refaz a autorização.</li>
  * </ul>
  */
@@ -97,8 +99,7 @@ public class ConversationAccessHelper {
      * Confere a participação de quem já tem a conversa em mãos.
      *
      * <p>
-     * Relê a conversa pelo id, para usar a participação atual. Se o objeto ainda não tem id, usa o próprio
-     * objeto.
+     * Relê a conversa pelo id, para usar a participação atual. Se o objeto ainda não tem id, usa o próprio objeto.
      * </p>
      *
      * @param conversation conversa já carregada.
@@ -169,6 +170,24 @@ public class ConversationAccessHelper {
             result.put(conversation.getId(), Set.copyOf(users));
         }
         return result;
+    }
+
+    /**
+     * Devolve os ids das conversas que o user pode ler hoje.
+     *
+     * <p>
+     * Segue a mesma regra da lista de conversas: o user participa e, em subgrupo, ainda é membro da comunidade.
+     * </p>
+     *
+     * @param actor identificador do user.
+     * @return ids das conversas legíveis. Vazio quando o user não participa de nenhuma.
+     */
+    public Set<String> readableConversationIds(UUID actor) {
+        List<Conversation> candidates = conversations.findByParticipantIdsContainingOrderByLastInteractionAtDesc(actor);
+        return authorizedParticipants(candidates).entrySet().stream()
+                .filter(entry -> entry.getValue().contains(actor))
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toSet());
     }
 
     /**

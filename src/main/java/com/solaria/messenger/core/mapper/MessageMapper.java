@@ -22,6 +22,7 @@ public final class MessageMapper {
                 .metadata(message.getMetadata())
                 .timestamp(message.getTimestamp())
                 .sequence(message.getSequence())
+                .changeVersion(message.getChangeVersion())
                 .build();
     }
 }

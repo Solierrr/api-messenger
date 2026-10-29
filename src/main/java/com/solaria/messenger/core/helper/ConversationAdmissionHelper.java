@@ -160,8 +160,8 @@ public class ConversationAdmissionHelper {
      *
      * <p>
      * A versão lida pelo chamador precisa ser a atual. Quem já participa precisa ter estado válido. Os novos ganham
-     * estado a partir da última sequência, sem mexer no cursor nem nas preferências de quem já estava. Se ninguém novo
-     * entrar, nada é gravado.
+     * estado a partir da última sequência, sem mexer no cursor nem nas preferências de quem já estava. Quem volta ao
+     * grupo reaproveita o estado antigo e perde a marca de saída. Se ninguém novo entrar, nada é gravado.
      * </p>
      *
      * @param id identificador do grupo.
@@ -243,6 +243,9 @@ public class ConversationAdmissionHelper {
             insertState(conversationId, user, head);
         } else if (state == null || !state.hasValidBaseline() || state.getLastReadSequence() > head) {
             throw new BusinessRuleException("Estado pessoal indisponível: baseline de admissão não verificável.");
+        } else if (newMembership) {
+            // readmissão: o estado antigo é reaproveitado, então a marca de saída sai junto com a perda de acesso
+            userStates.clearLeft(conversationId, user);
         }
     }
 

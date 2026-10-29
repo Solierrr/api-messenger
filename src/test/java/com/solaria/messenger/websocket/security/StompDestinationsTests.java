@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.util.UUID;
@@ -20,8 +21,8 @@ import com.solaria.messenger.core.helper.ConversationAccessHelper;
 import com.solaria.messenger.websocket.event.StompFrameDenied;
 
 /**
- * Cobre os destinos STOMP do broker: os tópicos que os publicadores montam são os que a autorização reconhece,
- * curingas e '/' são recusados, e o SUBSCRIBE no tópico privado só vale para o próprio user.
+ * Cobre os destinos STOMP do broker: os tópicos que os publicadores montam são os que a autorização reconhece, curingas
+ * e '/' são recusados, e o SUBSCRIBE no tópico privado só vale para o próprio user.
  */
 class StompDestinationsTests {
 
@@ -31,7 +32,13 @@ class StompDestinationsTests {
     void parsesTheTopicsThePublishersBuild() {
         assertEquals("abc_1-2", StompDestinations.conversationTopicId(StompDestinations.conversationTopic("abc_1-2")));
         assertEquals(USER.toString(), StompDestinations.userTopicOwner(StompDestinations.userTopic(USER, "acks")));
-        assertEquals(USER.toString(), StompDestinations.userTopicOwner(StompDestinations.userTopic(USER, "conversations")));
+        assertEquals(USER.toString(), StompDestinations.userTopicOwner(StompDestinations.userTopic(USER, "events")));
+    }
+
+    // eventos de conversa saem em .events; .conversations está fora da allowlist
+    @Test
+    void theOldConversationsTopicIsNoLongerInTheAllowlist() {
+        assertNull(StompDestinations.userTopicOwner("/topic/users." + USER + ".conversations"));
     }
 
     // '/' é recusado pelo RabbitMQ; '.', '*' e '#' são curingas ou separadores do amq.topic
@@ -63,6 +70,22 @@ class StompDestinationsTests {
         Message<byte[]> other = subscribe(StompDestinations.userTopic(UUID.randomUUID(), "errors"));
         assertNull(authorizer.authorizeSubscribe(other, StompHeaderAccessor.wrap(other), USER.toString()));
         verify(events).publishEvent(any(StompFrameDenied.class));
+    }
+
+    @Test
+    void subscribesToTheOwnEventsTopicButNotToAnotherUsersNorToTheOldConversationsTopic() {
+        ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+        var authorizer = new StompDestinationAuthorizer(mock(ConversationAccessHelper.class), events);
+
+        Message<byte[]> own = subscribe(StompDestinations.userTopic(USER, "events"));
+        assertNotNull(authorizer.authorizeSubscribe(own, StompHeaderAccessor.wrap(own), USER.toString()));
+
+        Message<byte[]> other = subscribe(StompDestinations.userTopic(UUID.randomUUID(), "events"));
+        assertNull(authorizer.authorizeSubscribe(other, StompHeaderAccessor.wrap(other), USER.toString()));
+
+        Message<byte[]> old = subscribe(StompDestinations.userTopic(USER, "conversations"));
+        assertNull(authorizer.authorizeSubscribe(old, StompHeaderAccessor.wrap(old), USER.toString()));
+        verify(events, times(2)).publishEvent(any(StompFrameDenied.class));
     }
 
     private static Message<byte[]> subscribe(String destination) {

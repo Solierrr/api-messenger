@@ -14,24 +14,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
-/**
- * Contrato Swagger/OpenAPI dos recursos de mensagem, em {@code /messaging/messages}.
- *
- * <p>Declara as operações e os códigos de resposta. A implementação fica em
- * {@link com.solaria.messenger.rest.controller.MessageController}.</p>
- *
- * <p>Principais operações disponibilizadas:</p>
- * <ul>
- *     <li>{@link #sendMessage(MessageRequestDTO)} - envia uma mensagem numa conversa existente.</li>
- *     <li>{@link #editMessage(String, MessageEditRequestDTO)} - edita o texto de uma mensagem própria.</li>
- *     <li>{@link #deleteMessage(String)} - exclui logicamente uma mensagem própria.</li>
- *     <li>{@link #getMessagesByConversationId(String, Integer, Integer, Integer)} - lista as mensagens paginadas.</li>
- * </ul>
- */
 @Tag(name = "Mensagens", description = "Mensagens trocadas por pessoas, entre si ou com o chatbot")
 public interface MessageOpenApi {
-
-    /** Contrato OpenAPI: envia uma mensagem numa conversa existente. */
     @Operation(
         summary = "Envia uma mensagem de uma pessoa numa conversa existente",
         description = "O messageType precisa combinar com o tipo da conversa: DIRECT -> USER_TO_USER, "
@@ -39,8 +23,8 @@ public interface MessageOpenApi {
                 + "clientMessageId é opcional e serve somente para correlação. Cada envio cria outra mensagem e retorna 201, "
                 + "mesmo com o mesmo clientMessageId. Não há replay nem retry automático. Conflitos comprovados de sequência "
                 + "podem retornar 409; persistência sem confirmação retorna 503 MESSAGE_PERSISTENCE_UNCERTAIN. "
-                + "O evento WS MESSAGE_CREATED correspondente (tópico /topic/conversations.{id}) é "
-                + "best-effort: clientes conectados devem fazer resync via sinceSequence a cada "
+                + "O evento WS MESSAGE_CREATED correspondente (tópico /topic/users.{userId}.events de cada participante, inclusive o autor) é "
+                + "best-effort: clientes conectados devem fazer resync via GET /messaging/updates a cada "
                 + "(re)conexão e reconciliar ACK/broadcast pelo id persistido. Receber MESSAGE_CREATED não marca leitura."
     )
     @ApiResponses({
@@ -54,7 +38,6 @@ public interface MessageOpenApi {
     })
     ResponseEntity<MessageResponseDTO> sendMessage(MessageRequestDTO dto);
 
-    /** Contrato OpenAPI: edita o texto de uma mensagem própria. */
     @Operation(summary = "Edita o texto de uma mensagem própria",
             description = "Somente autor ativo e participante atual em DIRECT/GROUP. Texto igual é no-op; "
                     + "mensagem excluída e comunidade arquivada não permitem edição. Preserva chave e sequência.")
@@ -69,7 +52,6 @@ public interface MessageOpenApi {
     })
     ResponseEntity<MessageResponseDTO> editMessage(String id, MessageEditRequestDTO dto);
 
-    /** Contrato OpenAPI: exclui logicamente uma mensagem própria. */
     @Operation(summary = "Exclui logicamente uma mensagem própria",
             description = "Remove o conteúdo e preserva identidade, chave e sequência. Repetição autorizada é no-op; "
                     + "comunidade arquivada não permite a operação, inclusive em repetição.")
@@ -83,7 +65,6 @@ public interface MessageOpenApi {
     })
     ResponseEntity<MessageResponseDTO> deleteMessage(String id);
 
-    /** Contrato OpenAPI: lista as mensagens de uma conversa, paginadas em ordem crescente. */
     @Operation(
         summary = "Lista as mensagens de uma conversa (paginado, ordem crescente)",
         description = "Retorna um array em ordem crescente de sequence, com o estado atual de mensagens "

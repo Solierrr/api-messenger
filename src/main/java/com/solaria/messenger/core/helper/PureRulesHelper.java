@@ -49,11 +49,14 @@ import com.solaria.messenger.core.model.enums.ConversationType;
  *     <li>{@link #directKey} -> gera a chave canônica de uma direta.</li>
  *     <li>{@link #requireNoNullParticipants} -> exige participantes sem nulos.</li>
  *     <li>{@link #withoutUser} -> devolve os participantes sem um user.</li>
+ *     <li>{@link #clampPageSize} -> ajusta o tamanho da página de mensagens.</li>
  * </ul>
  */
 public final class PureRulesHelper {
 
     private static final int MAX_ATTEMPTS = 3;
+    private static final int DEFAULT_PAGE_SIZE = 100;
+    private static final int MAX_PAGE_SIZE = 500;
 
     private PureRulesHelper() { }
 
@@ -63,10 +66,9 @@ public final class PureRulesHelper {
      * Aplica uma escrita com CAS, relendo o documento entre as tentativas.
      *
      * <p>
-     * Quando {@code mutation} devolve {@code null}, o documento atual volta sem releitura, porque não há nada a
-     * gravar. Nos outros casos o documento é relido. Se o retorno for {@code 1}, a função devolve a versão relida. Caso
-     * contrário, tenta de novo. Depois de três tentativas sem gravar, lança a exceção fornecida por
-     * {@code exhausted}.
+     * Quando {@code mutation} devolve {@code null}, o documento atual volta sem releitura, porque não há nada a gravar.
+     * Nos outros casos o documento é relido. Se o retorno for {@code 1}, a função devolve a versão relida. Caso
+     * contrário, tenta de novo. Depois de três tentativas sem gravar, lança a exceção fornecida por {@code exhausted}.
      * </p>
      *
      * @param <T> tipo do documento tratado pela escrita.
@@ -94,8 +96,8 @@ public final class PureRulesHelper {
     /**
      * Calcula a próxima versão do documento.
      *
-     * @param version versão atual. Nulo indica documento antigo, sem versão.
-     * @return próxima versão, ou zero quando o documento ainda não tinha versão.
+     * @param version versão atual. Nulo indica documento sem versão.
+     * @return próxima versão, ou zero quando o documento não tem versão.
      */
     public static Long nextVersion(Long version) {
         return version == null ? 0L : Math.addExact(version, 1L);
@@ -146,8 +148,8 @@ public final class PureRulesHelper {
      * Confere se o ator pode remover o alvo da comunidade.
      *
      * <p>
-     * Ninguém remove o {@code OWNER}. Remover outra pessoa exige ser OWNER ou ADMIN. Sair por conta própria não
-     * exige papel. Na remoção de terceiros, a comunidade precisa estar ativa enquanto o alvo ainda for membro.
+     * Ninguém remove o {@code OWNER}. Remover outra pessoa exige ser OWNER ou ADMIN. Sair por conta própria não exige
+     * papel. Na remoção de terceiros, a comunidade precisa estar ativa enquanto o alvo ainda for membro.
      * </p>
      *
      * @param community comunidade atual.
@@ -269,5 +271,17 @@ public final class PureRulesHelper {
         Set<UUID> survivors = new LinkedHashSet<>(participants);
         survivors.remove(user);
         return survivors;
+    }
+
+    // páginas
+
+    /**
+     * Ajusta o tamanho de uma página de mensagens.
+     *
+     * @param requested tamanho pedido. Sem valor, usa 100.
+     * @return o tamanho pedido, limitado ao intervalo de 1 a 500.
+     */
+    public static int clampPageSize(Integer requested) {
+        return requested == null ? DEFAULT_PAGE_SIZE : Math.clamp(requested, 1, MAX_PAGE_SIZE);
     }
 }

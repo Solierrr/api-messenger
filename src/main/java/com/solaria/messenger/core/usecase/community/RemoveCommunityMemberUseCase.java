@@ -19,6 +19,7 @@ import com.solaria.messenger.core.exception.BusinessException;
 import com.solaria.messenger.core.exception.InvalidFieldException;
 import com.solaria.messenger.core.exception.RemovalIncompleteException;
 import com.solaria.messenger.core.helper.CommunityHelper;
+import com.solaria.messenger.core.helper.ConversationStateHelper;
 import com.solaria.messenger.core.helper.LookupHelper;
 import com.solaria.messenger.core.helper.NotificationHelper;
 import com.solaria.messenger.core.helper.UserAccessHelper;
@@ -39,10 +40,10 @@ import static com.solaria.messenger.core.helper.PureRulesHelper.requireRemovalAu
  *
  * <p>
  * A remoção segue quatro passos, nesta ordem: passa a gestão dos subgrupos para os sucessores; tira o user da
- * comunidade; avisa o user que ele perdeu os subgrupos; e tira o user dos subgrupos. Se a comunidade já não tem o user,
- * a operação só limpa os resíduos, então pode ser repetida. Se uma falha técnica acontece no meio da cascata, o erro é
- * de remoção incompleta, e o DELETE pode ser repetido. Ao final, as sessões do user são derrubadas se ele estava
- * afetado.
+ * comunidade; marca a versão da saída e avisa o user que ele perdeu os subgrupos; e tira o user dos subgrupos. Se a
+ * comunidade já não tem o user, a operação só limpa os resíduos, então pode ser repetida. Se uma falha técnica acontece
+ * no meio da cascata, o erro é de remoção incompleta, e o DELETE pode ser repetido. Ao final, as sessões do user são
+ * derrubadas se ele estava afetado.
  * </p>
  *
  * <p>
@@ -57,6 +58,7 @@ import static com.solaria.messenger.core.helper.PureRulesHelper.requireRemovalAu
  *     <li>{@link RbacAuthorizationService} -> identifica o ator.</li>
  *     <li>{@link SessionRevoker} -> derruba as sessões do user removido.</li>
  *     <li>{@link UserAccessHelper} -> confere o ator ativo.</li>
+ *     <li>{@link ConversationStateHelper} -> marca a versão em que o user perdeu cada subgrupo.</li>
  * </ul>
  *
  * <p>
@@ -78,10 +80,12 @@ public class RemoveCommunityMemberUseCase {
     private final RbacAuthorizationService rbac;
     private final SessionRevoker sessionRevoker;
     private final UserAccessHelper users;
+    private final ConversationStateHelper states;
 
     public RemoveCommunityMemberUseCase(CommunityRepository communityRepository, CommunityHelper communities,
             LookupHelper lookup, NotificationHelper notifications, ConversationMutationGuard guard,
-            RbacAuthorizationService rbac, SessionRevoker sessionRevoker, UserAccessHelper users) {
+            RbacAuthorizationService rbac, SessionRevoker sessionRevoker, UserAccessHelper users,
+            ConversationStateHelper states) {
         this.communityRepository = communityRepository;
         this.communities = communities;
         this.lookup = lookup;
@@ -90,6 +94,7 @@ public class RemoveCommunityMemberUseCase {
         this.rbac = rbac;
         this.sessionRevoker = sessionRevoker;
         this.users = users;
+        this.states = states;
     }
 
     /**
@@ -138,10 +143,12 @@ public class RemoveCommunityMemberUseCase {
                                 Instant.now(), nextVersion(latest.getVersion()));
                     });
 
-                    // 3. avisa o user que ele perdeu os subgrupos
+                    // 3. marca a versão da saída e avisa o user que ele perdeu os subgrupos
                     if (!after.isMember(userId)) {
-                        groups.stream().filter(group -> group.hasParticipant(userId))
-                                .forEach(group -> notifications.publishRemovedConversation(userId, group.getId()));
+                        groups.stream().filter(group -> group.hasParticipant(userId)).forEach(group -> {
+                            states.markLeft(userId, group.getId());
+                            notifications.publishRemovedConversation(userId, group.getId());
+                        });
                     }
 
                     // 4. tira o user dos subgrupos

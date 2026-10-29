@@ -16,12 +16,13 @@ import com.solaria.messenger.websocket.dto.response.WsEventEnvelope;
  * Destinos STOMP do broker, compartilhados por quem publica, pela autorização de entrada e pela de saída.
  *
  * <p>
- * O RabbitMQ recusa '/' depois de {@code /topic}, por isso o separador é '.'. Os padrões recusam '.', '*' e '#'
- * no id, senão um cliente assinaria um curinga do RabbitMQ e receberia eventos de outros.
+ * O RabbitMQ recusa '/' depois de {@code /topic}, por isso o separador é '.'. Os padrões recusam '.', '*' e '#' no id,
+ * senão um cliente assinaria um curinga do RabbitMQ e receberia eventos de outros.
  * </p>
  * <ul>
- *     <li>{@code /topic/conversations.{id}} -> eventos de uma conversa.</li>
- *     <li>{@code /topic/users.{userId}.{acks|errors|conversations}} -> eventos privados do user, em todos os pods.</li>
+ *     <li>{@code /topic/conversations.{id}} -> presença, digitação e snapshot de presença de uma conversa.</li>
+ *     <li>{@code /topic/users.{userId}.{acks|errors|events}} -> eventos privados do user, em todos os pods. O
+ *         {@code events} leva {@code MESSAGE_*}, {@code CONVERSATION_UPDATED} e {@code CONVERSATION_REMOVED}.</li>
  * </ul>
  */
 public final class StompDestinations {
@@ -32,7 +33,7 @@ public final class StompDestinations {
     private static final Pattern CONVERSATION_TOPIC_PATTERN =
             Pattern.compile("^/topic/conversations\\.([A-Za-z0-9_-]+)$");
     private static final Pattern USER_TOPIC_PATTERN =
-            Pattern.compile("^/topic/users\\.([0-9a-f-]{36})\\.(acks|errors|conversations)$");
+            Pattern.compile("^/topic/users\\.([0-9a-f-]{36})\\.(acks|errors|events)$");
 
     private StompDestinations() { }
 
@@ -41,7 +42,7 @@ public final class StompDestinations {
         return CONVERSATION_TOPIC + conversationId;
     }
 
-    /** Tópico privado do user; {@code kind} é {@code acks}, {@code errors} ou {@code conversations}. */
+    /** Tópico privado do user; {@code kind} é {@code acks}, {@code errors} ou {@code events}. */
     public static String userTopic(UUID userId, String kind) {
         return USER_TOPIC + userId + "." + kind;
     }
@@ -59,8 +60,8 @@ public final class StompDestinations {
     }
 
     /**
-     * Conversa do frame pelo destino ou pelo {@code conversationId} do corpo; {@code null} quando o frame
-     * não pertence a uma conversa (feedback privado no tópico do usuário).
+     * Conversa do frame pelo destino ou pelo {@code conversationId} do corpo; {@code null} quando o frame não pertence
+     * a uma conversa (feedback privado no tópico do usuário).
      */
     static String conversationId(Message<?> message) {
         String destination = SimpMessageHeaderAccessor.wrap(message).getDestination();

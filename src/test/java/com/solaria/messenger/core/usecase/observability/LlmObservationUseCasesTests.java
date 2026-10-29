@@ -36,8 +36,7 @@ class LlmObservationUseCasesTests {
 
     @Test
     void defaultsCostUsdToZeroWhenNotInformed() {
-        // Compatibilidade de rollout: versões antigas do ai-assistant ainda
-        // não mandam costUsd — não pode virar null no banco nem quebrar o ingest.
+        // costUsd é opcional: ausente vira 0.0, sem null no banco nem falha no ingest
         LlmObservabilityRequestDTO dto = requestDto();
         dto.setCostUsd(null);
 

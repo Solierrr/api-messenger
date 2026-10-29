@@ -13,6 +13,8 @@ import com.solaria.messenger.core.model.Message;
 import com.solaria.messenger.core.repository.MessageRepository;
 import com.solaria.messenger.core.security.rbac.RbacAuthorizationService;
 
+import static com.solaria.messenger.core.helper.PureRulesHelper.clampPageSize;
+
 /**
  * Caso de uso que lista o histórico de mensagens de uma conversa.
  *
@@ -41,8 +43,6 @@ import com.solaria.messenger.core.security.rbac.RbacAuthorizationService;
 @Service
 public class ListConversationMessagesUseCase {
 
-    private static final int DEFAULT_MESSAGE_PAGE_SIZE = 100;
-    private static final int MAX_MESSAGE_PAGE_SIZE = 500;
     private final MessageRepository messageRepository;
     private final RbacAuthorizationService rbac;
     private final ConversationAccessHelper access;
@@ -83,7 +83,7 @@ public class ListConversationMessagesUseCase {
             throw new InvalidFieldException("beforeSequence deve ser maior ou igual a um.");
         }
 
-        Limit pageLimit = Limit.of(clampMessagePageSize(limit));
+        Limit pageLimit = Limit.of(clampPageSize(limit));
         List<Message> messages;
         if (sinceSequence != null) {
             messages = messageRepository.findByConversationIdAndSequenceGreaterThanOrderBySequenceAscTimestampAsc(
@@ -99,13 +99,5 @@ public class ListConversationMessagesUseCase {
         return messages.stream()
                 .map(MessageMapper::toResponse)
                 .toList();
-    }
-
-    /** Limita a página entre 1 e 500, com 100 por padrão */
-    private int clampMessagePageSize(Integer requested) {
-        if (requested == null) {
-            return DEFAULT_MESSAGE_PAGE_SIZE;
-        }
-        return Math.clamp(requested, 1, MAX_MESSAGE_PAGE_SIZE);
     }
 }

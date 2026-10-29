@@ -12,8 +12,12 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * estado pessoal de um usuário em uma conversa: 
- * última leitura, silenciamento, arquivamento e baseline de admissão.
+ * estado pessoal de um usuário em uma conversa: última leitura, silenciamento, arquivamento, baseline de admissão e
+ * versão em que perdeu a participação.
+ *
+ * <p>{@code leftAtVersion} é nulo enquanto o usuário participa. Quando ele sai ou é removido, recebe a versão do
+ * relógio de sincronização daquele momento, e o catch-up devolve as mensagens da conversa até essa versão. Na
+ * readmissão o estado é reaproveitado e o campo é limpo.</p>
  *
  * <p>Principais operações disponibilizadas:</p>
  * <ul>
@@ -46,6 +50,9 @@ public class ConversationUserState {
 
     @Field("baseline_sequence")
     private Integer baselineSequence;
+
+    @Field("left_at_version")
+    private Long leftAtVersion;
 
     /** O baseline é dado de admissão persistido, nunca calculado por leitura tardia */
     public boolean hasValidBaseline() {

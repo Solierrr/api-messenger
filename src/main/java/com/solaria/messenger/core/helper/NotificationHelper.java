@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -25,7 +26,8 @@ import com.solaria.messenger.core.support.ConversationSyncClock;
  * Avisa os clientes sobre mudanças em conversas e mensagens.
  *
  * <p>
- * Monta a projeção da lista de conversas dentro da fronteira do guard e entrega fora dela. Antes de entregar,
+ * Monta a projeção da lista de conversas dentro da fronteira do guard e entrega fora dela. Os eventos de mensagem vão
+ * ao canal de eventos de cada participante autorizado, e os de conversa vão só ao destinatário. Antes de entregar,
  * confere a autorização de novo, para que quem perdeu acesso no caminho não receba. Falha na publicação só gera log,
  * porque a gravação já aconteceu.
  * </p>
@@ -35,7 +37,8 @@ import com.solaria.messenger.core.support.ConversationSyncClock;
  * </p>
  * <ul>
  *     <li>{@link ConversationRepository} -> carrega as conversas afetadas.</li>
- *     <li>{@link ConversationAccessHelper} -> carrega as comunidades e confere quem pode ver cada conversa.</li>
+ *     <li>{@link ConversationAccessHelper} -> carrega as comunidades e confere quem pode ver cada conversa e quem
+ *         recebe cada evento de mensagem.</li>
  *     <li>{@link ConversationProjectionHelper} -> monta os itens da lista.</li>
  *     <li>{@link ConversationSyncClock} -> fornece a versão do evento.</li>
  *     <li>{@link ConversationMutationGuard} -> garante que a entrega sai fora da fronteira local.</li>
@@ -186,33 +189,52 @@ public class NotificationHelper {
     // mensagem
 
     /**
-     * Avisa a criação de uma mensagem e atualiza a prévia e as não lidas da conversa.
+     * Avisa a criação de uma mensagem a cada participante autorizado e atualiza a prévia e as não lidas da conversa.
      *
      * @param message mensagem gravada.
      */
     public void notifyMessageCreated(Message message) {
-        messageEvents.messageCreated(message);
+        fanOut(message, messageEvents::messageCreated);
         publishConversationState(message.getConversationId());
     }
 
     /**
-     * Avisa a edição de uma mensagem e atualiza a prévia da conversa.
+     * Avisa a edição de uma mensagem a cada participante autorizado e atualiza a prévia da conversa.
      *
      * @param message mensagem editada.
      */
     public void notifyMessageEdited(Message message) {
-        messageEvents.messageEdited(message);
+        fanOut(message, messageEvents::messageEdited);
         publishConversationState(message.getConversationId());
     }
 
     /**
-     * Avisa a exclusão de uma mensagem e atualiza a prévia e as não lidas da conversa.
+     * Avisa a exclusão de uma mensagem a cada participante autorizado e atualiza a prévia e as não lidas da conversa.
      *
      * @param message mensagem excluída.
      */
     public void notifyMessageDeleted(Message message) {
-        messageEvents.messageDeleted(message);
+        fanOut(message, messageEvents::messageDeleted);
         publishConversationState(message.getConversationId());
+    }
+
+    /**
+     * Entrega o evento ao canal de cada participante autorizado, inclusive o autor.
+     *
+     * <p>
+     * Os destinatários saem de uma leitura nova da conversa, não da lista que existia no envio, para que quem perdeu
+     * acesso no caminho não receba. A mensagem já foi persistida, então uma falha aqui só gera log.
+     * </p>
+     */
+    private void fanOut(Message message, BiConsumer<Message, Set<UUID>> delivery) {
+        try {
+            Set<UUID> recipients = resources.authorizedParticipants(Set.of(message.getConversationId()))
+                    .getOrDefault(message.getConversationId(), Set.of());
+            if (!recipients.isEmpty()) delivery.accept(message, recipients);
+        } catch (RuntimeException publicationFailure) {
+            log.warn("Falha ao publicar evento da mensagem {} (conversationId={})", message.getId(),
+                    message.getConversationId(), publicationFailure);
+        }
     }
 
     /** A mensagem já foi persistida; uma falha ao invalidar a lista nunca vira erro do comando */

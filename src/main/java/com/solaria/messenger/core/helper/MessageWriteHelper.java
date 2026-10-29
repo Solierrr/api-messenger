@@ -27,6 +27,7 @@ import com.solaria.messenger.core.repository.ConversationRepository;
 import com.solaria.messenger.core.repository.MessageRepository;
 import com.solaria.messenger.core.security.rbac.RbacAuthorizationService;
 import com.solaria.messenger.core.support.ConversationMutationGuard;
+import com.solaria.messenger.core.support.ConversationSyncClock;
 
 import static com.solaria.messenger.core.helper.PureRulesHelper.requireConversationActive;
 
@@ -34,9 +35,10 @@ import static com.solaria.messenger.core.helper.PureRulesHelper.requireConversat
  * Grava, edita e exclui mensagens, com as regras de envio e de autoria.
  *
  * <p>
- * O envio usa a sequência alocada pelo repository. Edição e exclusão usam o contador {@code mutationEpoch} como CAS:
- * a escrita só vale se o contador ainda for o lido. Falha técnica com resultado incerto vira erro de persistência
- * incerta. Falha ao atualizar a última interação só gera log, porque a mensagem já foi gravada.
+ * O envio usa a sequência alocada pelo repository. Edição e exclusão usam o contador {@code mutationEpoch} como CAS: a
+ * escrita só vale se o contador ainda for o lido. Toda gravação leva o {@code changeVersion}, tirado do relógio de
+ * sincronização antes da escrita e gravado no mesmo insert ou CAS. Falha técnica com resultado incerto vira erro de
+ * persistência incerta. Falha ao atualizar a última interação só gera log, porque a mensagem já foi gravada.
  * </p>
  *
  * <p>
@@ -48,6 +50,7 @@ import static com.solaria.messenger.core.helper.PureRulesHelper.requireConversat
  *     <li>{@link RbacAuthorizationService} -> identifica o autor e confere a autoria.</li>
  *     <li>{@link ConversationAccessHelper} -> confere participação, conversa e comunidade.</li>
  *     <li>{@link ConversationMutationGuard} -> serializa a operação na JVM.</li>
+ *     <li>{@link ConversationSyncClock} -> fornece o {@code changeVersion} de cada gravação.</li>
  * </ul>
  *
  * <p>
@@ -69,24 +72,27 @@ public class MessageWriteHelper {
     private final RbacAuthorizationService rbac;
     private final ConversationAccessHelper access;
     private final ConversationMutationGuard guard;
+    private final ConversationSyncClock clock;
 
     public MessageWriteHelper(MessageRepository messages, ConversationRepository conversations,
-            RbacAuthorizationService rbac, ConversationAccessHelper access, ConversationMutationGuard guard) {
+            RbacAuthorizationService rbac, ConversationAccessHelper access, ConversationMutationGuard guard,
+            ConversationSyncClock clock) {
         this.messageRepository = messages;
         this.conversations = conversations;
         this.rbac = rbac;
         this.access = access;
         this.guard = guard;
+        this.clock = clock;
     }
 
     // envio
 
     /**
-     * Grava a mensagem com a próxima sequência e atualiza a última interação da conversa.
+     * Grava a mensagem com a próxima sequência e a versão de sincronização, e atualiza a última interação da conversa.
      *
      * @param conversation conversa da mensagem.
      * @param message mensagem a gravar.
-     * @return mensagem gravada, com a sequência alocada.
+     * @return mensagem gravada, com a sequência e o {@code changeVersion} alocados.
      * @throws MessageSendFailedException caso a sequência não possa ser alocada, a consulta falhe ou o banco rejeite a
      *     escrita. Traz o status e o código do erro.
      */
@@ -96,8 +102,19 @@ public class MessageWriteHelper {
         return saved;
     }
 
-    /** Insere com a próxima sequência; cada tipo de falha vira um erro com status e código próprios */
+    /**
+     * Carimba a versão e insere com a próxima sequência. Cada tipo de falha vira um erro com status e código próprios
+     */
     private Message append(Message message) {
+        // shortcut: a versão é alocada antes do insert e sem transação, então outro pod pode gravar uma versão maior
+        // antes desta; o buraco aparece na sequence da conversa e o cliente busca de novo, evoluir se isso virar rotina
+        try {
+            message.setChangeVersion(clock.nextVersion());
+        } catch (RuntimeException unavailable) {
+            throw sendFailure(message, HttpStatus.SERVICE_UNAVAILABLE, "DEPENDENCY_UNAVAILABLE",
+                    "Não foi possível obter a versão de sincronização; esta tentativa não inseriu mensagem.", unavailable);
+        }
+
         // só o repository repete em colisão de sequência; aqui nenhuma falha reinicia o envio
         try {
             return messageRepository.insertWithPersistedSequence(message);
@@ -191,16 +208,20 @@ public class MessageWriteHelper {
                 return new MessageMutationResult(current, false);
             }
 
-            // grava só se o epoch ainda for o lido
+            // grava só se o epoch ainda for o lido, com a versão da mudança no mesmo CAS
+            // shortcut: mesma janela do envio (versão alocada antes do CAS, sem transação), mas edição e exclusão não deixam
+            // buraco na sequence; só o evento ao vivo cobre a corrida, evoluir junto com o envio
             long epoch = current.getMutationEpoch();
             long nextEpoch = Math.addExact(epoch, 1);
+            long version = clock.nextVersion();
             long modified = delete
-                    ? messageRepository.deleteIfCurrent(messageId, conversation.getId(), actor, epoch, nextEpoch)
-                    : messageRepository.editIfCurrent(messageId, conversation.getId(), actor, epoch, content, nextEpoch);
+                    ? messageRepository.deleteIfCurrent(messageId, conversation.getId(), actor, epoch, nextEpoch, version)
+                    : messageRepository.editIfCurrent(messageId, conversation.getId(), actor, epoch, content, nextEpoch, version);
             if (modified != 1) throw new MessageMutationNotAppliedException();
 
             // reflete a gravação no objeto em memória para a resposta
             current.setMutationEpoch(nextEpoch);
+            current.setChangeVersion(version);
             applyInMemory(current, content, delete);
             return new MessageMutationResult(current, true);
         });

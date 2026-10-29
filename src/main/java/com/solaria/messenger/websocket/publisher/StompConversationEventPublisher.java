@@ -15,7 +15,8 @@ import com.solaria.messenger.websocket.dto.response.WsEventEnvelope;
 import com.solaria.messenger.websocket.security.StompDestinations;
 
 /**
- * Entrega o estado das conversas no tópico privado {@code /topic/users.{userId}.conversations} de cada destinatário.
+ * Entrega o estado das conversas ({@code CONVERSATION_UPDATED} e {@code CONVERSATION_REMOVED}) no tópico privado
+ * {@code /topic/users.{userId}.events} de cada destinatário, o mesmo dos eventos {@code MESSAGE_*}.
  */
 @Component
 public class StompConversationEventPublisher implements ConversationEventPublisher {
@@ -46,7 +47,7 @@ public class StompConversationEventPublisher implements ConversationEventPublish
     /** O comando já persistiu; uma falha de entrega não repete nem desfaz a escrita. */
     private void send(UUID recipient, WsEventEnvelope event) {
         try {
-            messaging.convertAndSend(StompDestinations.userTopic(recipient, "conversations"), event);
+            messaging.convertAndSend(StompDestinations.userTopic(recipient, "events"), event);
         } catch (RuntimeException failure) {
             log.warn("Falha ao publicar evento de conversa (eventId={}, type={})", event.getEventId(), event.getType(), failure);
         }

@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 import com.solaria.messenger.core.exception.GroupManagerUnavailableException;
+import com.solaria.messenger.core.helper.ConversationStateHelper;
 import com.solaria.messenger.core.helper.GroupHelper;
 import com.solaria.messenger.core.helper.NotificationHelper;
 import com.solaria.messenger.core.helper.UserAccessHelper;
@@ -23,7 +24,8 @@ import static com.solaria.messenger.core.helper.PureRulesHelper.withoutUser;
  * <p>
  * Remover outra pessoa exige ser o gestor do grupo. Sair por conta própria exige só participar, mesmo com o grupo
  * arquivado. Quando o gestor sai, o sucessor informado assume a gestão. Um grupo que fica vazio fica sem gestor. Depois
- * da remoção, o user removido recebe o aviso e suas sessões são derrubadas.
+ * da remoção, o estado pessoal do user removido recebe a versão da saída, ele recebe o aviso e suas sessões são
+ * derrubadas.
  * </p>
  *
  * <p>
@@ -33,6 +35,7 @@ import static com.solaria.messenger.core.helper.PureRulesHelper.withoutUser;
  *     <li>{@link RbacAuthorizationService} -> identifica o ator.</li>
  *     <li>{@link UserAccessHelper} -> confere o ator e o sucessor.</li>
  *     <li>{@link SessionRevoker} -> derruba as sessões do user removido.</li>
+ *     <li>{@link ConversationStateHelper} -> marca a versão em que o user perdeu a conversa.</li>
  *     <li>{@link GroupHelper} -> valida a remoção e grava os participantes.</li>
  *     <li>{@link NotificationHelper} -> avisa o user removido e os clientes.</li>
  *     <li>{@link ConversationMutationGuard} -> serializa a operação na JVM.</li>
@@ -51,16 +54,18 @@ public class RemoveGroupParticipantUseCase {
     private final RbacAuthorizationService rbac;
     private final UserAccessHelper users;
     private final SessionRevoker sessionRevoker;
+    private final ConversationStateHelper states;
     private final GroupHelper groups;
     private final NotificationHelper notifications;
     private final ConversationMutationGuard guard;
 
     public RemoveGroupParticipantUseCase(RbacAuthorizationService rbac, UserAccessHelper users,
-            SessionRevoker sessionRevoker, GroupHelper groups, NotificationHelper notifications,
-            ConversationMutationGuard guard) {
+            SessionRevoker sessionRevoker, ConversationStateHelper states, GroupHelper groups,
+            NotificationHelper notifications, ConversationMutationGuard guard) {
         this.rbac = rbac;
         this.users = users;
         this.sessionRevoker = sessionRevoker;
+        this.states = states;
         this.groups = groups;
         this.notifications = notifications;
         this.guard = guard;
@@ -104,8 +109,9 @@ public class RemoveGroupParticipantUseCase {
                     return groups.writeParticipants(latest, survivors, manager);
                 });
 
-                // avisa quem saiu e derruba as sessões dele
+                // marca a versão da saída, avisa quem saiu e derruba as sessões dele
                 changed[0] = true;
+                states.markLeft(userId, id);
                 notifications.publishRemovedConversation(userId, id);
                 sessionRevoker.revokeUser(userId);
                 return null;
