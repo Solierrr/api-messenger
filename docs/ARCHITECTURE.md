@@ -63,7 +63,7 @@ O cliente assina `.events` antes de chamar `GET /messaging/updates`. O tópico `
 │   │   │   ├── core/                      # regra de negócio, sem dependência de rest/ ou websocket/
 │   │   │   │   ├── contract/              # DTOs de entrada/saída (request, response)
 │   │   │   │   ├── exception/
-│   │   │   │   ├── integration/           # clientes: auth/, core/ (api-core), user/
+│   │   │   │   ├── integration/           # clientes: auth/, core/ (api-core), notify/ (api-notify), user/
 │   │   │   │   ├── mapper/
 │   │   │   │   ├── model/                 # documents Mongo (+ enums)
 │   │   │   │   ├── observability/
@@ -93,7 +93,11 @@ O cliente assina `.events` antes de chamar `GET /messaging/updates`. O tópico `
 
 ## Divisão em `core`, `rest` e `websocket`
 
-O código segue o estilo de portas e adaptadores: `core/` concentra modelo, repositórios e casos de uso e **não importa** `rest/` nem `websocket/`. `rest/` e `websocket/` são adaptadores de entrada que chamam os serviços de `core/`; o `websocket/` implementa as portas de saída em `core/service/port` (publicação de eventos e revogação de sessão).
+O código segue o estilo de portas e adaptadores: `core/` concentra modelo, repositórios e casos de uso e **não importa** `rest/` nem `websocket/`. `rest/` e `websocket/` são adaptadores de entrada que chamam os serviços de `core/`; o `websocket/` implementa as portas de saída em `core/port` (publicação de eventos, revogação de sessão e presença online).
+
+## Push para quem está offline
+
+Depois de gravar uma mensagem de conversa `DIRECT` ou `GROUP`, o `OfflineMessageNotifier` (`core/helper`, acionado pelo `SendUserMessageUseCase`) agenda, numa fila limitada fora da requisição, um `POST /internal/notifications` no `api-notify` (`type=NEW_MESSAGE`, prévia de até 100 caracteres, `data` com `conversationId` e `messageId`) para cada participante autorizado que não é o remetente, não está online (presença do Redis; sem Redis vale a visão do pod) e não silenciou nem arquivou a conversa. Conversas `CHAT_BOT` não geram push. A falha do `api-notify` só gera log e nunca afeta o envio. Fica desligado sem `NOTIFY_BASE_URL`; usa `SERVICE_KEY_API_MESSENGER` (ou `SERVICE_KEY`) no header `X-Service-Key`.
 
 Referências consultadas:
 - [Hexagonal architecture: ports and adapters (Netguru)](https://www.netguru.com/blog/hexagonal-architecture-ports-adapters-guide)
