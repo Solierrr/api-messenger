@@ -1,5 +1,7 @@
 package com.solaria.messenger.core.helper;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -9,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataRetrievalFailureException;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -73,16 +76,18 @@ public class MessageWriteHelper {
     private final ConversationAccessHelper access;
     private final ConversationMutationGuard guard;
     private final ConversationSyncClock clock;
+    private final Duration mutationWindow;
 
     public MessageWriteHelper(MessageRepository messages, ConversationRepository conversations,
             RbacAuthorizationService rbac, ConversationAccessHelper access, ConversationMutationGuard guard,
-            ConversationSyncClock clock) {
+            ConversationSyncClock clock, @Value("${app.messages.mutation-window:PT30M}") Duration mutationWindow) {
         this.messageRepository = messages;
         this.conversations = conversations;
         this.rbac = rbac;
         this.access = access;
         this.guard = guard;
         this.clock = clock;
+        this.mutationWindow = mutationWindow;
     }
 
     // envio
@@ -169,8 +174,9 @@ public class MessageWriteHelper {
      * @param delete {@code true} para excluir, {@code false} para editar.
      * @return resultado com a mensagem e a indicação de alteração efetiva.
      * @throws ResourceNotFoundException caso a mensagem não exista.
-     * @throws BusinessRuleException caso a conversa seja do tipo CHAT_BOT, esteja inativa, ou a mensagem excluída seja
-     *     editada.
+     * @throws BusinessRuleException caso a conversa seja do tipo CHAT_BOT, esteja inativa, a mensagem excluída seja
+     *     editada, ou o prazo de {@code app.messages.mutation-window} (30 min por padrão) desde o envio tenha acabado.
+     *     Repetir um pedido já aplicado continua valendo fora do prazo.
      * @throws MessageMutationNotAppliedException caso o CAS não aplique em todas as tentativas.
      * @throws MessageMutationUncertainException caso falha técnica deixe incerto se a mudança foi gravada.
      */
@@ -207,6 +213,9 @@ public class MessageWriteHelper {
             if (delete ? current.isDeleted() : Objects.equals(current.getContent(), content)) {
                 return new MessageMutationResult(current, false);
             }
+
+            // só a mudança efetiva é limitada pela janela; repetir um pedido já aplicado continua valendo
+            requireInsideMutationWindow(current);
 
             // grava só se o epoch ainda for o lido, com a versão da mudança no mesmo CAS
             // shortcut: mesma janela do envio (versão alocada antes do CAS, sem transação), mas edição e exclusão não deixam
@@ -258,6 +267,14 @@ public class MessageWriteHelper {
         } else {
             message.setContent(content);
             message.setEdited(true);
+        }
+    }
+
+    /** Recusa a mudança quando o prazo para editar ou excluir já passou; mensagem sem carimbo de tempo não expira */
+    private void requireInsideMutationWindow(Message message) {
+        Instant sentAt = message.getTimestamp();
+        if (sentAt != null && Instant.now().isAfter(sentAt.plus(mutationWindow))) {
+            throw new BusinessRuleException("O prazo para editar ou excluir esta mensagem acabou.");
         }
     }
 

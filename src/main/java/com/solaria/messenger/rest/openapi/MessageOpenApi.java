@@ -47,7 +47,7 @@ public interface MessageOpenApi {
             @ApiResponse(responseCode = "403", description = "Ator sem acesso ou autoria"),
             @ApiResponse(responseCode = "404", description = "Mensagem ou conversa inexistente"),
             @ApiResponse(responseCode = "409", description = "Mutação concorrente impediu confirmar a escrita"),
-            @ApiResponse(responseCode = "422", description = "Estado da mensagem ou conversa impede edição"),
+            @ApiResponse(responseCode = "422", description = "Estado da mensagem ou conversa impede edição, ou o prazo de edição (30 min por padrão) acabou"),
             @ApiResponse(responseCode = "503", description = "Não foi possível confirmar a mutação; consulte o estado atual antes de repetir")
     })
     ResponseEntity<MessageResponseDTO> editMessage(String id, MessageEditRequestDTO dto);
@@ -60,7 +60,7 @@ public interface MessageOpenApi {
             @ApiResponse(responseCode = "403", description = "Ator sem acesso ou autoria"),
             @ApiResponse(responseCode = "404", description = "Mensagem ou conversa inexistente"),
             @ApiResponse(responseCode = "409", description = "Mutação concorrente impediu confirmar a escrita"),
-            @ApiResponse(responseCode = "422", description = "Estado da conversa impede exclusão"),
+            @ApiResponse(responseCode = "422", description = "Estado da conversa impede exclusão, ou o prazo de exclusão (30 min por padrão) acabou"),
             @ApiResponse(responseCode = "503", description = "Não foi possível confirmar a mutação; consulte o estado atual antes de repetir")
     })
     ResponseEntity<MessageResponseDTO> deleteMessage(String id);
