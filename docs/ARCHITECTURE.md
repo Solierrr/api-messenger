@@ -8,8 +8,7 @@ O `api-messenger` segue uma arquitetura em camadas típica de um serviço Spring
   </a>
 </p>
 
-- **Duas `SecurityFilterChain` independentes e segregadas por `@Order`** (`SecurityConfig`), documentado no próprio código-fonte: a chain `@Order(1)` cobre só `/internal/**`, autentica via token de serviço M2M HS256 (`ServiceTokenAuthFilter` + `ServiceTokenProvider`, segredo compartilhado `SERVICE_JWT_SECRET`); a chain `@Order(2)` cobre o restante das rotas, um resource server OAuth2 RS256 clássico que valida o JWT de usuário emitido pelo `api-auth` via JWKS (`app.jwt.jwk-set-uri`). O mesmo padrão de duas chains é usado no `api-core`, segundo o comentário da classe.
-- **Emissão de token de serviço própria** (`ServiceAuthController`, `ServiceTokenProvider`, `ServiceTokenProperties`), o serviço não delega a emissão do token M2M a nenhum outro repositório: `POST /internal/service-tokens` minta um par access+refresh token a partir de um `clientSecret` compartilhado (`SERVICE_CLIENT_SECRET`), comparado em tempo constante (`MessageDigest.isEqual`); `POST /internal/service-tokens/refresh` troca um refresh token válido por um novo access token.
+- **Duas `SecurityFilterChain` segregadas por `@Order`** (`SecurityConfig`): a chain `@Order(1)` cobre só `/internal/**` com `permitAll`, protegida pela rede (o Kong não roteia esse prefixo); a chain `@Order(2)` cobre o restante das rotas, um resource server OAuth2 RS256 que valida o JWT de usuário emitido pelo `api-auth` via JWKS (`app.jwt.jwk-set-uri`).
 - **RBAC por ownership, não por permissão** (`RbacAuthorizationService`), diferente de serviços com RBAC baseado em papéis/permissões — aqui a autorização é sempre "o usuário autenticado é dono/participante do recurso?", resolvida a partir da claim `sub` (`authId`) do JWT de usuário. `requireParticipant` cobre tanto conversas usuário-a-usuário (remetente ou destinatário) quanto conversas com o chatbot (o próprio usuário).
 - **Duas origens para o mesmo agregado de mensagem** (`MessageService`), mensagens humanas entram por `POST /messaging/messages` (autenticado por JWT de usuário, valida participação na conversa), enquanto respostas do chatbot entram por `POST /internal/messages` (autenticado por token de serviço, chamado pelo pipeline de LLM) — o serviço rejeita explicitamente `messageType=CHATBOT_TO_USER` vindo da rota de usuário, forçando essa origem a passar sempre pela rota interna.
 - **Observabilidade de LLM como cidadão de primeira classe** (`LlmObservabilityController`/`LlmObservabilityService`, coleção `llm_observability`), cada etapa do pipeline de IA (`LLM_CALL` ou `TOOL_CALL`) é registrada com nó (`node`), ordem do passo, modelo usado, tokens de entrada/saída/total, latência e status de erro — dados publicados via `POST /internal/observability` e consultáveis por `conversationId`, `node` ou `status`. `MessageMetadata` (campos `specialistsUsed`, `workflowSteps`, `turnId`) reforça que o pipeline de IA é multi-agente/multi-etapa.
@@ -27,15 +26,24 @@ O `api-messenger` segue uma arquitetura em camadas típica de um serviço Spring
 - `GET /messaging/conversations/me`, lista as conversas do usuário autenticado.
 - `POST /messaging/messages`, envia uma mensagem humana em uma conversa existente.
 - `GET /messaging/messages/conversation/{conversationId}`, lista as mensagens de uma conversa (exige ser participante).
+- `GET /messaging/updates?since={versão}&limit={n}`, catch-up de mensagens. Devolve o estado atual das mensagens com `changeVersion` maior que `since`. Entram as conversas que o usuário lê hoje e as que ele perdeu depois de `since`. Nas conversas perdidas, só vão as mensagens até a versão da saída. A resposta é `{ syncEpoch, cursor, hasMore, messages }`. Sem `since`, devolve só o ponto de partida.
 - `POST /messaging/ratings`, `GET /messaging/ratings/{id}`, `GET /messaging/ratings/evaluated/{evaluatedId}`, `GET /messaging/ratings/evaluator/{evaluatorId}`, `PATCH /messaging/ratings/{id}`, `PATCH /messaging/ratings/{id}/status`, ciclo de vida de avaliações (`RatingType.PROFISSIONAL`/`PRODUTO`) entre avaliador e avaliado.
 
-### `/internal/**` — autenticado por token de serviço M2M
+### `/internal/**` — sem autenticação de aplicação, isolado pela rede
 
-- `POST /internal/service-tokens`, minta um par access+refresh token de serviço a partir de `clientSecret`.
-- `POST /internal/service-tokens/refresh`, troca um refresh token válido por um novo access token.
 - `POST /internal/messages`, ingestão de mensagens do chatbot (`CHATBOT_TO_USER`) publicadas pelo pipeline de LLM.
 - `POST /internal/observability`, ingestão de um passo de observabilidade (`LLM_CALL`/`TOOL_CALL`).
 - `GET /internal/observability/{id}`, `GET /internal/observability`, consulta de observabilidade por id ou por filtro (`conversationId`, `node`, `status`).
+
+### Tempo real (STOMP)
+
+O broker é o RabbitMQ em modo relay, e os destinos usam `.` como separador.
+
+- `/topic/users.{userId}.events` leva os eventos duráveis do usuário. Só o dono assina. Recebe `MESSAGE_CREATED`, `MESSAGE_EDITED` e `MESSAGE_DELETED` de todas as conversas em que ele participa, inclusive das mensagens que ele mesmo enviou. Recebe também `CONVERSATION_UPDATED` e `CONVERSATION_REMOVED`. O payload de `MESSAGE_*` é o `MessageResponseDTO`, com `changeVersion`.
+- `/topic/users.{userId}.acks` e `/topic/users.{userId}.errors` levam a confirmação do envio e os erros. Só o dono assina.
+- `/topic/conversations.{id}` leva presença, digitação e `PRESENCE_SNAPSHOT`. Só participantes assinam. O tópico não leva mais `MESSAGE_*`.
+
+O cliente assina `.events` antes de chamar `GET /messaging/updates`. O tópico `/topic/users.{userId}.conversations` não existe mais.
 
 ```Tree do Repositório
 ├── .github/

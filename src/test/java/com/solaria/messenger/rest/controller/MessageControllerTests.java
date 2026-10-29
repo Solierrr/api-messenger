@@ -77,8 +77,7 @@ class MessageControllerTests {
 
     @Test
     void sendMessageResponseHasNoLocationHeader() throws Exception {
-        // F-17: sem GET por id de mensagem, o header antigo apontava para uma rota inexistente
-        // (e resolveria via Kong para o serviço errado) - a resposta não deve ter Location.
+        // não existe GET por id de mensagem, então a resposta não leva Location
         given(sendMessage.execute(any(MessageRequestDTO.class)))
                 .willReturn(messageResponse(MessageType.USER_TO_GROUP));
 
@@ -100,7 +99,7 @@ class MessageControllerTests {
 
     @Test
     void acceptsMessageWithoutRole() throws Exception {
-        // F-21: role é derivado no servidor - o campo deixou de ser @NotBlank no DTO.
+        // role é opcional no DTO: o servidor define o valor
         given(sendMessage.execute(any(MessageRequestDTO.class)))
                 .willReturn(messageResponse(MessageType.USER_TO_USER));
 

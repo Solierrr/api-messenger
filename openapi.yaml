@@ -746,7 +746,9 @@ paths:
       - Mensagens
       summary: Envia uma mensagem de uma pessoa numa conversa existente
       description: 'O messageType precisa combinar com o tipo da conversa: DIRECT -> USER_TO_USER, GROUP -> USER_TO_GROUP,
-        CHAT_BOT -> USER_TO_CHATBOT. CHATBOT_TO_USER é recusado.'
+        CHAT_BOT -> USER_TO_CHATBOT. CHATBOT_TO_USER é recusado. O evento WS MESSAGE_CREATED correspondente vai ao tópico
+        /topic/users.{userId}.events de cada participante, inclusive o autor, e é best-effort: ao (re)conectar, o cliente
+        recupera o que perdeu com GET /messaging/updates.'
       operationId: sendMessage
       requestBody:
         content:
@@ -1031,6 +1033,48 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RatingResponseDTO'
+      security:
+      - bearerAuth: []
+  /messaging/updates:
+    get:
+      tags:
+      - Mensagens
+      summary: Devolve as mensagens que mudaram depois de uma versão (catch-up)
+      description: Sem since, devolve só o ponto de partida. O cursor é a versão atual do relógio e messages vem vazio. Com
+        since, devolve o estado atual das mensagens com changeVersion maior que since, em ordem crescente de changeVersion.
+        A resposta traz mensagens novas, editadas e excluídas (tombstone) das conversas que o usuário lê hoje e das que
+        perdeu depois de since. Nas conversas perdidas, só entram as mensagens até a versão da saída. Para a lista de
+        conversas, use GET /messaging/conversations/me. O cursor é o maior changeVersion devolvido, ou o since recebido
+        quando não há mensagens. Com hasMore verdadeiro, repita a chamada com since igual ao cursor. Se syncEpoch for
+        diferente da época guardada, refaça a sincronização completa. Para não perder eventos, assine
+        /topic/users.{userId}.events antes de chamar.
+      operationId: getUpdates
+      parameters:
+      - name: since
+        in: query
+        description: Versão exclusiva, maior ou igual a zero. Devolve as mensagens com changeVersion maior que ela. Ausente
+          devolve só o ponto de partida.
+        required: false
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      - name: limit
+        in: query
+        description: Tamanho máximo da página. Ausente usa 100; valores fora de 1–500 são ajustados.
+        required: false
+        schema:
+          type: integer
+          format: int32
+      responses:
+        '200':
+          description: Página de mudanças retornada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageUpdatesResponseDTO'
+        '400':
+          description: INVALID_FIELD quando since é negativo. Um since não numérico também devolve 400.
       security:
       - bearerAuth: []
 components:
@@ -1447,6 +1491,31 @@ components:
         sequence:
           type: integer
           format: int32
+        changeVersion:
+          type: integer
+          format: int64
+          description: Versão da última mudança da mensagem (envio, edição ou exclusão). O cliente mantém a de maior valor.
+            Vale 0 em mensagem legada sem carimbo.
+    MessageUpdatesResponseDTO:
+      type: object
+      description: Resultado do catch-up de mensagens. O cliente guarda o cursor e o devolve como since na próxima chamada.
+      properties:
+        syncEpoch:
+          type: string
+          description: Época do relógio de sincronização. Se for diferente da guardada pelo cliente, ele refaz a sincronização
+            completa.
+        cursor:
+          type: integer
+          format: int64
+          description: Maior changeVersion devolvido. Sem mensagens, é o since recebido. Sem since, é a versão atual do relógio.
+        hasMore:
+          type: boolean
+          description: Verdadeiro quando ainda há mensagens depois do cursor.
+        messages:
+          type: array
+          description: Mensagens alteradas depois do since, em ordem crescente de changeVersion.
+          items:
+            $ref: '#/components/schemas/MessageResponseDTO'
     ParticipantsRequestDTO:
       type: object
       properties:

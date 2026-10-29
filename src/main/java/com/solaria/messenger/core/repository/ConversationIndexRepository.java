@@ -26,7 +26,10 @@ public class ConversationIndexRepository {
         this.mongo = mongo;
     }
 
-    /** Cria a unicidade nova da direta antes de remover o índice legado, e garante o índice de estados pessoais. */
+    /**
+     * Garante a unicidade da direta ({@code uq_direct_pair}) e o índice de estados pessoais, e remove
+     * {@code uq_direct_active_direct_key} se existir.
+     */
     @PostConstruct
     public void prepareIndexes() {
         var indexes = mongo.indexOps(Conversation.class);
@@ -36,7 +39,7 @@ public class ConversationIndexRepository {
                 || !"direct_key".equals(old.get().getIndexFields().getFirst().getKey()))) {
             throw new IllegalStateException("O índice legado de direta tem uma definição inesperada.");
         }
-        // Criar a restrição nova primeiro: duplicatas existentes impedem iniciar, sem excluir ou mesclar dados.
+        // cria a restrição antes do drop: duplicatas existentes impedem iniciar, sem excluir ou mesclar dados
         indexes.createIndex(new Index().on("direct_key", Sort.Direction.ASC).unique().named("uq_direct_pair")
                 .partial(PartialIndexFilter.of(Criteria.where("conversation_type").is("DIRECT"))));
         if (old.isPresent()) indexes.dropIndex(LEGACY_DIRECT_INDEX);

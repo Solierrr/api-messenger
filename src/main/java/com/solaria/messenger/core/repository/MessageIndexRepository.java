@@ -13,7 +13,10 @@ import com.solaria.messenger.core.model.Message;
 
 import jakarta.annotation.PostConstruct;
 
-/** Retira somente o índice antigo de deduplicação; dados e unicidade de sequência permanecem. */
+/**
+ * Remove o índice de deduplicação {@code sender_client_message_id_idx}, se existir; dados e unicidade de sequência
+ * permanecem.
+ */
 @Repository
 public class MessageIndexRepository {
 
@@ -26,7 +29,9 @@ public class MessageIndexRepository {
         this.mongo = mongo;
     }
 
-    /** Remover a anotação não exclui índices existentes; uma incompatibilidade impede iniciar com dedup ativa */
+    /**
+     * O índice pode existir no banco sem anotação no modelo; uma definição inesperada impede iniciar com dedup ativa
+     */
     @PostConstruct
     public void removeLegacyDeduplicationIndex() {
         if (!mongo.collectionExists(Message.class)) return;

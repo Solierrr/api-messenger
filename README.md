@@ -1,6 +1,6 @@
 # Finalidade do repositório
 
-O `api-messenger` é o serviço de mensageria da Solaria, responsável por armazenar e servir todo o histórico de conversas trocadas na plataforma — tanto conversas usuário-a-usuário quanto conversas usuário-a-chatbot atendidas pelo pipeline de LLM. O serviço modela conversas e mensagens sobre MongoDB, expõe endpoints protegidos por JWT de usuário (emitido pelo `api-auth`) para o fluxo humano, e uma rota interna autenticada por token de serviço M2M para que o pipeline de IA (`ai-assistant`) publique respostas do chatbot e registre observabilidade de cada chamada de LLM/ferramenta (tokens consumidos, latência, especialistas acionados). Também centraliza avaliações (ratings) de profissionais e produtos vinculadas às conversas.
+O `api-messenger` é o serviço de mensageria da Solaria, responsável por armazenar e servir todo o histórico de conversas trocadas na plataforma — tanto conversas usuário-a-usuário quanto conversas usuário-a-chatbot atendidas pelo pipeline de LLM. O serviço modela conversas e mensagens sobre MongoDB, expõe endpoints protegidos por JWT de usuário (emitido pelo `api-auth`) para o fluxo humano, e uma rota interna, isolada pela rede, para que o pipeline de IA (`ai-assistant`) publique respostas do chatbot e registre observabilidade de cada chamada de LLM/ferramenta (tokens consumidos, latência, especialistas acionados). Também centraliza avaliações (ratings) de profissionais e produtos.
 
 <p>
 

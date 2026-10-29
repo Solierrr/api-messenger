@@ -10,24 +10,11 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
-/**
- * Contrato Swagger/OpenAPI da publicação de mensagens do chatbot, em {@code /internal/messages}.
- *
- * <p>Documenta a ingestão interna da resposta do bot. A implementação fica em
- * {@link com.solaria.messenger.rest.controller.ChatbotMessageController}.</p>
- *
- * <p>Principais operações disponibilizadas:</p>
- * <ul>
- *     <li>{@link #ingestChatbotMessage(ChatbotMessageRequestDTO)} - publica a resposta do bot numa conversa existente.</li>
- * </ul>
- */
 @Tag(
     name = "Mensagens do chatbot (interno)",
     description = "Publicação da resposta do bot numa conversa. Endpoint interno, em /internal/messages, alcançável apenas pela rede interna (nunca via Kong)."
 )
 public interface ChatbotMessageOpenApi {
-
-    /** Contrato OpenAPI: publica a resposta do bot numa conversa existente. */
     @Operation(
         summary = "Publica a resposta do bot numa conversa existente",
         description = "messageType é sempre CHATBOT_TO_USER e role sempre \"assistant\". A conversa "
