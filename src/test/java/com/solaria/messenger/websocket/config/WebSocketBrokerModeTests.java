@@ -15,7 +15,6 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.messaging.simp.broker.SimpleBrokerMessageHandler;
 import org.springframework.messaging.simp.stomp.StompBrokerRelayMessageHandler;
 
-/** Sobe o contexto nos dois modos de broker e confere qual handler STOMP foi montado. */
 class WebSocketBrokerModeTests {
 
     @Nested
