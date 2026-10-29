@@ -11,6 +11,7 @@ import com.solaria.messenger.core.exception.InvalidFieldException;
 import com.solaria.messenger.core.helper.ConversationAccessHelper;
 import com.solaria.messenger.core.helper.MessageWriteHelper;
 import com.solaria.messenger.core.helper.NotificationHelper;
+import com.solaria.messenger.core.helper.OfflineMessageNotifier;
 import com.solaria.messenger.core.model.Conversation;
 import com.solaria.messenger.core.model.Message;
 import com.solaria.messenger.core.model.enums.ConversationType;
@@ -38,6 +39,7 @@ import static com.solaria.messenger.core.mapper.MessageMapper.toResponse;
  *     <li>{@link ConversationAccessHelper} -> confere a participação e a comunidade.</li>
  *     <li>{@link MessageWriteHelper} -> grava a mensagem e atualiza a última interação.</li>
  *     <li>{@link NotificationHelper} -> avisa a criação da mensagem.</li>
+ *     <li>{@link OfflineMessageNotifier} -> agenda o push a quem está offline.</li>
  *     <li>{@link ConversationMutationGuard} -> serializa a operação na JVM.</li>
  * </ul>
  *
@@ -56,14 +58,17 @@ public class SendUserMessageUseCase {
     private final ConversationAccessHelper access;
     private final MessageWriteHelper writes;
     private final NotificationHelper notifications;
+    private final OfflineMessageNotifier offlineNotifier;
     private final ConversationMutationGuard guard;
 
     public SendUserMessageUseCase(RbacAuthorizationService rbac, ConversationAccessHelper access,
-            MessageWriteHelper writes, NotificationHelper notifications, ConversationMutationGuard guard) {
+            MessageWriteHelper writes, NotificationHelper notifications, OfflineMessageNotifier offlineNotifier,
+            ConversationMutationGuard guard) {
         this.rbac = rbac;
         this.access = access;
         this.writes = writes;
         this.notifications = notifications;
+        this.offlineNotifier = offlineNotifier;
         this.guard = guard;
     }
 
@@ -86,6 +91,7 @@ public class SendUserMessageUseCase {
                 conversation -> sendAuthorized(conversation, dto, clientMessageId)));
 
         notifications.notifyMessageCreated(saved);
+        offlineNotifier.notifyOffline(saved);
         return toResponse(saved);
     }
 
