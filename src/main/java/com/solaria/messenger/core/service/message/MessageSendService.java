@@ -54,16 +54,19 @@ public class MessageSendService {
     private final MessageChangeNotifier messageChangeNotifier;
     private final ConversationAuthorizationService resourceAccess;
     private final ConversationMutationGuard guard;
+    private final OfflineMessageNotifier offlineNotifier;
 
     public MessageSendService(MessageRepository messages, ConversationRepository conversations,
             RbacAuthorizationService rbac, MessageChangeNotifier notifier,
-            ConversationAuthorizationService authorization, ConversationMutationGuard guard) {
+            ConversationAuthorizationService authorization, ConversationMutationGuard guard,
+            OfflineMessageNotifier offlineNotifier) {
         this.messageRepository = messages;
         this.conversations = conversations;
         this.rbac = rbac;
         this.messageChangeNotifier = notifier;
         this.resourceAccess = authorization;
         this.guard = guard;
+        this.offlineNotifier = offlineNotifier;
     }
 
     /** Grava a mensagem do user; cada chamada é um insert novo, nunca reaproveita um anterior */
@@ -78,6 +81,7 @@ public class MessageSendService {
                 conversation -> sendUserMessageAuthorized(conversation, dto, clientMessageId)));
 
         messageChangeNotifier.notifyCreated(saved);
+        offlineNotifier.notifyOffline(saved);
         return toResponse(saved);
     }
 
