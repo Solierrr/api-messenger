@@ -33,7 +33,6 @@ import com.solaria.messenger.core.service.UserAccessService;
 import com.solaria.messenger.websocket.dto.response.WsEventEnvelope;
 import com.solaria.messenger.websocket.security.StompDestinations;
 
-/** Conecta por WebSocket real com o relay desligado e confere que o broker em memória entrega o evento ao assinante. */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "app.broker.enabled=false")
 class SimpleBrokerDeliveryTests {
 

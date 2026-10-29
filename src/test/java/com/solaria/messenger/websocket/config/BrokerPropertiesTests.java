@@ -8,7 +8,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
 
-/** Cobre o default do relay: ligado só com host ou com a flag explícita, e a flag sempre prevalece. */
 class BrokerPropertiesTests {
 
     @Configuration
