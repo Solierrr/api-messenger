@@ -29,6 +29,7 @@ import com.solaria.messenger.core.helper.ConversationAccessHelper;
  *     <li>prefixo {@code /app} para destinos de comando;</li>
  *     <li>autenticação real do CONNECT via {@link StompAuthChannelInterceptor};</li>
  *     <li>broker externo: relay STOMP para o RabbitMQ, que entrega os eventos a todos os pods;</li>
+ *     <li>sem relay habilitado ({@code app.broker.enabled}), broker em memória do Spring, válido para um pod só (QA);</li>
  *     <li>Kong derruba conexões ociosas após ~60s, e o heartbeat 10s/10s pedido pelo cliente é negociado com o
  *         RabbitMQ.</li>
  * </ul>
@@ -65,9 +66,22 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     /**
      * Relay de /topic para o RabbitMQ, prefixo /app e ordem de publicação preservada.
      * O RabbitMQ recusa '/' depois de /topic, por isso os destinos usam '.' (ver {@code StompDestinations}).
+     * Com o relay desligado, o broker em memória atende os mesmos destinos e negocia o mesmo heartbeat de 10s.
      */
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
+        if (broker.enabled()) {
+            enableRelay(registry);
+        } else {
+            registry.enableSimpleBroker("/topic")
+                    .setHeartbeatValue(new long[] { 10_000, 10_000 })
+                    .setTaskScheduler(heartbeatTaskScheduler());
+        }
+        registry.setApplicationDestinationPrefixes("/app");
+        registry.setPreservePublishOrder(true);
+    }
+
+    private void enableRelay(MessageBrokerRegistry registry) {
         registry.enableStompBrokerRelay("/topic")
                 .setRelayHost(broker.host())
                 .setRelayPort(broker.stompPort())
@@ -78,8 +92,6 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 .setSystemLogin(broker.login())
                 .setSystemPasscode(broker.passcode())
                 .setAutoStartup(broker.autoStartup());
-        registry.setApplicationDestinationPrefixes("/app");
-        registry.setPreservePublishOrder(true);
     }
 
     /** Autentica e autoriza os frames de entrada */
