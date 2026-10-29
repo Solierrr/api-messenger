@@ -10,6 +10,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -21,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 
+import com.solaria.messenger.core.exception.BusinessRuleException;
 import com.solaria.messenger.core.exception.MessageMutationNotAppliedException;
 import com.solaria.messenger.core.exception.MessageSendFailedException;
 import com.solaria.messenger.core.model.Conversation;
@@ -60,7 +62,8 @@ class MessageWriteHelperTests {
 
     @BeforeEach
     void setUp() {
-        helper = new MessageWriteHelper(messages, conversations, rbac, access, new ConversationMutationGuard(), clock);
+        helper = new MessageWriteHelper(messages, conversations, rbac, access, new ConversationMutationGuard(), clock,
+                Duration.ofMinutes(30));
         conversation = new Conversation();
         conversation.setId(CONVERSATION);
         conversation.setConversationType(ConversationType.GROUP);
@@ -150,6 +153,60 @@ class MessageWriteHelperTests {
         assertThat(current.getChangeVersion()).isEqualTo(10L);
     }
 
+    @Test
+    void editAndDeleteInsideTheWindowAreWritten() {
+        Message current = storedMessage();
+        current.setTimestamp(Instant.now().minus(Duration.ofMinutes(29)));
+        givenAuthorizedMutation(current);
+        given(clock.nextVersion()).willReturn(93L, 94L);
+        given(messages.editIfCurrent("msg-1", CONVERSATION, AUTHOR, 3L, "novo", 4L, 93L)).willReturn(1L);
+
+        assertThat(helper.mutate("msg-1", "novo", false).changed()).isTrue();
+    }
+
+    @Test
+    void editOutsideTheWindowIsRefusedWithoutWriting() {
+        Message current = storedMessage();
+        current.setTimestamp(Instant.now().minus(Duration.ofMinutes(31)));
+        givenAuthorizedMutation(current);
+
+        assertThatThrownBy(() -> helper.mutate("msg-1", "novo", false)).isInstanceOf(BusinessRuleException.class);
+        verify(messages, never()).editIfCurrent(any(), any(), any(), anyLong(), any(), anyLong(), anyLong());
+        verify(clock, never()).nextVersion();
+    }
+
+    @Test
+    void deleteOutsideTheWindowIsRefusedWithoutWriting() {
+        Message current = storedMessage();
+        current.setTimestamp(Instant.now().minus(Duration.ofMinutes(31)));
+        givenAuthorizedMutation(current);
+
+        assertThatThrownBy(() -> helper.mutate("msg-1", null, true)).isInstanceOf(BusinessRuleException.class);
+        verify(messages, never()).deleteIfCurrent(any(), any(), any(), anyLong(), anyLong(), anyLong());
+    }
+
+    @Test
+    void repeatedDeleteOutsideTheWindowStillSucceedsWithoutWriting() {
+        Message current = storedMessage();
+        current.setTimestamp(Instant.now().minus(Duration.ofDays(2)));
+        current.setDeleted(true);
+        givenAuthorizedMutation(current);
+
+        assertThat(helper.mutate("msg-1", null, true).changed()).isFalse();
+        verify(messages, never()).deleteIfCurrent(any(), any(), any(), anyLong(), anyLong(), anyLong());
+    }
+
+    @Test
+    void messageWithoutTimestampNeverExpires() {
+        Message current = storedMessage();
+        current.setTimestamp(null);
+        givenAuthorizedMutation(current);
+        given(clock.nextVersion()).willReturn(95L);
+        given(messages.deleteIfCurrent("msg-1", CONVERSATION, AUTHOR, 3L, 4L, 95L)).willReturn(1L);
+
+        assertThat(helper.mutate("msg-1", null, true).changed()).isTrue();
+    }
+
     private void givenAuthorizedMutation(Message current) {
         given(rbac.currentUserId()).willReturn(AUTHOR);
         given(messages.findById("msg-1")).willReturn(java.util.Optional.of(current));
@@ -168,6 +225,7 @@ class MessageWriteHelperTests {
     private static Message storedMessage() {
         Message message = newMessage();
         message.setId("msg-1");
+        message.setTimestamp(Instant.now().minus(Duration.ofMinutes(5)));
         message.setMutationEpoch(3L);
         message.setChangeVersion(10L);
         return message;
