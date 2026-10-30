@@ -12,14 +12,17 @@ import io.micrometer.tracing.Tracer;
 import jakarta.servlet.DispatcherType;
 
 /**
- * Observabilidade das requisições HTTP
+ * Configura a observabilidade das requisições HTTP: header de traceId e descarte do tráfego do Actuator
  *
- * <ul>
- *     <li>{@link #traceIdResponseFilterRegistration(ObjectProvider)} -> registra o
- *     {@link TraceIdResponseFilter} logo após o filtro de observação do Spring MVC</li>
- *     <li>{@link #noActuatorObservations()} -> descarta observações (spans/métricas) do tráfego
- *     de probe em {@code /actuator/**}</li>
- * </ul>
+ * <p>
+ * Sem o {@link TraceIdResponseFilter}, web e mobile não recebem o traceId para levar ao suporte
+ * -> a request não é localizada no Grafana
+ * </p>
+ *
+ * <p>
+ * {@link #noActuatorObservations()} -> descarta spans e métricas do tráfego de probe em {@code /actuator/**},
+ * reduzindo ruído e custo
+ * </p>
  */
 @Configuration
 public class HttpObservabilityConfig {

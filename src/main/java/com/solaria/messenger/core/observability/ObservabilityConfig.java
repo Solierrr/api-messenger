@@ -7,11 +7,16 @@ import org.springframework.core.task.TaskDecorator;
 import org.springframework.core.task.support.ContextPropagatingTaskDecorator;
 
 /**
- * Configuração de observabilidade comum aos dois transportes
+ * Configura os beans de observabilidade comuns aos dois transportes (HTTP e STOMP)
  *
- * <p>Concentra na camada de infra os beans que ajustam o comportamento de
- * Micrometer / Micrometer Tracing / OpenTelemetry, sem misturar observabilidade com negócio.
- * O que é específico de HTTP fica em {@link com.solaria.messenger.rest.observability.HttpObservabilityConfig}.</p>
+ * <p>
+ * Concentra na camada de infra os ajustes de Micrometer, Micrometer Tracing e OpenTelemetry
+ * -> observabilidade não se mistura com a camada de negócio
+ * </p>
+ *
+ * <p>
+ * O que é específico de HTTP fica em {@link com.solaria.messenger.rest.observability.HttpObservabilityConfig}
+ * </p>
  */
 @Configuration
 public class ObservabilityConfig {
