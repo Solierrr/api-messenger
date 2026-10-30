@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import java.time.Instant;
@@ -13,6 +14,7 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.http.client.MockClientHttpRequest;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -132,6 +134,41 @@ class LangSmithClientTests {
         server.expect(requestTo(STATS)).andRespond(withServerError());
 
         assertThatThrownBy(() -> client.totals(START, END)).isInstanceOf(DependencyUnavailableException.class);
+    }
+
+    @Test
+    void reportsRetryAfterAndBodyWhenLangSmithLimitsTheRequests() {
+        expectProject();
+        server.expect(requestTo(STATS)).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", "3600")
+                .body("{\"detail\":\"Monthly\nusage limit reached\"}"));
+
+        assertThatThrownBy(() -> client.totals(START, END))
+                .isInstanceOf(DependencyUnavailableException.class)
+                .hasMessageContaining("LangSmith respondeu 429 ao consultar as estatísticas")
+                .hasMessageContaining("Retry-After: 3600s")
+                .hasMessageContaining("Detalhe: {\"detail\":\"Monthly usage limit reached\"}");
+    }
+
+    @Test
+    void keepsTheShortMessageWhenTheErrorHasNoHeaderOrBody() {
+        expectProject();
+        server.expect(requestTo(STATS)).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
+
+        assertThatThrownBy(() -> client.totals(START, END))
+                .isInstanceOf(DependencyUnavailableException.class)
+                .hasMessage("LangSmith respondeu 429 ao consultar as estatísticas.");
+    }
+
+    @Test
+    void cutsLongErrorBodiesAndAlsoReportsLimitsWhenLookingUpTheProject() {
+        server.expect(requestTo(SESSIONS)).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS).body("x".repeat(500)));
+
+        assertThatThrownBy(() -> client.totals(START, END))
+                .isInstanceOf(DependencyUnavailableException.class)
+                .hasMessageContaining("LangSmith respondeu 429 ao buscar o projeto solaria-qa")
+                .hasMessageContaining("x".repeat(200) + "...")
+                .satisfies(error -> assertThat(error.getMessage()).doesNotContain("x".repeat(201)));
     }
 
     @Test
