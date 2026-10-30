@@ -46,6 +46,7 @@ public class LangSmithClient {
             "run_count", "error_rate", "total_tokens", "prompt_tokens", "completion_tokens",
             "total_cost", "latency_p50", "latency_p99");
     private static final int MAX_GROUPS = 20;
+    private static final int MAX_REASON_CHARS = 200;
 
     private final RestClient restClient;
     private final String project;
@@ -160,10 +161,25 @@ public class LangSmithClient {
             return response == null ? Map.of() : response;
         } catch (RestClientResponseException ex) {
             throw new DependencyUnavailableException(
-                    "LangSmith respondeu " + ex.getStatusCode().value() + " ao consultar as estatísticas.", ex);
+                    "LangSmith respondeu " + ex.getStatusCode().value() + " ao consultar as estatísticas" + reason(ex) + ".",
+                    ex);
         } catch (ResourceAccessException ex) {
             throw new DependencyUnavailableException("LangSmith indisponível ao consultar as estatísticas.", ex);
         }
+    }
+
+    private static String reason(RestClientResponseException ex) {
+        StringBuilder reason = new StringBuilder();
+        String retryAfter = ex.getResponseHeaders() == null ? null : ex.getResponseHeaders().getFirst("Retry-After");
+        if (retryAfter != null && !retryAfter.isBlank()) {
+            reason.append(" (Retry-After: ").append(retryAfter.trim()).append("s)");
+        }
+        String body = ex.getResponseBodyAsString().replaceAll("\\s+", " ").trim();
+        if (!body.isEmpty()) {
+            String excerpt = body.length() > MAX_REASON_CHARS ? body.substring(0, MAX_REASON_CHARS) + "..." : body;
+            reason.append(". Detalhe: ").append(excerpt);
+        }
+        return reason.toString();
     }
 
     private UUID projectId() {
@@ -187,7 +203,8 @@ public class LangSmithClient {
             }
         } catch (RestClientResponseException ex) {
             throw new DependencyUnavailableException(
-                    "LangSmith respondeu " + ex.getStatusCode().value() + " ao buscar o projeto " + project + ".", ex);
+                    "LangSmith respondeu " + ex.getStatusCode().value() + " ao buscar o projeto " + project + reason(ex) + ".",
+                    ex);
         } catch (ResourceAccessException ex) {
             throw new DependencyUnavailableException("LangSmith indisponível ao buscar o projeto " + project + ".", ex);
         }
