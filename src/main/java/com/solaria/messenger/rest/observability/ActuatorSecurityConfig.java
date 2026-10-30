@@ -9,15 +9,16 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * {@link SecurityFilterChain} dedicada com prioridade({@code @Order(0)}) para os endpoints do Actuator
+ * Declara uma {@link SecurityFilterChain} dedicada e prioritária ({@code @Order(0)}) para o Actuator
  *
  * <p>
- * Sem isso {@code /actuator/**} cairia nas chains de negócio
- * exigiria JWT então as probes do Kubernetes/load balancers receberiam {@code 401}
+ * Sem chain própria, {@code /actuator/**} cairia nas chains de negócio que exigem JWT
+ * -> probes do Kubernetes e load balancers receberiam {@code 401}
  * </p>
  *
  * <p>
- * Classe separada de {@code SecurityConfig} 
+ * {@link #actuatorSecurityFilterChain(HttpSecurity)} -> libera {@code /actuator/health} e {@code /actuator/info},
+ * nega o resto
  * </p>
  */
 @Configuration

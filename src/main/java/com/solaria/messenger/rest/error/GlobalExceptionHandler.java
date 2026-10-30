@@ -30,10 +30,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Classe responsável por centralizar tratamento de exceções
+ * Centraliza o tratamento de exceções da API e devolve qualquer erro como {@link ProblemDetail}
  *
- * Logging/observabilidade -> toda exceção tratada é marcada como erro no tracing
- * Gera um log correlacionado ao trace ->{@code WARN} para 4xx, {@code ERROR} com stack trace para 5xx
+ * <p>
+ * Cobre regras de negócio ({@link BusinessException}), conflitos do Mongo, validação de corpo e de parâmetros,
+ * JSON malformado, acesso negado e erros inesperados -> web e mobile recebem sempre o mesmo formato
+ * </p>
+ *
+ * <p>
+ * Toda exceção tratada é marcada como erro no tracing e nas métricas (span {@code ERROR} + tag
+ * {@code exception} em {@code http.server.requests}) e gera log correlacionado ao trace:
+ * {@code WARN} para 4xx, {@code ERROR} com stack trace para 5xx
+ * </p>
+ *
+ * <p>Corpo montado por {@link ProblemDetailFactory}</p>
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
