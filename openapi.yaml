@@ -1267,7 +1267,6 @@ components:
           type: string
           enum:
           - ACTIVE
-          - DEACTIVATED
         startedAt:
           type: string
           format: date-time
@@ -1436,10 +1435,6 @@ components:
           - USER_TO_GROUP
           - USER_TO_CHATBOT
           - CHATBOT_TO_USER
-        role:
-          type: string
-          maxLength: 32
-          minLength: 0
         environment:
           type: string
           enum:

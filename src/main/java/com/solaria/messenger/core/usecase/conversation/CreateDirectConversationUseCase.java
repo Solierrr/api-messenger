@@ -11,17 +11,13 @@ import org.springframework.stereotype.Service;
 import com.solaria.messenger.core.contract.request.DirectConversationRequestDTO;
 import com.solaria.messenger.core.contract.response.ConversationResponseDTO;
 import com.solaria.messenger.core.exception.BaselineUnavailableException;
-import com.solaria.messenger.core.exception.ConcurrentUpdateException;
 import com.solaria.messenger.core.exception.DirectIdentityInconsistentException;
 import com.solaria.messenger.core.exception.InvalidFieldException;
-import com.solaria.messenger.core.exception.PersistenceUncertainException;
 import com.solaria.messenger.core.helper.ConversationAdmissionHelper;
 import com.solaria.messenger.core.helper.ConversationStateHelper;
-import com.solaria.messenger.core.helper.LookupHelper;
 import com.solaria.messenger.core.helper.NotificationHelper;
 import com.solaria.messenger.core.helper.UserAccessHelper;
 import com.solaria.messenger.core.model.Conversation;
-import com.solaria.messenger.core.model.enums.ConversationStatus;
 import com.solaria.messenger.core.model.enums.ConversationType;
 import com.solaria.messenger.core.repository.ConversationRepository;
 import com.solaria.messenger.core.repository.MessageRepository;
@@ -31,7 +27,6 @@ import com.solaria.messenger.core.support.ConversationMutationGuard;
 
 import static com.solaria.messenger.core.helper.PureRulesHelper.directKey;
 import static com.solaria.messenger.core.helper.PureRulesHelper.newConversation;
-import static com.solaria.messenger.core.helper.PureRulesHelper.nextVersion;
 import static com.solaria.messenger.core.mapper.ConversationMapper.toResponse;
 
 /**
@@ -39,9 +34,8 @@ import static com.solaria.messenger.core.mapper.ConversationMapper.toResponse;
  *
  * <p>
  * A direta é única por par. A chave {@code directKey} vem dos dois ids ordenados, então a ordem do pedido não muda o
- * resultado. Se a direta já existe e está ativa, ela volta sem trocar histórico nem preferências. Se estiver
- * desativada, é reativada com CAS (compare-and-set sobre a versão). Se duas requisições criam o mesmo par ao mesmo
- * tempo, a que perde usa a direta criada pela outra.
+ * resultado. Se a direta já existe, ela volta sem trocar histórico nem preferências. Se duas requisições criam o
+ * mesmo par ao mesmo tempo, a que perde usa a direta criada pela outra.
  * </p>
  *
  * <p>
@@ -51,7 +45,6 @@ import static com.solaria.messenger.core.mapper.ConversationMapper.toResponse;
  *     <li>{@link ConversationRepository} -> busca e grava a conversa.</li>
  *     <li>{@link RbacAuthorizationService} -> identifica o user atual.</li>
  *     <li>{@link UserAccessHelper} -> confere se os dois users estão ativos.</li>
- *     <li>{@link LookupHelper} -> recarrega a conversa quando o CAS não aplica.</li>
  *     <li>{@link ConversationStateHelper} -> valida o estado pessoal dos participantes.</li>
  *     <li>{@link ConversationAdmissionHelper} -> grava conversa e estados na mesma transação.</li>
  *     <li>{@link MessageRepository} -> consulta a última sequência gravada.</li>
@@ -72,7 +65,6 @@ public class CreateDirectConversationUseCase {
     private final ConversationRepository conversationRepository;
     private final RbacAuthorizationService rbac;
     private final UserAccessHelper users;
-    private final LookupHelper lookup;
     private final ConversationStateHelper personalStates;
     private final ConversationAdmissionHelper admissions;
     private final MessageRepository messages;
@@ -80,13 +72,12 @@ public class CreateDirectConversationUseCase {
     private final ConversationMutationGuard guard;
 
     public CreateDirectConversationUseCase(ConversationRepository conversations, RbacAuthorizationService rbac,
-            UserAccessHelper users, LookupHelper lookup, ConversationStateHelper states,
+            UserAccessHelper users, ConversationStateHelper states,
             ConversationAdmissionHelper admissions, MessageRepository messages, NotificationHelper notifications,
             ConversationMutationGuard guard) {
         this.conversationRepository = conversations;
         this.rbac = rbac;
         this.users = users;
-        this.lookup = lookup;
         this.personalStates = states;
         this.admissions = admissions;
         this.messages = messages;
@@ -106,7 +97,6 @@ public class CreateDirectConversationUseCase {
      * @return direta criada ou reaproveitada.
      * @throws InvalidFieldException caso o destinatário seja nulo ou seja o próprio user.
      * @throws DirectIdentityInconsistentException caso a direta encontrada não seja exatamente o par.
-     * @throws ConcurrentUpdateException caso a direta esteja em um estado que não pode ser reativado.
      */
     public ConversationResponseDTO execute(DirectConversationRequestDTO dto) {
         // o array guarda, de dentro da lambda, se algo foi gravado e precisa ser avisado
@@ -126,7 +116,7 @@ public class CreateDirectConversationUseCase {
             String key = directKey(List.of(actor, recipient));
             Conversation existing = conversationRepository.findByConversationTypeAndDirectKey(ConversationType.DIRECT, key)
                     .orElse(null);
-            if (existing != null) return toResponse(reuseDirect(existing, actor, recipient, changed));
+            if (existing != null) return toResponse(reuseDirect(existing, actor, recipient));
 
             // não existe: cria uma nova
             Conversation conversation = newConversation(ConversationType.DIRECT, actor,
@@ -140,7 +130,7 @@ public class CreateDirectConversationUseCase {
                 // outra requisição criou o mesmo par ao mesmo tempo: usa a que ganhou
                 Conversation winner = conversationRepository.findByConversationTypeAndDirectKey(ConversationType.DIRECT, key)
                         .orElseThrow(() -> collision);
-                return toResponse(reuseDirect(winner, actor, recipient, changed));
+                return toResponse(reuseDirect(winner, actor, recipient));
             }
         });
 
@@ -148,35 +138,11 @@ public class CreateDirectConversationUseCase {
         return response;
     }
 
-    /** Reaproveita a direta do par; se estiver desativada, reativa com CAS */
-    private Conversation reuseDirect(Conversation conversation, UUID actor, UUID recipient, boolean[] changed) {
+    /** Reaproveita a direta do par */
+    private Conversation reuseDirect(Conversation conversation, UUID actor, UUID recipient) {
         requireDirectPair(conversation, actor, recipient);
         requireDirectStates(conversation);
-        if (conversation.getStatus() == ConversationStatus.ACTIVE) return conversation;
-        if (conversation.getStatus() != ConversationStatus.DEACTIVATED) throw new ConcurrentUpdateException();
-
-        // tenta reativar; erro técnico aqui deixa incerto se gravou
-        Long next = nextVersion(conversation.getVersion());
-        long modified;
-        try {
-            modified = conversationRepository.reactivateDirectIfCurrent(conversation.getId(), conversation.getVersion(),
-                    conversation.getDirectKey(), Set.of(actor, recipient), next);
-        } catch (RuntimeException uncertain) {
-            throw new PersistenceUncertainException("DIRECT_REACTIVATION_UNCERTAIN", conversation.getId(), uncertain);
-        }
-        if (modified == 1) {
-            conversation.setStatus(ConversationStatus.ACTIVE);
-            conversation.setVersion(next);
-            changed[0] = true;
-            return conversation;
-        }
-
-        // CAS não aplicou: outra requisição mexeu antes, então relê e só aceita se ela já estiver ativa
-        Conversation current = lookup.requireConversation(conversation.getId());
-        requireDirectPair(current, actor, recipient);
-        requireDirectStates(current);
-        if (current.getStatus() != ConversationStatus.ACTIVE) throw new ConcurrentUpdateException();
-        return current;
+        return conversation;
     }
 
     /** A direta encontrada precisa ser exatamente o par, fora de comunidade */

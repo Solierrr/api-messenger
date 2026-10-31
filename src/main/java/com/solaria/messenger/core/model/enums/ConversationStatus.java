@@ -6,10 +6,8 @@ package com.solaria.messenger.core.model.enums;
  *
  * <ul>
  *     <li>{@code ACTIVE} - conversa ativa.</li>
- *     <li>{@code DEACTIVATED} - conversa desativada.</li>
  * </ul>
  */
 public enum ConversationStatus {
-    ACTIVE,
-    DEACTIVATED
+    ACTIVE
 }

@@ -33,7 +33,7 @@ public interface MessageOpenApi {
             @ApiResponse(responseCode = "403", description = "O usuário autenticado não participa desta conversa"),
             @ApiResponse(responseCode = "404", description = "Conversa não encontrada"),
             @ApiResponse(responseCode = "409", description = "CONCURRENT_MODIFICATION ou DATA_INTEGRITY_VIOLATION; sem replay"),
-            @ApiResponse(responseCode = "422", description = "Conversa desativada ou comunidade arquivada"),
+            @ApiResponse(responseCode = "422", description = "Comunidade arquivada ou tipo de mensagem incompatível"),
             @ApiResponse(responseCode = "503", description = "DEPENDENCY_UNAVAILABLE antes do insert ou MESSAGE_PERSISTENCE_UNCERTAIN; não reenviar automaticamente")
     })
     ResponseEntity<MessageResponseDTO> sendMessage(MessageRequestDTO dto);

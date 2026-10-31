@@ -19,7 +19,6 @@ import com.solaria.messenger.core.model.enums.MessageType;
 import com.solaria.messenger.core.security.rbac.RbacAuthorizationService;
 import com.solaria.messenger.core.support.ConversationMutationGuard;
 
-import static com.solaria.messenger.core.helper.PureRulesHelper.requireConversationActive;
 import static com.solaria.messenger.core.mapper.MessageMapper.toResponse;
 
 /**
@@ -97,7 +96,6 @@ public class SendUserMessageUseCase {
 
     /** Confere conversa ativa, tipo da mensagem e comunidade ativa, e grava */
     private Message sendAuthorized(Conversation conversation, MessageRequestDTO dto, UUID clientMessageId) {
-        requireConversationActive(conversation);
         requireMessageTypeMatchesConversation(dto.getMessageType(), conversation.getConversationType());
         access.requireCommunityActive(conversation);
 

@@ -6,9 +6,11 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
 
+import com.solaria.messenger.core.contract.response.RejectedParticipantDTO;
 import com.solaria.messenger.core.exception.ResourceNotFoundException;
 import com.solaria.messenger.core.exception.SuccessorIneligibleException;
 import com.solaria.messenger.core.exception.UnauthorizedAccessException;
@@ -37,7 +39,7 @@ import com.solaria.messenger.core.integration.user.dto.UserActivityResponseDTO;
  * <ul>
  *     <li>{@link #requireActiveActor(UUID)} -> exige que o ator esteja ativo.</li>
  *     <li>{@link #requireActiveUsers(Collection)} -> exige que todos os usuários informados estejam ativos.</li>
- *     <li>{@link #eligibleUsers(Collection)} -> devolve só os usuários ativos.</li>
+ *     <li>{@link #ineligibleUsers(Collection)} -> devolve os convidados recusados, com o motivo.</li>
  *     <li>{@link #requireSuccessorsActive(Collection)} -> exige que os sucessores estejam ativos.</li>
  * </ul>
  */
@@ -77,7 +79,7 @@ public class UserAccessHelper {
      * Confere que todos os usuários informados existem e estão ativos na Auth.
      *
      * <p>
-     * Usado nos comandos administrativos, que validam todos os convidados. Ids repetidos contam uma vez só.
+     * Ids repetidos contam uma vez só.
      * </p>
      *
      * @param authIds identificadores na Auth. Lista vazia não faz consulta.
@@ -98,24 +100,26 @@ public class UserAccessHelper {
     }
 
     /**
-     * Devolve os usuários ativos entre os informados.
+     * Devolve os convidados que não podem entrar, com o motivo.
      *
      * <p>
-     * Usuários inativos ou inexistentes ficam de fora, sem gerar erro. Falha técnica na Auth continua abortando o
-     * comando.
+     * Inexistente na Auth vira {@code USER_NOT_FOUND}, e inativo vira {@code USER_INACTIVE}. Falha técnica na Auth
+     * continua abortando o comando.
      * </p>
      *
      * @param authIds identificadores na Auth.
-     * @return conjunto com os usuários ativos.
+     * @return recusados com o motivo, vazio quando todos podem entrar.
      */
-    public Set<UUID> eligibleUsers(Collection<UUID> authIds) {
+    public List<RejectedParticipantDTO> ineligibleUsers(Collection<UUID> authIds) {
         Set<UUID> requested = new LinkedHashSet<>(authIds);
-        if (requested.isEmpty()) return Set.of();
+        if (requested.isEmpty()) return List.of();
         UserActivityBatchResponseDTO result = userAccessClient.getActivityBatch(requested);
-        Set<UUID> eligible = new LinkedHashSet<>();
-        result.users().stream().filter(user -> Boolean.TRUE.equals(user.active()))
-                .forEach(user -> eligible.add(user.authId()));
-        return Set.copyOf(eligible);
+        Set<UUID> active = result.users().stream().filter(user -> Boolean.TRUE.equals(user.active()))
+                .map(UserActivityResponseDTO::authId).collect(Collectors.toSet());
+        return requested.stream().filter(user -> !active.contains(user))
+                .map(user -> new RejectedParticipantDTO(user,
+                        result.missingAuthIds().contains(user) ? "USER_NOT_FOUND" : "USER_INACTIVE"))
+                .toList();
     }
 
     /**

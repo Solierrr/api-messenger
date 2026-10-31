@@ -112,6 +112,7 @@ public class RemoveGroupParticipantUseCase {
                 // marca a versão da saída, avisa quem saiu e derruba as sessões dele
                 changed[0] = true;
                 states.markLeft(userId, id);
+                groups.deleteIfEmpty(id);
                 notifications.publishRemovedConversation(userId, id);
                 sessionRevoker.revokeUser(userId);
                 return null;

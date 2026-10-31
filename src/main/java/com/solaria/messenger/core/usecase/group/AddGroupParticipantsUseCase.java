@@ -1,6 +1,8 @@
 package com.solaria.messenger.core.usecase.group;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -9,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionException;
 
 import com.solaria.messenger.core.contract.response.ConversationResponseDTO;
+import com.solaria.messenger.core.contract.response.RejectedParticipantDTO;
 import com.solaria.messenger.core.exception.BusinessException;
 import com.solaria.messenger.core.exception.BusinessRuleException;
 import com.solaria.messenger.core.exception.PersistenceUncertainException;
@@ -90,21 +93,29 @@ public class AddGroupParticipantsUseCase {
             Conversation initial = groups.managedConversation(id);
             groups.requireManageable(initial, actor);
 
-            // convidados sem nulos, membros da comunidade (se houver), e os novos precisam estar ativos
+            // convidados sem nulos; quem não é da comunidade (se houver) ou está inativo fica de fora
             Set<UUID> requested = new LinkedHashSet<>(userIds);
             requireNoNullParticipants(requested);
-            validateCommunityMembers(initial, requested);
+            List<RejectedParticipantDTO> rejected = new ArrayList<>();
+            ProjectCommunity community = groups.communityFor(initial);
+            if (community != null) requested.stream().filter(user -> !community.isMember(user))
+                    .forEach(user -> rejected.add(new RejectedParticipantDTO(user, "NOT_COMMUNITY_MEMBER")));
+            rejected.forEach(user -> requested.remove(user.userId()));
             Set<UUID> additions = new LinkedHashSet<>(requested);
             additions.removeAll(initial.getParticipantIds());
-            users.requireActiveUsers(additions);
+            rejected.addAll(users.ineligibleUsers(additions));
+            rejected.forEach(user -> requested.remove(user.userId()));
+            if (requested.isEmpty()) throw new BusinessRuleException("Nenhum convidado pode entrar no grupo.");
 
             // grava na transação; erro técnico vira "persistência incerta"
             try {
                 Conversation accepted = admissions.admitParticipants(id, initial.getVersion(), actor, requested);
                 changed[0] = !initial.getParticipantIds().equals(accepted.getParticipantIds());
-                return toResponse(accepted);
-            } catch (BusinessException | OptimisticLockingFailureException rejected) {
-                throw rejected;
+                ConversationResponseDTO result = toResponse(accepted);
+                result.setRejectedParticipants(List.copyOf(rejected));
+                return result;
+            } catch (BusinessException | OptimisticLockingFailureException refused) {
+                throw refused;
             } catch (TransactionException uncertain) {
                 throw new PersistenceUncertainException("ADMISSION_PERSISTENCE_UNCERTAIN", id, uncertain);
             } catch (RuntimeException failure) {
@@ -114,13 +125,5 @@ public class AddGroupParticipantsUseCase {
 
         if (changed[0]) notifications.publishConversationChanged(id);
         return response;
-    }
-
-    /** Em subgrupo, todos os convidados precisam ser membros da comunidade */
-    private void validateCommunityMembers(Conversation conversation, Set<UUID> users) {
-        ProjectCommunity community = groups.communityFor(conversation);
-        if (community != null && users.stream().anyMatch(user -> !community.isMember(user))) {
-            throw new BusinessRuleException("Todos os participantes precisam ser membros da comunidade.");
-        }
     }
 }

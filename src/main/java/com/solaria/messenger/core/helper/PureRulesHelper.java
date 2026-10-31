@@ -19,6 +19,7 @@ import com.solaria.messenger.core.exception.UnauthorizedAccessException;
 import com.solaria.messenger.core.model.CommunityMember;
 import com.solaria.messenger.core.model.Conversation;
 import com.solaria.messenger.core.model.ProjectCommunity;
+import com.solaria.messenger.core.model.enums.CommunityRole;
 import com.solaria.messenger.core.model.enums.CommunityStatus;
 import com.solaria.messenger.core.model.enums.ConversationStatus;
 import com.solaria.messenger.core.model.enums.ConversationType;
@@ -44,7 +45,6 @@ import com.solaria.messenger.core.model.enums.ConversationType;
  *     <li>{@link #requireRemovalAuthority} -> confere se o ator pode remover o alvo.</li>
  *     <li>{@link #requireCommunityActive} -> exige comunidade ativa.</li>
  *     <li>{@link #copyMembers} -> copia os membros para montar a escrita.</li>
- *     <li>{@link #requireConversationActive} -> exige conversa ativa.</li>
  *     <li>{@link #newConversation} -> monta uma conversa ativa nova.</li>
  *     <li>{@link #directKey} -> gera a chave canônica de uma direta.</li>
  *     <li>{@link #requireNoNullParticipants} -> exige participantes sem nulos.</li>
@@ -148,8 +148,8 @@ public final class PureRulesHelper {
      * Confere se o ator pode remover o alvo da comunidade.
      *
      * <p>
-     * Ninguém remove o {@code OWNER}. Remover outra pessoa exige ser OWNER ou ADMIN. Sair por conta própria não exige
-     * papel. Na remoção de terceiros, a comunidade precisa estar ativa enquanto o alvo ainda for membro.
+     * Ninguém remove o {@code OWNER}. Remover outra pessoa exige ser OWNER ou ADMIN, e remover um ADMIN exige ser
+     * OWNER. Sair por conta própria não exige papel. Na remoção de terceiros, a comunidade precisa estar ativa enquanto o alvo ainda for membro.
      * </p>
      *
      * @param community comunidade atual.
@@ -165,6 +165,7 @@ public final class PureRulesHelper {
         if (!actor.equals(target) && (!community.isMember(actor) || !community.isAdmin(actor))) {
             throw new UnauthorizedAccessException("A remoção de terceiros exige OWNER ou ADMIN atuais.");
         }
+        if (!actor.equals(target) && community.hasRole(target, CommunityRole.ADMIN)) requireOwner(community, actor);
         if (community.isMember(target) && !actor.equals(target)) requireCommunityActive(community);
     }
 
@@ -193,22 +194,6 @@ public final class PureRulesHelper {
     }
 
     // conversa
-
-    /**
-     * Confere que a conversa está ativa para receber comandos.
-     *
-     * <p>
-     * Conversa desativada não aceita comandos, mas continua podendo ser lida.
-     * </p>
-     *
-     * @param conversation conversa consultada.
-     * @throws BusinessRuleException caso a conversa esteja desativada.
-     */
-    public static void requireConversationActive(Conversation conversation) {
-        if (conversation.getStatus() != ConversationStatus.ACTIVE) {
-            throw new BusinessRuleException("A conversa está desativada e não aceita novas mensagens.");
-        }
-    }
 
     /**
      * Monta uma conversa ativa com id próprio.

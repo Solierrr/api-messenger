@@ -1,12 +1,15 @@
 package com.solaria.messenger.core.contract.response;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 import com.solaria.messenger.core.model.enums.ConversationStatus;
 import com.solaria.messenger.core.model.enums.ConversationType;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -39,4 +42,8 @@ public class ConversationResponseDTO {
     private ConversationStatus status;
     private Instant startedAt;
     private Instant lastInteractionAt;
+
+    /** Convidados que ficaram de fora; só vem nas operações que recebem convidados. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private List<RejectedParticipantDTO> rejectedParticipants;
 }

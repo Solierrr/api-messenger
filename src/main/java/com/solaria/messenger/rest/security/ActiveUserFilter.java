@@ -1,7 +1,11 @@
 package com.solaria.messenger.rest.security;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
@@ -29,7 +33,7 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>
  * Confere se o subject do token é um UUID canônico e se o usuário está ativo na api-auth, consultando
- * {@link UserAccessHelper} a cada requisição. Usuário inativo ou inexistente recebe erro no formato
+ * {@link UserAccessHelper}. Quem foi confirmado ativo fica 30 s sem nova consulta. Usuário inativo ou inexistente recebe erro no formato
  * {@code ProblemDetail}, escrito diretamente na resposta, pois o filtro roda antes do Spring MVC.
  * </p>
  *
@@ -42,6 +46,10 @@ public class ActiveUserFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(ActiveUserFilter.class);
     private static final Pattern CANONICAL_UUID = Pattern.compile(
             "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+
+    // shortcut: cache só por instância e sem limite de tamanho; trocar por Caffeine se o número de usuários crescer
+    private static final Duration ACTIVE_CACHE_TTL = Duration.ofSeconds(30);
+    private final Map<UUID, Instant> activeUntil = new ConcurrentHashMap<>();
 
     private final UserAccessHelper userAccessService;
     private final ProblemDetailAuthenticationEntryPoint authenticationEntryPoint;
@@ -84,11 +92,19 @@ public class ActiveUserFilter extends OncePerRequestFilter {
             return;
         }
 
-        try {
-            userAccessService.requireActiveActor(UUID.fromString(subject));
-        } catch (BusinessException ex) {
-            writeBusinessError(request, response, ex);
-            return;
+        // usuário confirmado ativo há menos de 30 s não consulta a Auth de novo
+        UUID actor = UUID.fromString(subject);
+        Instant now = Instant.now();
+        Instant until = activeUntil.get(actor);
+        if (until == null || until.isBefore(now)) {
+            try {
+                userAccessService.requireActiveActor(actor);
+            } catch (BusinessException ex) {
+                activeUntil.remove(actor);
+                writeBusinessError(request, response, ex);
+                return;
+            }
+            activeUntil.put(actor, now.plus(ACTIVE_CACHE_TTL));
         }
         filterChain.doFilter(request, response);
     }

@@ -248,6 +248,7 @@ public class CommunityHelper {
                 Set<UUID> survivors = withoutUser(latest.getParticipantIds(), target);
                 return groups.writeParticipants(latest, survivors, survivors.isEmpty() ? null : latest.getManagerUserId());
             });
+            groups.deleteIfEmpty(group.getId());
         }
     }
 

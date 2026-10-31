@@ -91,6 +91,11 @@ public class ConversationUserStateRepository {
                 ConversationUserState.class).getModifiedCount() > 0;
     }
 
+    /** Apaga os estados de uma conversa apagada. */
+    public void deleteByConversationId(String conversationId) {
+        mongoTemplate.remove(Query.query(Criteria.where(CONVERSATION_ID).is(conversationId)), ConversationUserState.class);
+    }
+
     /** Limpa a marca de saída quando o usuário volta à conversa e o estado antigo é reaproveitado. */
     public boolean clearLeft(String conversationId, UUID userId) {
         Query query = Query.query(Criteria.where(CONVERSATION_ID).is(conversationId)
