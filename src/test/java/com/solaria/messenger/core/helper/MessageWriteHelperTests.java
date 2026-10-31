@@ -27,7 +27,6 @@ import com.solaria.messenger.core.exception.MessageMutationNotAppliedException;
 import com.solaria.messenger.core.exception.MessageSendFailedException;
 import com.solaria.messenger.core.model.Conversation;
 import com.solaria.messenger.core.model.Message;
-import com.solaria.messenger.core.model.enums.ConversationStatus;
 import com.solaria.messenger.core.model.enums.ConversationType;
 import com.solaria.messenger.core.repository.ConversationRepository;
 import com.solaria.messenger.core.repository.MessageRepository;
@@ -67,7 +66,6 @@ class MessageWriteHelperTests {
         conversation = new Conversation();
         conversation.setId(CONVERSATION);
         conversation.setConversationType(ConversationType.GROUP);
-        conversation.setStatus(ConversationStatus.ACTIVE);
     }
 
     @Test

@@ -6,7 +6,6 @@ import java.util.UUID;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.solaria.messenger.core.model.enums.CommunityStatus;
-import com.solaria.messenger.core.model.enums.ConversationStatus;
 import com.solaria.messenger.core.model.enums.ConversationType;
 
 /** Projeção própria compartilhada por REST e eventos; ordem local não é versão durável de domínio. */
@@ -21,7 +20,6 @@ public record ConversationListItemResponseDTO(
         String title,
         String communityId,
         @JsonInclude(JsonInclude.Include.ALWAYS) CommunityStatus communityStatus,
-        ConversationStatus status,
         Instant startedAt,
         Instant lastInteractionAt,
         @JsonInclude(JsonInclude.Include.NON_NULL) Integer lastReadSequence,

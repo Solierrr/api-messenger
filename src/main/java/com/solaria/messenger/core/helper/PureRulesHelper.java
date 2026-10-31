@@ -21,7 +21,6 @@ import com.solaria.messenger.core.model.Conversation;
 import com.solaria.messenger.core.model.ProjectCommunity;
 import com.solaria.messenger.core.model.enums.CommunityRole;
 import com.solaria.messenger.core.model.enums.CommunityStatus;
-import com.solaria.messenger.core.model.enums.ConversationStatus;
 import com.solaria.messenger.core.model.enums.ConversationType;
 
 /**
@@ -215,7 +214,6 @@ public final class PureRulesHelper {
         conversation.setParticipantIds(participants);
         conversation.setCreatedBy(createdBy);
         if (type == ConversationType.GROUP) conversation.setManagerUserId(createdBy);
-        conversation.setStatus(ConversationStatus.ACTIVE);
         conversation.setStartedAt(now);
         conversation.setLastInteractionAt(now);
         return conversation;

@@ -109,7 +109,7 @@ class StompEventPublishersTests {
     @Test
     void conversationUpdatedAndRemovedGoToTheEventsTopic() {
         ConversationListItemResponseDTO item = new ConversationListItemResponseDTO(CONVERSATION, "epoch-1", 9L, null,
-                Set.of(AUTHOR, PEER), null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+                Set.of(AUTHOR, PEER), null, null, null, null, null, null, null, null, null, null, null, null, null);
 
         conversationPublisher.conversationUpdated(PEER, item);
         conversationPublisher.conversationRemoved(PEER, CONVERSATION, "epoch-1", 9L);

@@ -154,7 +154,7 @@ public class ConversationProjectionHelper {
         // campos pessoais ficam nulos quando não há estado (chatbot)
         return new ConversationListItemResponseDTO(conversation.getId(), clock.epoch(), syncVersion, conversation.getConversationType(),
                 conversation.getParticipantIds(), conversation.getCreatedBy(), conversation.getManagerUserId(), conversation.getTitle(),
-                conversation.getCommunityId(), communityStatus, conversation.getStatus(), conversation.getStartedAt(), interaction,
+                conversation.getCommunityId(), communityStatus, conversation.getStartedAt(), interaction,
                 state == null ? null : state.lastReadSequence(), state == null ? null : unread,
                 state == null ? null : state.muted(), state == null ? null : state.archived(),
                 state == null ? null : state.muted() || state.archived(), preview);
