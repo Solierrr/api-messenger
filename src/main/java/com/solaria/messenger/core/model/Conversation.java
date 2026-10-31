@@ -13,7 +13,6 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
-import com.solaria.messenger.core.model.enums.ConversationStatus;
 import com.solaria.messenger.core.model.enums.ConversationType;
 
 import lombok.AllArgsConstructor;
@@ -74,14 +73,12 @@ public class Conversation {
     @Field("user_details")
     private Map<String, Object> userDetails;
 
-    /** Par canônico permanente de uma DIRECT, inclusive quando desativada
+    /** Par canônico permanente de uma DIRECT
      * 
      * Representa 2 IDs de user para a conversa
      */
     @Field("direct_key")
     private String directKey;
-
-    private ConversationStatus status;
 
     @Field("started_at")
     private Instant startedAt;

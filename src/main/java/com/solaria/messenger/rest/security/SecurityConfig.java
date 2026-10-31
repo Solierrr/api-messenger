@@ -59,11 +59,12 @@ public class SecurityConfig {
          */
         @Bean
         public FilterRegistrationBean<ActiveUserFilter> activeUserFilterRegistration(
+                        StringRedisTemplate redis,
                         UserAccessHelper userAccessService,
                         ProblemDetailFactory problemDetailFactory,
                         ObjectMapper objectMapper) {
                 FilterRegistrationBean<ActiveUserFilter> registration = new FilterRegistrationBean<>(
-                                new ActiveUserFilter(userAccessService, problemDetailAuthenticationEntryPoint,
+                                new ActiveUserFilter(redis, userAccessService, problemDetailAuthenticationEntryPoint,
                                                 problemDetailFactory, objectMapper));
                 registration.setEnabled(false);
                 return registration;

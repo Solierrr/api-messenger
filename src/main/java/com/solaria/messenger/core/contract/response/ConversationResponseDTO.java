@@ -6,7 +6,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import com.solaria.messenger.core.model.enums.ConversationStatus;
 import com.solaria.messenger.core.model.enums.ConversationType;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -39,7 +38,6 @@ public class ConversationResponseDTO {
     private String communityId;
     private String userType;
     private Map<String, Object> userDetails;
-    private ConversationStatus status;
     private Instant startedAt;
     private Instant lastInteractionAt;
 

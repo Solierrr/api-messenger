@@ -23,7 +23,6 @@ import com.mongodb.ClientSessionOptions;
 import com.mongodb.client.ClientSession;
 import com.solaria.messenger.core.model.Conversation;
 import com.solaria.messenger.core.model.ConversationUserState;
-import com.solaria.messenger.core.model.enums.ConversationStatus;
 import com.solaria.messenger.core.model.enums.ConversationType;
 import com.solaria.messenger.core.repository.CommunityRepository;
 import com.solaria.messenger.core.repository.ConversationRepository;
@@ -60,7 +59,6 @@ class ConversationAdmissionHelperTests {
         Conversation current = new Conversation();
         current.setId(GROUP);
         current.setConversationType(ConversationType.GROUP);
-        current.setStatus(ConversationStatus.ACTIVE);
         current.setVersion(1L);
         current.setManagerUserId(MANAGER);
         current.setParticipantIds(new LinkedHashSet<>(Set.of(MANAGER)));

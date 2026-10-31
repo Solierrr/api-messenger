@@ -22,7 +22,6 @@ import com.solaria.messenger.core.model.Conversation;
 import com.solaria.messenger.core.model.ConversationUserState;
 import com.solaria.messenger.core.model.Message;
 import com.solaria.messenger.core.model.ProjectCommunity;
-import com.solaria.messenger.core.model.enums.ConversationStatus;
 import com.solaria.messenger.core.model.enums.ConversationType;
 import com.solaria.messenger.core.repository.CommunityRepository;
 import com.solaria.messenger.core.repository.ConversationRepository;
@@ -126,8 +125,8 @@ public class ConversationAdmissionHelper {
         return Objects.requireNonNull(transaction.execute(status -> {
             ConversationType type = conversation.getConversationType();
 
-            // conversa ativa, com o criador e pelo menos dois participantes
-            if (conversation.getStatus() != ConversationStatus.ACTIVE || conversation.getParticipantIds().size() < 2
+            // com o criador e pelo menos dois participantes
+            if (conversation.getParticipantIds().size() < 2
                     || !conversation.hasParticipant(conversation.getCreatedBy())) {
                 throw new BusinessRuleException("A criação exige criador e ao menos dois participantes distintos.");
             }
@@ -206,7 +205,7 @@ public class ConversationAdmissionHelper {
 
     /** Só grupo ativo, e só o gestor atual adiciona */
     private void requireCanAdmit(Conversation current, UUID actor) {
-        if (current.getConversationType() != ConversationType.GROUP || current.getStatus() != ConversationStatus.ACTIVE) {
+        if (current.getConversationType() != ConversationType.GROUP) {
             throw new BusinessRuleException("O grupo não aceita novas admissões.");
         }
         if (!current.hasParticipant(actor) || !actor.equals(current.getManagerUserId())) {

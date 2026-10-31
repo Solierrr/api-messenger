@@ -4,7 +4,6 @@ import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
 
-import com.solaria.messenger.core.model.enums.ConversationStatus;
 
 /**
  * DTO de resposta com os metadados de um subgrupo de comunidade.
@@ -15,7 +14,6 @@ import com.solaria.messenger.core.model.enums.ConversationStatus;
 public record SubgroupMetadataResponseDTO(
         String id,
         String title,
-        ConversationStatus status,
         Set<UUID> participantIds,
         UUID managerUserId,
         Instant startedAt,
