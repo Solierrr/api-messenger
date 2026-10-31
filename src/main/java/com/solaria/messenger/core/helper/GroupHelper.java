@@ -208,8 +208,8 @@ public class GroupHelper {
      * Apaga de vez o grupo que ficou sem participantes, com as mensagens e os estados pessoais.
      *
      * <p>
-     * shortcut: sem os estados, o catch-up de um aparelho offline não recebe a saída deste grupo e ele só some na
-     * próxima carga da lista; guardar a marca de saída em outro lugar se isso incomodar.
+     * Apagar os estados não afeta o catch-up: a marca de saída só limita as mensagens deste grupo até a saída, e
+     * essas mensagens também são apagadas.
      * </p>
      *
      * @param id identificador do grupo. Grupo com participantes não muda.
