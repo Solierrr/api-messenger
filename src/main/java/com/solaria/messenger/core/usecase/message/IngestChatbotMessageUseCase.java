@@ -17,7 +17,6 @@ import com.solaria.messenger.core.model.enums.ConversationType;
 import com.solaria.messenger.core.model.enums.MessageType;
 import com.solaria.messenger.core.support.ConversationMutationGuard;
 
-import static com.solaria.messenger.core.helper.PureRulesHelper.requireConversationActive;
 import static com.solaria.messenger.core.mapper.MessageMapper.toResponse;
 
 /**
@@ -89,7 +88,6 @@ public class IngestChatbotMessageUseCase {
 
     /** Grava a resposta do assistente na conversa CHAT_BOT ativa */
     private Message ingestAuthorized(Conversation conversation, ChatbotMessageRequestDTO dto) {
-        requireConversationActive(conversation);
 
         Message message = new Message();
         message.setConversationId(conversation.getId());

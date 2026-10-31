@@ -5,10 +5,10 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Service;
 
 import com.solaria.messenger.core.contract.response.LangSmithSummaryDTO;
@@ -20,7 +20,7 @@ import com.solaria.messenger.core.integration.langsmith.LangSmithClient;
  * <p>
  * Junta os totais e os agrupamentos por assistente e por modelo do período. Sem datas, usa os últimos 7 dias até
  * hoje, em UTC, e o último dia entra inteiro. Sem o cliente configurado, responde desligado sem chamar o
- * LangSmith. A resposta de cada período fica em cache local por 2 minutos.
+ * LangSmith. A resposta de cada período fica em cache no MongoDB por 2 minutos, o mesmo para todos os pods.
  * </p>
  *
  * <p>
@@ -28,6 +28,7 @@ import com.solaria.messenger.core.integration.langsmith.LangSmithClient;
  * </p>
  * <ul>
  *     <li>{@link LangSmithClient} -> consulta as estatísticas no LangSmith.</li>
+ *     <li>{@link MongoTemplate} -> guarda o cache do resumo em {@code langsmith_summary_cache}.</li>
  * </ul>
  *
  * <p>
@@ -42,13 +43,15 @@ public class GetLangSmithSummaryUseCase {
 
     private static final Duration TTL = Duration.ofMinutes(2);
     private static final int DEFAULT_DAYS = 7;
+    private static final String CACHE = "langsmith_summary_cache";
     private final LangSmithClient client;
+    private final MongoTemplate mongoTemplate;
     private final String projectUrl;
-    private final Map<String, Cached> cache = new ConcurrentHashMap<>();
 
-    public GetLangSmithSummaryUseCase(LangSmithClient client,
+    public GetLangSmithSummaryUseCase(LangSmithClient client, MongoTemplate mongoTemplate,
             @Value("${app.langsmith.project-url:}") String projectUrl) {
         this.client = client;
+        this.mongoTemplate = mongoTemplate;
         this.projectUrl = projectUrl == null || projectUrl.isBlank() ? null : projectUrl.trim();
     }
 
@@ -66,9 +69,9 @@ public class GetLangSmithSummaryUseCase {
         LocalDate end = to != null ? to : LocalDate.now(ZoneOffset.UTC);
         LocalDate start = from != null ? from : end.minusDays(DEFAULT_DAYS);
 
-        // o cache é deste pod e evita consultar o LangSmith a cada abertura do painel
+        // o cache é compartilhado entre os pods e evita consultar o LangSmith a cada abertura do painel
         String key = start + "|" + end;
-        Cached cached = cache.get(key);
+        CachedSummary cached = mongoTemplate.findById(key, CachedSummary.class, CACHE);
         if (cached != null && cached.expiresAt().isAfter(Instant.now())) {
             return cached.value();
         }
@@ -82,10 +85,11 @@ public class GetLangSmithSummaryUseCase {
                 client.totals(startInstant, endInstant),
                 client.byAssistant(startInstant, endInstant),
                 client.byModel(startInstant, endInstant));
-        cache.put(key, new Cached(value, Instant.now().plus(TTL)));
+        mongoTemplate.save(new CachedSummary(key, value, Instant.now().plus(TTL)), CACHE);
         return value;
     }
 
-    private record Cached(LangSmithSummaryDTO value, Instant expiresAt) {
+    /** Resumo guardado de um período, válido até {@code expiresAt}. */
+    public record CachedSummary(@Id String id, LangSmithSummaryDTO value, Instant expiresAt) {
     }
 }

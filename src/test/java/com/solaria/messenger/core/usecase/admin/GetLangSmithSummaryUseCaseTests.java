@@ -2,9 +2,9 @@ package com.solaria.messenger.core.usecase.admin;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.time.Instant;
@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.mongodb.core.MongoTemplate;
 
 import com.solaria.messenger.core.contract.response.LangSmithStatsDTO;
 import com.solaria.messenger.core.contract.response.LangSmithSummaryDTO;
@@ -29,11 +30,14 @@ class GetLangSmithSummaryUseCaseTests {
     @Mock
     private LangSmithClient client;
 
+    @Mock
+    private MongoTemplate mongoTemplate;
+
     @Test
     void answersDisabledWithoutCallingLangSmithWhenNotConfigured() {
         given(client.enabled()).willReturn(false);
 
-        LangSmithSummaryDTO summary = new GetLangSmithSummaryUseCase(client, "").execute(null, null);
+        LangSmithSummaryDTO summary = new GetLangSmithSummaryUseCase(client, mongoTemplate, "").execute(null, null);
 
         assertThat(summary.enabled()).isFalse();
         assertThat(summary.totals()).isNull();
@@ -48,7 +52,7 @@ class GetLangSmithSummaryUseCaseTests {
         given(client.byAssistant(any(), any())).willReturn(List.of());
         given(client.byModel(any(), any())).willReturn(List.of());
 
-        LangSmithSummaryDTO summary = new GetLangSmithSummaryUseCase(client, " https://smith/p ")
+        LangSmithSummaryDTO summary = new GetLangSmithSummaryUseCase(client, mongoTemplate, " https://smith/p ")
                 .execute(LocalDate.parse("2026-10-20"), LocalDate.parse("2026-10-26"));
 
         ArgumentCaptor<Instant> start = ArgumentCaptor.forClass(Instant.class);
@@ -63,19 +67,18 @@ class GetLangSmithSummaryUseCaseTests {
     }
 
     @Test
-    void reusesTheAnswerForTheSamePeriodWhileItIsFresh() {
+    void reusesTheSharedAnswerForTheSamePeriodWhileItIsFresh() {
         given(client.enabled()).willReturn(true);
-        given(client.totals(any(), any())).willReturn(TOTALS);
-        given(client.byAssistant(any(), any())).willReturn(List.of());
-        given(client.byModel(any(), any())).willReturn(List.of());
-        GetLangSmithSummaryUseCase service = new GetLangSmithSummaryUseCase(client, "");
+        LangSmithSummaryDTO stored = new LangSmithSummaryDTO(true, "solaria-qa", null, TOTALS, List.of(), List.of());
+        given(mongoTemplate.findById(eq("2026-10-20|2026-10-20"), eq(GetLangSmithSummaryUseCase.CachedSummary.class),
+                eq("langsmith_summary_cache")))
+                .willReturn(new GetLangSmithSummaryUseCase.CachedSummary("2026-10-20|2026-10-20", stored,
+                        Instant.now().plusSeconds(60)));
         LocalDate day = LocalDate.parse("2026-10-20");
 
-        LangSmithSummaryDTO first = service.execute(day, day);
-        LangSmithSummaryDTO second = service.execute(day, day);
-        service.execute(day, day.plusDays(1));
+        LangSmithSummaryDTO summary = new GetLangSmithSummaryUseCase(client, mongoTemplate, "").execute(day, day);
 
-        assertThat(second).isSameAs(first);
-        verify(client, times(2)).totals(any(), any());
+        assertThat(summary).isEqualTo(stored);
+        verify(client, never()).totals(any(), any());
     }
 }

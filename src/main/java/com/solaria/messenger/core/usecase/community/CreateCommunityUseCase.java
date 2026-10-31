@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 
 import com.solaria.messenger.core.contract.request.CommunityRequestDTO;
 import com.solaria.messenger.core.contract.response.CommunityResponseDTO;
+import com.solaria.messenger.core.contract.response.RejectedParticipantDTO;
+import com.solaria.messenger.core.exception.BusinessRuleException;
 import com.solaria.messenger.core.exception.DuplicateResourceException;
 import com.solaria.messenger.core.helper.UserAccessHelper;
 import com.solaria.messenger.core.integration.core.ProjectAuthorityClient;
@@ -81,7 +83,7 @@ public class CreateCommunityUseCase {
             throw new DuplicateResourceException("Já existe uma comunidade para o projeto: " + dto.getProjectId());
         }
 
-        // membros iniciais sem nulos e sem o próprio criador, todos precisam estar ativos
+        // membros iniciais sem nulos e sem o próprio criador; inexistente ou inativo fica de fora
         Set<UUID> memberIds = new LinkedHashSet<>();
         if (dto.getMemberIds() != null) {
             dto.getMemberIds().stream()
@@ -89,7 +91,11 @@ public class CreateCommunityUseCase {
                     .filter(id -> !id.equals(currentUserId))
                     .forEach(memberIds::add);
         }
-        users.requireActiveUsers(memberIds);
+        List<RejectedParticipantDTO> rejected = users.ineligibleUsers(memberIds);
+        if (!memberIds.isEmpty() && rejected.size() == memberIds.size()) {
+            throw new BusinessRuleException("Nenhum convidado pode entrar na comunidade.");
+        }
+        rejected.forEach(user -> memberIds.remove(user.userId()));
 
         // monta a lista com o criador como OWNER e os demais como MEMBER
         Instant now = Instant.now();
@@ -105,6 +111,8 @@ public class CreateCommunityUseCase {
         community.setCreatedBy(currentUserId);
         community.setCreatedAt(now);
         community.setUpdatedAt(now);
-        return toResponse(communityRepository.save(community));
+        CommunityResponseDTO response = toResponse(communityRepository.save(community));
+        response.setRejectedParticipants(rejected);
+        return response;
     }
 }

@@ -25,14 +25,13 @@ import com.solaria.messenger.core.support.ConversationMutationGuard;
 import static com.solaria.messenger.core.helper.PureRulesHelper.nextVersion;
 import static com.solaria.messenger.core.helper.PureRulesHelper.requireAdmin;
 import static com.solaria.messenger.core.helper.PureRulesHelper.requireMember;
-import static com.solaria.messenger.core.helper.PureRulesHelper.requireOwner;
 import static com.solaria.messenger.core.mapper.CommunityMapper.toResponse;
 
 /**
  * Caso de uso que arquiva ou reativa uma comunidade.
  *
  * <p>
- * Arquivar exige ser {@code OWNER}. Reativar exige papel {@code ADMIN} ou {@code OWNER}. A gravação usa CAS e tenta
+ * Arquivar e reativar exigem papel {@code ADMIN} ou {@code OWNER}. A gravação usa CAS e tenta
  * de novo se a versão mudou. Os subgrupos só recebem o aviso de mudança se o status realmente mudou.
  * </p>
  *
@@ -98,7 +97,7 @@ public class UpdateCommunityStatusUseCase {
         return response;
     }
 
-    /** Reativar exige ADMIN; arquivar exige OWNER; grava com CAS e tenta de novo se a versão mudou */
+    /** Arquivar e reativar exigem ADMIN; grava com CAS e tenta de novo se a versão mudou */
     private CommunityResponseDTO updateCommunityLocked(String id, CommunityUpdateRequestDTO dto, boolean[] changed) {
         CommunityStatus requested = dto.getStatus();
         UUID actor = rbac.currentUserId();
@@ -106,11 +105,7 @@ public class UpdateCommunityStatusUseCase {
         ProjectCommunity updated = communities.mutateCommunity(lookup.requireCommunity(id), current -> {
             // confere o papel na versão mais recente
             requireMember(current, actor);
-            if (requested == CommunityStatus.ACTIVE) {
-                requireAdmin(current, actor);
-            } else {
-                requireOwner(current, actor);
-            }
+            requireAdmin(current, actor);
 
             // status já é o pedido: nada a gravar
             if (current.getStatus() == requested) return null;

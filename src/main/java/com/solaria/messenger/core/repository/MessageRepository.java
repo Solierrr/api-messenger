@@ -50,6 +50,9 @@ import com.solaria.messenger.core.repository.projection.LatestMessage;
  */
 public interface MessageRepository extends MongoRepository<Message, String> {
 
+    /** Apaga todas as mensagens da conversa. */
+    void deleteByConversationId(String conversationId);
+
     /** Mensagem de maior sequência da conversa. */
     Optional<Message> findFirstByConversationIdOrderBySequenceDesc(String conversationId);
 

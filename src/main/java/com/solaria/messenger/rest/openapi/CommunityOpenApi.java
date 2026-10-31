@@ -26,13 +26,14 @@ public interface CommunityOpenApi {
     @Operation(
         summary = "Cria a comunidade de um projeto",
         description = "Quem cria vira OWNER | memberIds opcionais entram como MEMBER | Uma comunidade por projeto. "
-        + "Só o demandante do projeto pode criar "
+        + "Só o demandante do projeto pode criar | memberIds inexistentes ou inativos ficam de fora e voltam em "
+        + "rejectedParticipants; se nenhum passar, responde 422"
     )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Comunidade criada"),
             @ApiResponse(responseCode = "400", description = "Dados de entrada inválidos"),
-            @ApiResponse(responseCode = "403", description = "Usuário autenticado não é o demandante ou um membro inicial está inativo"),
-            @ApiResponse(responseCode = "404", description = "Projeto ou membro inicial não encontrado"),
+            @ApiResponse(responseCode = "403", description = "Usuário autenticado não é o demandante"),
+            @ApiResponse(responseCode = "404", description = "Projeto não encontrado"),
             @ApiResponse(responseCode = "409", description = "Já existe uma comunidade para o projeto"),
             @ApiResponse(responseCode = "503", description = "Dependência indisponível para validar o demandante ou os membros")
     })
@@ -61,14 +62,14 @@ public interface CommunityOpenApi {
     @Operation(
         summary = "Altera somente o status da comunidade",
         description = "status é obrigatório; pedido vazio ou status nulo é 400 INVALID_FIELD, sem efeitos. "
-                + "Arquivar exige OWNER; reativar ARCHIVED exige OWNER/ADMIN atual. Mesmo status é no-op autorizado. "
+                + "Arquivar e reativar exigem OWNER/ADMIN atual. Mesmo status é no-op autorizado. "
                 + "ARCHIVED bloqueia mensagens e administração ordinária, preservando leitura, estado pessoal e saída. "
                 + "Não há cleanup de typing nem metadados descritivos editáveis."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Status atualizado ou no-op autorizado"),
             @ApiResponse(responseCode = "400", description = "INVALID_FIELD; status obrigatório, não nulo e válido"),
-            @ApiResponse(responseCode = "403", description = "OWNER para arquivar; OWNER/ADMIN para ativar ou repetir a ativação"),
+            @ApiResponse(responseCode = "403", description = "Arquivar e ativar exigem OWNER/ADMIN"),
             @ApiResponse(responseCode = "404", description = "Comunidade não encontrada"),
             @ApiResponse(responseCode = "409", description = "CONCURRENT_MODIFICATION"),
             @ApiResponse(responseCode = "503", description = "Falha técnica de persistência ou de dependência")
@@ -77,12 +78,13 @@ public interface CommunityOpenApi {
 
     @Operation(
         summary = "Adiciona/altera papel de membros",
-        description = "Adicionar MEMBER exige ADMIN | conceder ADMIN exige OWNER"
+        description = "Adicionar e conceder ADMIN exigem ADMIN | rebaixar um ADMIN exige OWNER | novos membros "
+                + "inexistentes ou inativos ficam de fora e voltam em rejectedParticipants; se nenhum passar, 422"
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Membros adicionados"),
-            @ApiResponse(responseCode = "403", description = "Papel insuficiente ou novo membro inativo"),
-            @ApiResponse(responseCode = "404", description = "Comunidade ou novo membro não encontrado"),
+            @ApiResponse(responseCode = "403", description = "Papel insuficiente"),
+            @ApiResponse(responseCode = "404", description = "Comunidade não encontrada"),
             @ApiResponse(responseCode = "409", description = "CONCURRENT_MODIFICATION ou MEMBERSHIP_CLEANUP_REQUIRED antes da readmissão"),
             @ApiResponse(responseCode = "503", description = "Core indisponível para validar novos membros"),
             @ApiResponse(responseCode = "422", description = "Comunidade arquivada ou papel OWNER solicitado")
@@ -91,9 +93,10 @@ public interface CommunityOpenApi {
 
     @Operation(
         summary = "Remove um membro | sair da comunidade",
-        description = "Cada um pode sair | remover outros exige OWNER/ADMIN | OWNER não pode ser removido nem sair. "
+        description = "Cada um pode sair | remover outros exige OWNER/ADMIN | remover ADMIN exige OWNER | "
+                + "OWNER não pode ser removido nem sair. "
                 + "A remoção também revoga participação nos subgrupos. Informe sucessor por conversa quando necessário; "
-                + "Somente remoção administrativa pode esvaziar um grupo sem sucessor. Retorna 204 sem roster. "
+                + "Grupo que fica vazio é apagado com mensagens e estados. Retorna 204 sem roster. "
                 + "Após revogar no pai, repetição explícita só limpa resíduos; readmissão aguarda essa limpeza. "
                 + "Saída voluntária é permitida em comunidade arquivada; remoção ordinária de terceiros é bloqueada."
     )
@@ -120,7 +123,7 @@ public interface CommunityOpenApi {
         summary = "Inicia uma conversa em grupo entre membros da comunidade",
         description = "participantIds omitido ou vazio seleciona os membros atuais; se informado, seleciona os IDs pedidos. "
                 + "O criador autorizado entra sempre, com ao menos outro participante elegível. "
-                + "Convidados individualmente inelegíveis são excluídos e retornados com motivo genérico. "
+                + "Convidados inexistentes, inativos ou fora da comunidade ficam de fora e voltam com o motivo. "
                 + "Falhas técnicas abortam o comando; conversa e estados pessoais são atômicos, sem retry de criação."
     )
     @ApiResponses({

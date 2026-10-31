@@ -18,13 +18,12 @@ public interface ChatbotMessageOpenApi {
     @Operation(
         summary = "Publica a resposta do bot numa conversa existente",
         description = "messageType é sempre CHATBOT_TO_USER e role sempre \"assistant\". A conversa "
-                + "precisa ser do tipo CHAT_BOT e estar ativa."
+                + "precisa ser do tipo CHAT_BOT."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Mensagem publicada com sucesso"),
             @ApiResponse(responseCode = "400", description = "Dados de entrada inválidos ou conversa não é do tipo CHAT_BOT"),
-            @ApiResponse(responseCode = "404", description = "Conversa não encontrada"),
-            @ApiResponse(responseCode = "422", description = "A conversa está desativada")
+            @ApiResponse(responseCode = "404", description = "Conversa não encontrada")
     })
     ResponseEntity<MessageResponseDTO> ingestChatbotMessage(ChatbotMessageRequestDTO dto);
 }

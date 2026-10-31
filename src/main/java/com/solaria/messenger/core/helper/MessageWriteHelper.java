@@ -32,7 +32,6 @@ import com.solaria.messenger.core.security.rbac.RbacAuthorizationService;
 import com.solaria.messenger.core.support.ConversationMutationGuard;
 import com.solaria.messenger.core.support.ConversationSyncClock;
 
-import static com.solaria.messenger.core.helper.PureRulesHelper.requireConversationActive;
 
 /**
  * Grava, edita e exclui mensagens, com as regras de envio e de autoria.
@@ -245,7 +244,6 @@ public class MessageWriteHelper {
                 if (current.getConversationType() == ConversationType.CHAT_BOT) {
                     throw new BusinessRuleException("A conversa não permite alterações de mensagens.");
                 }
-                requireConversationActive(current);
                 access.requireCommunityActive(current);
                 return mutation.apply(current);
             });

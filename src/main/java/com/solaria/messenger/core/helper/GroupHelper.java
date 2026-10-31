@@ -17,10 +17,11 @@ import com.solaria.messenger.core.model.Conversation;
 import com.solaria.messenger.core.model.ProjectCommunity;
 import com.solaria.messenger.core.model.enums.ConversationType;
 import com.solaria.messenger.core.repository.ConversationRepository;
+import com.solaria.messenger.core.repository.ConversationUserStateRepository;
+import com.solaria.messenger.core.repository.MessageRepository;
 
 import static com.solaria.messenger.core.helper.PureRulesHelper.applyOptimistic;
 import static com.solaria.messenger.core.helper.PureRulesHelper.nextVersion;
-import static com.solaria.messenger.core.helper.PureRulesHelper.requireConversationActive;
 
 /**
  * Confere a gestão de grupos e grava as mudanças de participantes e de gestor.
@@ -35,6 +36,7 @@ import static com.solaria.messenger.core.helper.PureRulesHelper.requireConversat
  * </p>
  * <ul>
  *     <li>{@link ConversationRepository} -> grava participantes e gestor com CAS.</li>
+ *     <li>{@link MessageRepository} e {@link ConversationUserStateRepository} -> apagam o grupo vazio.</li>
  *     <li>{@link ConversationAccessHelper} -> confere participação e comunidade ativa.</li>
  *     <li>{@link LookupHelper} -> carrega o grupo e a comunidade pai.</li>
  * </ul>
@@ -49,6 +51,7 @@ import static com.solaria.messenger.core.helper.PureRulesHelper.requireConversat
  *     <li>{@link #validateSuccessor(Conversation, UUID, UUID)} -> valida o sucessor do gestor.</li>
  *     <li>{@link #validateRemoval(Conversation, UUID, UUID, UUID)} -> valida a remoção de um participante.</li>
  *     <li>{@link #writeParticipants(Conversation, Set, UUID)} -> grava participantes e gestor com CAS.</li>
+ *     <li>{@link #deleteIfEmpty(String)} -> apaga de vez o grupo que ficou vazio.</li>
  *     <li>{@link #writeManager(Conversation, UUID)} -> grava só o novo gestor com CAS.</li>
  *     <li>{@link #mutateGroup(Conversation, Function)} -> aplica uma escrita com nova tentativa.</li>
  * </ul>
@@ -59,11 +62,16 @@ public class GroupHelper {
     private final ConversationRepository conversationRepository;
     private final ConversationAccessHelper access;
     private final LookupHelper lookup;
+    private final MessageRepository messageRepository;
+    private final ConversationUserStateRepository stateRepository;
 
-    public GroupHelper(ConversationRepository conversations, ConversationAccessHelper access, LookupHelper lookup) {
+    public GroupHelper(ConversationRepository conversations, ConversationAccessHelper access, LookupHelper lookup,
+            MessageRepository messages, ConversationUserStateRepository states) {
         this.conversationRepository = conversations;
         this.access = access;
         this.lookup = lookup;
+        this.messageRepository = messages;
+        this.stateRepository = states;
     }
 
     /**
@@ -105,7 +113,6 @@ public class GroupHelper {
      */
     public void requireManageable(Conversation conversation, UUID actor) {
         authorizeManagement(conversation, actor);
-        requireConversationActive(conversation);
         access.requireCommunityActive(conversation);
     }
 
@@ -165,10 +172,9 @@ public class GroupHelper {
             throw new GroupManagerUnavailableException();
         }
 
-        // saída do gestor sem sucessor só vale quando o grupo vai ficar vazio por remoção de terceiro
-        if (target.equals(manager)) {
-            boolean emptyAdministrative = !actor.equals(target) && conversation.getParticipantIds().size() == 1;
-            if (successor == null && !emptyAdministrative) throw new SuccessorRequiredException();
+        // saída do gestor sem sucessor só vale quando ele é o último participante
+        if (target.equals(manager) && successor == null && conversation.getParticipantIds().size() > 1) {
+            throw new SuccessorRequiredException();
         }
         if (successor != null) validateSuccessor(conversation, target, successor);
     }
@@ -196,6 +202,22 @@ public class GroupHelper {
         }
         return conversationRepository.updateParticipantsIfCurrent(current.getId(), current.getVersion(),
                 participants, manager, Instant.now(), nextVersion(current.getVersion()));
+    }
+
+    /**
+     * Apaga de vez o grupo que ficou sem participantes, com as mensagens e os estados pessoais.
+     *
+     * <p>
+     * shortcut: sem os estados, o catch-up de um aparelho offline não recebe a saída deste grupo e ele só some na
+     * próxima carga da lista; guardar a marca de saída em outro lugar se isso incomodar.
+     * </p>
+     *
+     * @param id identificador do grupo. Grupo com participantes não muda.
+     */
+    public void deleteIfEmpty(String id) {
+        if (conversationRepository.deleteEmptyGroup(id) == 0) return;
+        messageRepository.deleteByConversationId(id);
+        stateRepository.deleteByConversationId(id);
     }
 
     /**

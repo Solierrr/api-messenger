@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 
 import com.solaria.messenger.core.contract.request.CommunityMembersRequestDTO;
 import com.solaria.messenger.core.contract.response.CommunityResponseDTO;
+import com.solaria.messenger.core.contract.response.RejectedParticipantDTO;
+import com.solaria.messenger.core.exception.BusinessRuleException;
 import com.solaria.messenger.core.exception.InvalidFieldException;
 import com.solaria.messenger.core.helper.CommunityHelper;
 import com.solaria.messenger.core.helper.LookupHelper;
@@ -33,8 +35,9 @@ import static com.solaria.messenger.core.mapper.CommunityMapper.toResponse;
  * Caso de uso que adiciona membros a uma comunidade ou altera o papel dos que já são membros.
  *
  * <p>
- * O papel padrão é {@code MEMBER}. O papel {@code OWNER} nunca pode ser atribuído por aqui. Dar {@code ADMIN} exige
- * ser {@code OWNER}. Os outros papéis exigem papel {@code ADMIN} ou {@code OWNER}. A comunidade precisa estar ativa.
+ * O papel padrão é {@code MEMBER}. O papel {@code OWNER} nunca pode ser atribuído por aqui. Adicionar e promover
+ * exigem papel {@code ADMIN} ou {@code OWNER}, e rebaixar um {@code ADMIN} exige ser {@code OWNER}. A comunidade
+ * precisa estar ativa.
  * Quem já é membro só tem o papel atualizado, exceto o {@code OWNER}. Quem é novo precisa estar ativo e não pode ter
  * resíduo nos subgrupos. Tudo é revalidado a cada tentativa do CAS.
  * </p>
@@ -103,19 +106,23 @@ public class AddCommunityMembersUseCase {
         if (role == CommunityRole.OWNER) {
             throw new InvalidFieldException("Não é possível atribuir o papel OWNER.");
         }
-        requireMemberAddition(community, actor, role);
+        requireMemberAddition(community, actor);
 
         // separa quem já é membro (só troca papel) de quem é novo (precisa estar ativo e sem resíduo nos subgrupos)
         Set<UUID> existingIds = community.memberIds();
         Set<UUID> existingRequestedIds = new LinkedHashSet<>(dto.getUserIds());
         existingRequestedIds.retainAll(existingIds);
         Set<UUID> newMemberIds = newMembers(dto.getUserIds(), existingIds);
-        communities.requireNoResidualCommunityMembership(id, newMemberIds);
-        users.requireActiveUsers(newMemberIds);
+        List<RejectedParticipantDTO> rejected = users.ineligibleUsers(newMemberIds);
+        Set<UUID> admitted = new LinkedHashSet<>(dto.getUserIds());
+        admitted.remove(null);
+        rejected.forEach(user -> admitted.remove(user.userId()));
+        if (admitted.isEmpty()) throw new BusinessRuleException("Nenhum convidado pode entrar na comunidade.");
+        communities.requireNoResidualCommunityMembership(id, newMembers(admitted, existingIds));
 
-        return toResponse(communities.mutateCommunity(community, latest -> {
+        CommunityResponseDTO response = toResponse(communities.mutateCommunity(community, latest -> {
             // revalida na versão mais recente: quem era membro na leitura precisa continuar sendo
-            requireMemberAddition(latest, actor, role);
+            requireMemberAddition(latest, actor);
             if (!latest.memberIds().containsAll(existingRequestedIds)) {
                 throw communities.concurrentModification();
             }
@@ -123,28 +130,28 @@ public class AddCommunityMembersUseCase {
             // atualiza o papel de quem já existe (menos o OWNER) e adiciona os novos
             List<CommunityMember> updatedMembers = copyMembers(latest.getMembers());
             Instant now = Instant.now();
-            for (UUID userId : dto.getUserIds()) {
-                if (userId == null) continue;
+            for (UUID userId : admitted) {
                 updatedMembers.stream().filter(member -> member.getUserId().equals(userId)).findFirst()
                         .ifPresentOrElse(existing -> {
+                            if (existing.getRole() == CommunityRole.ADMIN && role != CommunityRole.ADMIN) {
+                                requireOwner(latest, actor);
+                            }
                             if (existing.getRole() != CommunityRole.OWNER) existing.setRole(role);
                         }, () -> updatedMembers.add(CommunityMember.of(userId, role, now)));
             }
 
             // confere de novo o resíduo nos subgrupos e grava só se a versão não mudou
-            communities.requireNoResidualCommunityMembership(id, newMembers(dto.getUserIds(), latest.memberIds()));
+            communities.requireNoResidualCommunityMembership(id, newMembers(admitted, latest.memberIds()));
             return communityRepository.updateMembersIfCurrent(latest.getId(), latest.getVersion(), updatedMembers,
                     Instant.now(), nextVersion(latest.getVersion()));
         }));
+        response.setRejectedParticipants(rejected);
+        return response;
     }
 
-    /** Dar ADMIN exige OWNER; os outros papéis exigem ADMIN; a comunidade precisa estar ativa */
-    private void requireMemberAddition(ProjectCommunity community, UUID actor, CommunityRole role) {
-        if (role == CommunityRole.ADMIN) {
-            requireOwner(community, actor);
-        } else {
-            requireAdmin(community, actor);
-        }
+    /** Adicionar e promover exigem ADMIN; a comunidade precisa estar ativa */
+    private void requireMemberAddition(ProjectCommunity community, UUID actor) {
+        requireAdmin(community, actor);
         requireCommunityActive(community);
     }
 

@@ -32,9 +32,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public interface ConversationOpenApi {
     @Operation(
         summary = "Inicia uma conversa direta entre duas pessoas",
-        description = "O iniciador é o usuário autenticado. O par canônico identifica uma única DIRECT, ativa ou "
-                + "desativada. Após revalidar atividade e autorização, reutiliza ou reativa o mesmo ID, histórico e "
-                + "preferências. Criação, reuso e reativação retornam 201 com Location. Não há retry automático."
+        description = "O iniciador é o usuário autenticado. O par canônico identifica uma única DIRECT. "
+                + "Após revalidar atividade e autorização, reutiliza o mesmo ID, histórico e preferências. "
+                + "Criação e reuso retornam 201 com Location. Não há retry automático."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Conversa criada ou reaproveitada", headers = {
@@ -138,14 +138,15 @@ public interface ConversationOpenApi {
     @Operation(
         summary = "Adiciona participantes a uma conversa em grupo",
         description = "Somente o gestor atual adiciona participantes. Grupo e comunidade devem estar ativos; "
-                + "em subgrupo, os convidados precisam pertencer à comunidade e estar ativos na Auth. "
+                + "convidado inexistente, inativo ou, em subgrupo, fora da comunidade fica de fora e volta em "
+                + "rejectedParticipants; sem nenhum convidado aceito, responde 422. "
                 + "Participação e estados são gravados atomicamente; primeiro baseline é o head da entrada. "
                 + "Readmissão preserva baseline original, leitura e preferências, sem scanner ou reparação automática."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Participantes adicionados"),
-            @ApiResponse(responseCode = "403", description = "Papel insuficiente ou convidado inativo"),
-            @ApiResponse(responseCode = "404", description = "Conversa ou novo participante não encontrado"),
+            @ApiResponse(responseCode = "403", description = "Papel insuficiente"),
+            @ApiResponse(responseCode = "404", description = "Conversa não encontrada"),
             @ApiResponse(responseCode = "409", description = "GROUP_MANAGER_UNAVAILABLE ou CONCURRENT_MODIFICATION"),
             @ApiResponse(responseCode = "422", description = "Grupo/comunidade inativos, participante fora da comunidade ou estado inconsistente"),
             @ApiResponse(responseCode = "503", description = "Auth/banco indisponível ou resultado da admissão não confirmado")
@@ -174,7 +175,8 @@ public interface ConversationOpenApi {
     @Operation(
         summary = "Remove um participante de um grupo ou sai do grupo",
         description = "Somente o gestor pode remover terceiros, com grupo e comunidade ativos. "
-                + "Saída voluntária continua permitida no archive, com sucessor quando o gestor sai. "
+                + "Saída voluntária continua permitida no archive, com sucessor quando o gestor sai e ainda há outros. "
+                + "Grupo que fica vazio é apagado com mensagens e estados. "
                 + "Retorna 204 sem roster; repetir a retirada dos próprios resíduos não concede acesso."
     )
     @ApiResponses({

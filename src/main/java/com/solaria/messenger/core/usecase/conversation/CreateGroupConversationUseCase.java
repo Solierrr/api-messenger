@@ -1,5 +1,6 @@
 package com.solaria.messenger.core.usecase.conversation;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -119,14 +120,16 @@ public class CreateGroupConversationUseCase {
         if (parent != null) candidates.retainAll(parent.memberIds());
 
         // aceitos: criador + candidatos elegíveis; o grupo precisa de pelo menos dois
+        List<RejectedParticipantDTO> rejected = new ArrayList<>(users.ineligibleUsers(candidates));
         Set<UUID> accepted = new LinkedHashSet<>();
         accepted.add(creator);
-        accepted.addAll(users.eligibleUsers(candidates));
+        accepted.addAll(candidates);
+        rejected.forEach(user -> accepted.remove(user.userId()));
         if (accepted.size() < 2) {
             throw new BusinessRuleException("Um grupo exige o criador e ao menos outro participante elegível.");
         }
-        List<RejectedParticipantDTO> rejected = requested.stream().filter(user -> !accepted.contains(user))
-                .map(user -> new RejectedParticipantDTO(user, "PARTICIPANT_NOT_ADMITTED")).toList();
+        requested.stream().filter(user -> !user.equals(creator) && !candidates.contains(user))
+                .forEach(user -> rejected.add(new RejectedParticipantDTO(user, "NOT_COMMUNITY_MEMBER")));
 
         // grava o grupo e devolve aceitos e rejeitados
         Conversation conversation = newConversation(ConversationType.GROUP, creator, accepted);

@@ -38,14 +38,12 @@ import com.solaria.messenger.core.model.enums.ConversationType;
  */
 public interface ConversationRepository extends MongoRepository<Conversation, String> {
 
-    /** Direta pelo par canônico, inclusive quando desativada. */
+    /** Direta pelo par canônico. */
     Optional<Conversation> findByConversationTypeAndDirectKey(ConversationType type, String directKey);
 
-    /** Reativa somente a identidade e a versão observadas, sem alterar preferências ou participantes. */
-    @Query("{ '_id': ?0, 'version': ?1, 'conversation_type': 'DIRECT', 'direct_key': ?2, "
-            + "'status': 'DEACTIVATED', 'community_id': null, 'participant_ids': { '$all': ?3, '$size': 2 } }")
-    @Update("{ '$set': { 'status': 'ACTIVE', 'version': ?4 } }")
-    long reactivateDirectIfCurrent(String id, Long version, String directKey, Set<UUID> participants, Long nextVersion);
+    /** Apaga o grupo só se ele estiver sem participantes. */
+    @Query(value = "{ '_id': ?0, 'conversation_type': 'GROUP', 'participant_ids': { '$size': 0 } }", delete = true)
+    long deleteEmptyGroup(String id);
 
     /** Conversas em que o user participa */
     List<Conversation> findByParticipantIdsContainingOrderByLastInteractionAtDesc(UUID userId);
