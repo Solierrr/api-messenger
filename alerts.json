@@ -1,0 +1,8 @@
+{
+  "service": "api-messenger",
+  "aliases": [
+    "messenger"
+  ],
+  "project": "DEV",
+  "host": "https://messenger.solarianetwork.site"
+}
