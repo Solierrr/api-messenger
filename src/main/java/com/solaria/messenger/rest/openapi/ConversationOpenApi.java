@@ -28,34 +28,13 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
-/**
- * Contrato Swagger/OpenAPI dos recursos de conversa, em {@code /messaging/conversations}.
- *
- * <p>Declara as operações e os códigos de resposta. A implementação fica em
- * {@link com.solaria.messenger.rest.controller.ConversationController}.</p>
- *
- * <p>Principais operações disponibilizadas:</p>
- * <ul>
- *     <li>{@link #createDirectConversation(DirectConversationRequestDTO)} - inicia ou reaproveita uma direta.</li>
- *     <li>{@link #createGroupConversation(GroupConversationRequestDTO)} - inicia um grupo.</li>
- *     <li>{@link #createChatbotConversation(ChatbotConversationRequestDTO)} - inicia uma conversa com o chatbot.</li>
- *     <li>{@link #findById(String)} - busca uma conversa.</li>
- *     <li>{@link #findMine(boolean)} - lista as conversas do usuário com o estado próprio.</li>
- *     <li>{@link #patchOwnedState(String, ConversationStatePatchRequestDTO)} - altera leitura e preferências.</li>
- *     <li>{@link #addParticipants(String, ParticipantsRequestDTO)} - adiciona participantes a um grupo.</li>
- *     <li>{@link #transferManager(String, TransferManagerRequestDTO)} - transfere a gestão do grupo.</li>
- *     <li>{@link #removeParticipant(String, UUID, String)} - remove um participante ou registra a saída.</li>
- * </ul>
- */
 @Tag(name = "Conversas", description = "Conversas diretas, em grupo e com o chatbot")
 public interface ConversationOpenApi {
-
-    /** Contrato OpenAPI: inicia ou reaproveita a direta entre duas pessoas. */
     @Operation(
         summary = "Inicia uma conversa direta entre duas pessoas",
-        description = "O iniciador é o usuário autenticado. O par canônico identifica uma única DIRECT, ativa ou "
-                + "desativada. Após revalidar atividade e autorização, reutiliza ou reativa o mesmo ID, histórico e "
-                + "preferências. Criação, reuso e reativação retornam 201 com Location. Não há retry automático."
+        description = "O iniciador é o usuário autenticado. O par canônico identifica uma única DIRECT. "
+                + "Após revalidar atividade e autorização, reutiliza o mesmo ID, histórico e preferências. "
+                + "Criação e reuso retornam 201 com Location. Não há retry automático."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Conversa criada ou reaproveitada", headers = {
@@ -86,7 +65,6 @@ public interface ConversationOpenApi {
     })
     ResponseEntity<ConversationResponseDTO> createDirectConversation(DirectConversationRequestDTO dto);
 
-    /** Contrato OpenAPI: inicia uma conversa em grupo. */
     @Operation(summary = "Inicia uma conversa em grupo",
             description = "Inclui o criador e exige ao menos dois participantes distintos elegíveis. "
                     + "Inelegibilidade individual exclui apenas o convidado; a resposta informa seu ID e motivo genérico. "
@@ -103,7 +81,6 @@ public interface ConversationOpenApi {
     })
     ResponseEntity<GroupCreationResponseDTO> createGroupConversation(GroupConversationRequestDTO dto);
 
-    /** Contrato OpenAPI: inicia uma conversa com o chatbot. */
     @Operation(
         summary = "Inicia uma conversa com o chatbot",
         description = " o inciador da conversa é o id do JWT do usuario autenticado"
@@ -114,7 +91,6 @@ public interface ConversationOpenApi {
     })
     ResponseEntity<ConversationResponseDTO> createChatbotConversation(ChatbotConversationRequestDTO dto);
 
-    /** Contrato OpenAPI: busca uma conversa pelo identificador. */
     @Operation(
         summary = "Busca uma conversa pelo identificador",
         description = "Só participantes da conversa podem acessá-la"
@@ -126,13 +102,12 @@ public interface ConversationOpenApi {
     })
     ResponseEntity<ConversationResponseDTO> findById(String id);
 
-    /** Contrato OpenAPI: lista as conversas autorizadas com o estado próprio. */
     @Operation(summary = "Lista conversas autorizadas com estado próprio",
             description = "archived=false seleciona a principal; true seleciona arquivadas pessoais. "
                     + "Valida baseline de todos os humanos autorizados antes do filtro. Não inicializa estado. "
                     + "CHAT_BOT fica só na principal e omite as cinco chaves pessoais; preserva nulls de preview. "
                     + "Prévia/badge vêm de mensagens persistidas em lote. Ordem por última interação decrescente, id crescente. "
-                    + "A mesma projeção é publicada em CONVERSATION_UPDATED na fila privada. "
+                    + "A mesma projeção é publicada em CONVERSATION_UPDATED em /topic/users.{userId}.events. "
                     + "syncEpoch/syncVersion ordenam itens; headers marcam o snapshot inteiro, inclusive vazio.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Array de itens próprios", headers = {
@@ -146,7 +121,6 @@ public interface ConversationOpenApi {
     })
     ResponseEntity<List<ConversationListItemResponseDTO>> findMine(boolean archived);
 
-    /** Contrato OpenAPI: altera leitura e preferências do próprio ator. */
     @Operation(summary = "Altera leitura e preferências do próprio ator",
             description = "PATCH parcial, ao menos uma chave presente e não nula. Cursor monotônico até head persistido. "
                     + "Valor menor não impede outra preferência válida. No-op não grava/publica. "
@@ -161,25 +135,24 @@ public interface ConversationOpenApi {
     })
     ResponseEntity<ConversationStateResponseDTO> patchOwnedState(String id, ConversationStatePatchRequestDTO patch);
 
-    /** Contrato OpenAPI: adiciona participantes a uma conversa em grupo. */
     @Operation(
         summary = "Adiciona participantes a uma conversa em grupo",
         description = "Somente o gestor atual adiciona participantes. Grupo e comunidade devem estar ativos; "
-                + "em subgrupo, os convidados precisam pertencer à comunidade e estar ativos na Auth. "
+                + "convidado inexistente, inativo ou, em subgrupo, fora da comunidade fica de fora e volta em "
+                + "rejectedParticipants; sem nenhum convidado aceito, responde 422. "
                 + "Participação e estados são gravados atomicamente; primeiro baseline é o head da entrada. "
                 + "Readmissão preserva baseline original, leitura e preferências, sem scanner ou reparação automática."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Participantes adicionados"),
-            @ApiResponse(responseCode = "403", description = "Papel insuficiente ou convidado inativo"),
-            @ApiResponse(responseCode = "404", description = "Conversa ou novo participante não encontrado"),
+            @ApiResponse(responseCode = "403", description = "Papel insuficiente"),
+            @ApiResponse(responseCode = "404", description = "Conversa não encontrada"),
             @ApiResponse(responseCode = "409", description = "GROUP_MANAGER_UNAVAILABLE ou CONCURRENT_MODIFICATION"),
             @ApiResponse(responseCode = "422", description = "Grupo/comunidade inativos, participante fora da comunidade ou estado inconsistente"),
             @ApiResponse(responseCode = "503", description = "Auth/banco indisponível ou resultado da admissão não confirmado")
     })
     ResponseEntity<ConversationResponseDTO> addParticipants(String id, ParticipantsRequestDTO dto);
 
-    /** Contrato OpenAPI: transfere a gestão atual do grupo. */
     @Operation(
         summary = "Transfere a gestão atual do grupo",
         description = "O gestor atual designa outro participante ativo; grupo e comunidade devem estar ativos. "
@@ -199,11 +172,11 @@ public interface ConversationOpenApi {
     ResponseEntity<ManagerTransferResponse> transferManager(
             String id, TransferManagerRequestDTO dto);
 
-    /** Contrato OpenAPI: remove um participante ou registra a saída do próprio usuário. */
     @Operation(
         summary = "Remove um participante de um grupo ou sai do grupo",
         description = "Somente o gestor pode remover terceiros, com grupo e comunidade ativos. "
-                + "Saída voluntária continua permitida no archive, com sucessor quando o gestor sai. "
+                + "Saída voluntária continua permitida no archive, com sucessor quando o gestor sai e ainda há outros. "
+                + "Grupo que fica vazio é apagado com mensagens e estados. "
                 + "Retorna 204 sem roster; repetir a retirada dos próprios resíduos não concede acesso."
     )
     @ApiResponses({
@@ -223,7 +196,6 @@ public interface ConversationOpenApi {
                             pattern = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"))
             String successorUserId);
 
-    /** Remoção sem sucessor explícito. */
     default ResponseEntity<Void> removeParticipant(String id, UUID userId) {
         return removeParticipant(id, userId, null);
     }

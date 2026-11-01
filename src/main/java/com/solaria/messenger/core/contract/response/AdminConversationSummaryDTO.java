@@ -3,6 +3,7 @@ package com.solaria.messenger.core.contract.response;
 import java.time.Instant;
 import java.util.UUID;
 
+/** Resumo de uma conversa com o chatbot no histórico administrativo */
 public record AdminConversationSummaryDTO(
         String sessionId,
         UUID userId,

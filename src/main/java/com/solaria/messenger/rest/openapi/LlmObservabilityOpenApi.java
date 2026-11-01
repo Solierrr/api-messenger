@@ -13,16 +13,12 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
-/**
- * Contrato Swagger/OpenAPI da telemetria de LLM, exposta em {@code /internal/observability}
- */
 @Tag(
     name = "Observabilidade de LLM",
 description = "Telemetria interna do pipeline de LLM -> roteador/nós do grafo reportam métricas de cada passo (chamada a modelo ou a ferramenta). "
     + "Endpoints internos, em /internal/observability, cujo acesso deve ser restrito pela rede de implantação."
 )
 public interface LlmObservabilityOpenApi {
-
     @Operation(
         summary = "Registra um evento de telemetria de um passo do pipeline de LLM",
         description = "Log de auditoria imutável -> não há update/delete. Se timestamp não for informado o horário de ingestão (Instant.now()) é usado."

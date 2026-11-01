@@ -16,18 +16,23 @@ import org.springframework.web.socket.config.annotation.WebSocketTransportRegist
 import com.solaria.messenger.websocket.security.StompAuthChannelInterceptor;
 import com.solaria.messenger.websocket.security.ResourceOutboundChannelInterceptor;
 import com.solaria.messenger.websocket.session.LocalWebSocketSessionRegistry;
-import com.solaria.messenger.core.service.ConversationAuthorizationService;
+import com.solaria.messenger.core.helper.ConversationAccessHelper;
 
 /**
- * Configuracao do WebSocket/STOMP
+ * Configuração do WebSocket/STOMP.
  *
- * - endpoint STOMP em /ws
- * - prefixo /app para destinos de comando
- * - autenticacao real do CONNECT via {@link StompAuthChannelInterceptor}
- * - endpoints websocket registrados em /messanging/ws por conta do Kong(gateway)
- * - broker externo: relay STOMP para o RabbitMQ, que entrega os eventos a todos os pods
- * - sem relay habilitado ({@code app.broker.enabled}), broker em memória do Spring, válido para um pod só (QA)
- * - Kong derruba conexoes ociosas apos ~60s; o heartbeat 10s/10s pedido pelo cliente é negociado com o RabbitMQ
+ * <p>
+ * Pontos da configuração:
+ * </p>
+ * <ul>
+ *     <li>endpoint STOMP em {@code /ws}, também registrado em {@code /messaging/ws} por conta do Kong (gateway);</li>
+ *     <li>prefixo {@code /app} para destinos de comando;</li>
+ *     <li>autenticação real do CONNECT via {@link StompAuthChannelInterceptor};</li>
+ *     <li>broker externo: relay STOMP para o RabbitMQ, que entrega os eventos a todos os pods;</li>
+ *     <li>sem relay habilitado ({@code app.broker.enabled}), broker em memória do Spring, válido para um pod só (QA);</li>
+ *     <li>Kong derruba conexões ociosas após ~60s, e o heartbeat 10s/10s pedido pelo cliente é negociado com o
+ *         RabbitMQ.</li>
+ * </ul>
  */
 @Configuration
 @EnableWebSocketMessageBroker
@@ -36,11 +41,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final StompAuthChannelInterceptor stompAuthChannelInterceptor;
     private final LocalWebSocketSessionRegistry webSocketSessionRegistry;
-    private final ConversationAuthorizationService authorization;
+    private final ConversationAccessHelper authorization;
     private final BrokerProperties broker;
 
     public WebSocketConfig(StompAuthChannelInterceptor stompAuthChannelInterceptor,
-            LocalWebSocketSessionRegistry webSocketSessionRegistry, ConversationAuthorizationService authorization,
+            LocalWebSocketSessionRegistry webSocketSessionRegistry, ConversationAccessHelper authorization,
             BrokerProperties broker) {
         this.stompAuthChannelInterceptor = stompAuthChannelInterceptor;
         this.webSocketSessionRegistry = webSocketSessionRegistry;

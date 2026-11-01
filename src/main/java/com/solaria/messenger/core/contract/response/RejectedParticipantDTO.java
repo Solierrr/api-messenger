@@ -2,6 +2,6 @@ package com.solaria.messenger.core.contract.response;
 
 import java.util.UUID;
 
-/** Informa somente o ID solicitado e um motivo genérico, sem revelar dados da conta. */
+/** Convidado que ficou de fora: {@code USER_NOT_FOUND}, {@code USER_INACTIVE} ou {@code NOT_COMMUNITY_MEMBER}. */
 public record RejectedParticipantDTO(UUID userId, String reasonCode) {
 }

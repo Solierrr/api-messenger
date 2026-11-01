@@ -20,7 +20,6 @@ public final class ConversationMapper {
                 .communityId(conversation.getCommunityId())
                 .userType(conversation.getUserType())
                 .userDetails(conversation.getUserDetails())
-                .status(conversation.getStatus())
                 .startedAt(conversation.getStartedAt())
                 .lastInteractionAt(conversation.getLastInteractionAt())
                 .build();
@@ -31,7 +30,6 @@ public final class ConversationMapper {
         return new SubgroupMetadataResponseDTO(
                 conversation.getId(),
                 conversation.getTitle(),
-                conversation.getStatus(),
                 conversation.getParticipantIds(),
                 conversation.getManagerUserId(),
                 conversation.getStartedAt(),

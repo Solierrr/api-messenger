@@ -8,7 +8,7 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import com.solaria.messenger.core.model.Rating;
 
 /**
- * Repositório Spring Data MongoDB da entidade {@link Rating}.
+ * Repositório da entidade {@link Rating}.
  *
  * <p>Principais consultas disponibilizadas:</p>
  * <ul>

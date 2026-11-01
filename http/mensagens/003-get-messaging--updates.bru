@@ -1,0 +1,28 @@
+meta {
+  name: GET /messaging/updates
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/messaging/updates
+  body: none
+  auth: bearer
+}
+
+params:query {
+  since: 0
+  ~limit: 100
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+docs {
+  Devolve as mensagens que mudaram depois de uma versão (catch-up)
+  Sem since, devolve só o ponto de partida. O cursor é a versão atual do relógio e messages vem vazio. Desmarque o parâmetro since para ver esse caso.
+  Com since, devolve o estado atual das mensagens com changeVersion maior que since, em ordem crescente. Entram as conversas que o usuário lê hoje e as que perdeu depois de since. Nas conversas perdidas, só vão as mensagens até a versão da saída.
+  Guarde o cursor da resposta e envie-o como since na próxima chamada. Com hasMore verdadeiro, repita a chamada. Se syncEpoch mudar, refaça a sincronização completa.
+  Assine /topic/users.{userId}.events antes de chamar, para não perder eventos entre a consulta e a assinatura.
+}

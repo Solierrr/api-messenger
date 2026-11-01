@@ -18,8 +18,11 @@ import com.solaria.messenger.websocket.dto.response.WsErrorPayload;
 import com.solaria.messenger.websocket.security.StompDestinations;
 
 /**
- * Tratamento centralizado dos erros dos handlers {@code @MessageMapping}
- * o cliente é avisado em {@code /topic/users.{userId}.errors} e a conexão permanece aberta
+ * Tratamento centralizado dos erros dos handlers {@code @MessageMapping}.
+ *
+ * <p>
+ * O cliente é avisado em {@code /topic/users.{userId}.errors} e a conexão permanece aberta.
+ * </p>
  */
 @ControllerAdvice
 public class StompErrorHandler {
@@ -61,7 +64,7 @@ public class StompErrorHandler {
     }
 
     /**
-     * Corpo do SEND que não é JSON válido 
+     * Corpo do SEND que não é JSON válido
      * comando é descartado e ocliente é avisado no tópico privado de erros
      */
     @MessageExceptionHandler(MessageConversionException.class)
@@ -82,7 +85,7 @@ public class StompErrorHandler {
                 .build(), "conflito de sequência");
     }
 
-    /** A correlação só é anexada pelo MessageSendService, já em formato UUID canônico. */
+    /** A correlação só é anexada pelo MessageWriteHelper, já em formato UUID canônico. */
     private static String correlatedClientMessageId(BusinessException ex) {
         return ex.getProperties().get("clientMessageId") instanceof String clientMessageId ? clientMessageId : null;
     }

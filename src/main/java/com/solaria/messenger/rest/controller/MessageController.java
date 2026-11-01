@@ -18,19 +18,24 @@ import com.solaria.messenger.core.contract.request.MessageRequestDTO;
 import com.solaria.messenger.core.contract.response.MessageResponseDTO;
 import com.solaria.messenger.core.contract.request.MessageEditRequestDTO;
 import com.solaria.messenger.rest.openapi.MessageOpenApi;
-import com.solaria.messenger.core.service.message.MessageMutationService;
-import com.solaria.messenger.core.service.message.MessageQueryService;
-import com.solaria.messenger.core.service.message.MessageSendService;
+import com.solaria.messenger.core.usecase.message.DeleteMessageUseCase;
+import com.solaria.messenger.core.usecase.message.EditMessageUseCase;
+import com.solaria.messenger.core.usecase.message.ListConversationMessagesUseCase;
+import com.solaria.messenger.core.usecase.message.SendUserMessageUseCase;
 
 import jakarta.validation.Valid;
 
 /**
  * Controller REST dos recursos de mensagem, exposto em {@code /messaging/messages}.
  *
- * <p>Atua na camada de entrada HTTP: valida o corpo ({@code @Valid}) e delega envio, edição, remoção
- * e consulta aos serviços de mensagem. O contrato da API é declarado em {@link MessageOpenApi}.</p>
+ * <p>
+ * Atua na camada de entrada HTTP: valida o corpo ({@code @Valid}) e delega envio, edição, remoção
+ * e consulta aos serviços de mensagem. O contrato da API é declarado em {@link MessageOpenApi}.
+ * </p>
  *
- * <p>Principais operações disponibilizadas:</p>
+ * <p>
+ * Principais operações disponibilizadas:
+ * </p>
  * <ul>
  *     <li>{@link #sendMessage(MessageRequestDTO)} -> envia uma mensagem (201).</li>
  *     <li>{@link #editMessage(String, MessageEditRequestDTO)} -> edita o texto de uma mensagem própria.</li>
@@ -42,35 +47,38 @@ import jakarta.validation.Valid;
 @RequestMapping("/messaging/messages")
 public class MessageController implements MessageOpenApi {
 
-    private final MessageSendService sends;
-    private final MessageMutationService mutations;
-    private final MessageQueryService queries;
+    private final SendUserMessageUseCase sendMessage;
+    private final EditMessageUseCase editMessage;
+    private final DeleteMessageUseCase deleteMessage;
+    private final ListConversationMessagesUseCase listMessages;
 
-    public MessageController(MessageSendService sends, MessageMutationService mutations, MessageQueryService queries) {
-        this.sends = sends;
-        this.mutations = mutations;
-        this.queries = queries;
+    public MessageController(SendUserMessageUseCase sendMessage, EditMessageUseCase editMessage,
+            DeleteMessageUseCase deleteMessage, ListConversationMessagesUseCase listMessages) {
+        this.sendMessage = sendMessage;
+        this.editMessage = editMessage;
+        this.deleteMessage = deleteMessage;
+        this.listMessages = listMessages;
     }
 
     /** Envia uma mensagem e devolve 201, sem cabeçalho Location. */
     @Override
     @PostMapping
     public ResponseEntity<MessageResponseDTO> sendMessage(@Valid @RequestBody MessageRequestDTO dto) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(sends.sendUserMessage(dto));
+        return ResponseEntity.status(HttpStatus.CREATED).body(sendMessage.execute(dto));
     }
 
     /** Edita o texto de uma mensagem própria. */
     @Override
     @PatchMapping("/{id}")
     public ResponseEntity<MessageResponseDTO> editMessage(@PathVariable String id, @Valid @RequestBody MessageEditRequestDTO dto) {
-        return ResponseEntity.ok(mutations.editMessage(id, dto));
+        return ResponseEntity.ok(editMessage.execute(id, dto));
     }
 
     /** Exclui logicamente uma mensagem própria e devolve o tombstone. */
     @Override
     @DeleteMapping("/{id}")
     public ResponseEntity<MessageResponseDTO> deleteMessage(@PathVariable String id) {
-        return ResponseEntity.ok(mutations.deleteMessage(id));
+        return ResponseEntity.ok(deleteMessage.execute(id));
     }
 
     /** Lista o histórico paginado por um único cursor ({@code sinceSequence} ou {@code beforeSequence}). */
@@ -80,6 +88,6 @@ public class MessageController implements MessageOpenApi {
             @RequestParam(required = false) Integer sinceSequence,
             @RequestParam(required = false) Integer beforeSequence,
             @RequestParam(required = false) Integer limit) {
-        return ResponseEntity.ok(queries.getMessagesByConversationId(conversationId, sinceSequence, beforeSequence, limit));
+        return ResponseEntity.ok(listMessages.execute(conversationId, sinceSequence, beforeSequence, limit));
     }
 }

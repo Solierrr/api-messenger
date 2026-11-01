@@ -29,9 +29,10 @@ import com.solaria.messenger.core.contract.response.MessageResponseDTO;
 import com.solaria.messenger.rest.error.ProblemDetailFactory;
 import com.solaria.messenger.core.model.enums.MessageType;
 import com.solaria.messenger.core.security.rbac.RbacAuthorizationService;
-import com.solaria.messenger.core.service.message.MessageMutationService;
-import com.solaria.messenger.core.service.message.MessageQueryService;
-import com.solaria.messenger.core.service.message.MessageSendService;
+import com.solaria.messenger.core.usecase.message.DeleteMessageUseCase;
+import com.solaria.messenger.core.usecase.message.EditMessageUseCase;
+import com.solaria.messenger.core.usecase.message.ListConversationMessagesUseCase;
+import com.solaria.messenger.core.usecase.message.SendUserMessageUseCase;
 
 @WebMvcTest(MessageController.class)
 @Import(ProblemDetailFactory.class)
@@ -41,13 +42,16 @@ class MessageControllerTests {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private MessageSendService sends;
+    private SendUserMessageUseCase sendMessage;
 
     @MockitoBean
-    private MessageMutationService mutations;
+    private EditMessageUseCase editMessage;
 
     @MockitoBean
-    private MessageQueryService queries;
+    private DeleteMessageUseCase deleteMessage;
+
+    @MockitoBean
+    private ListConversationMessagesUseCase listMessages;
 
     // dependências do StompErrorHandler, que é @ControllerAdvice e entra no slice do @WebMvcTest
     @MockitoBean
@@ -58,7 +62,7 @@ class MessageControllerTests {
 
     @Test
     void sendsGroupMessage() throws Exception {
-        given(sends.sendUserMessage(any(MessageRequestDTO.class)))
+        given(sendMessage.execute(any(MessageRequestDTO.class)))
                 .willReturn(messageResponse(MessageType.USER_TO_GROUP));
 
         mockMvc.perform(post("/messaging/messages")
@@ -73,9 +77,8 @@ class MessageControllerTests {
 
     @Test
     void sendMessageResponseHasNoLocationHeader() throws Exception {
-        // F-17: sem GET por id de mensagem, o header antigo apontava para uma rota inexistente
-        // (e resolveria via Kong para o serviço errado) - a resposta não deve ter Location.
-        given(sends.sendUserMessage(any(MessageRequestDTO.class)))
+        // não existe GET por id de mensagem, então a resposta não leva Location
+        given(sendMessage.execute(any(MessageRequestDTO.class)))
                 .willReturn(messageResponse(MessageType.USER_TO_GROUP));
 
         mockMvc.perform(post("/messaging/messages")
@@ -96,8 +99,8 @@ class MessageControllerTests {
 
     @Test
     void acceptsMessageWithoutRole() throws Exception {
-        // F-21: role é derivado no servidor - o campo deixou de ser @NotBlank no DTO.
-        given(sends.sendUserMessage(any(MessageRequestDTO.class)))
+        // role é opcional no DTO: o servidor define o valor
+        given(sendMessage.execute(any(MessageRequestDTO.class)))
                 .willReturn(messageResponse(MessageType.USER_TO_USER));
 
         mockMvc.perform(post("/messaging/messages")
@@ -109,7 +112,7 @@ class MessageControllerTests {
 
     @Test
     void getsMessagesByConversationId() throws Exception {
-        given(queries.getMessagesByConversationId(eq("conv-1"), isNull(), isNull(), isNull()))
+        given(listMessages.execute(eq("conv-1"), isNull(), isNull(), isNull()))
                 .willReturn(List.of(messageResponse(MessageType.USER_TO_GROUP)));
 
         mockMvc.perform(get("/messaging/messages/conversation/conv-1"))
@@ -120,7 +123,7 @@ class MessageControllerTests {
 
     @Test
     void passesSinceSequenceAndLimitToService() throws Exception {
-        given(queries.getMessagesByConversationId(eq("conv-1"), eq(5), isNull(), eq(20)))
+        given(listMessages.execute(eq("conv-1"), eq(5), isNull(), eq(20)))
                 .willReturn(List.of(messageResponse(MessageType.USER_TO_GROUP)));
 
         mockMvc.perform(get("/messaging/messages/conversation/conv-1")
@@ -128,7 +131,7 @@ class MessageControllerTests {
                         .param("limit", "20"))
                 .andExpect(status().isOk());
 
-        verify(queries).getMessagesByConversationId("conv-1", 5, null, 20);
+        verify(listMessages).execute("conv-1", 5, null, 20);
     }
 
     private MessageResponseDTO messageResponse(MessageType type) {

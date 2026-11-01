@@ -11,7 +11,8 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import com.solaria.messenger.core.model.Conversation;
-import com.solaria.messenger.core.service.ConversationAuthorizationService;
+import com.solaria.messenger.core.helper.ConversationAccessHelper;
+import com.solaria.messenger.core.helper.LookupHelper;
 import com.solaria.messenger.websocket.dto.response.WsEventEnvelope;
 import com.solaria.messenger.websocket.security.StompDestinations;
 import com.solaria.messenger.websocket.session.LocalWebSocketSessionRegistry;
@@ -33,14 +34,16 @@ import com.solaria.messenger.websocket.event.SessionPresenceChanged;
 public class TypingService {
 
     private static final Logger log = LoggerFactory.getLogger(TypingService.class);
-    private final ConversationAuthorizationService authorization;
+    private final ConversationAccessHelper authorization;
+    private final LookupHelper lookup;
     private final TypingPresenceService typingPresence;
     private final LocalWebSocketSessionRegistry sessions;
     private final SimpMessagingTemplate messaging;
 
-    public TypingService(ConversationAuthorizationService authorization, TypingPresenceService typingPresence,
+    public TypingService(ConversationAccessHelper authorization, LookupHelper lookup, TypingPresenceService typingPresence,
             LocalWebSocketSessionRegistry sessions, SimpMessagingTemplate messaging) {
         this.authorization = authorization;
+        this.lookup = lookup;
         this.typingPresence = typingPresence;
         this.sessions = sessions;
         this.messaging = messaging;
@@ -52,7 +55,7 @@ public class TypingService {
         if (typingPresence.startedRecently(conversationId, userId)) return;
 
         // participante de conversa com comunidade ativa
-        Conversation conversation = authorization.requireEntityById(conversationId);
+        Conversation conversation = lookup.requireConversation(conversationId);
         authorization.requireParticipant(conversation, actor);
         authorization.requireCommunityActive(conversation);
 
@@ -62,7 +65,7 @@ public class TypingService {
 
     /** Avisa o fim do typing; funciona mesmo com a comunidade arquivada */
     public void stop(String conversationId, UUID actor) {
-        Conversation conversation = authorization.requireEntityById(conversationId);
+        Conversation conversation = lookup.requireConversation(conversationId);
         authorization.requireParticipant(conversation, actor);
 
         String userId = actor.toString();
