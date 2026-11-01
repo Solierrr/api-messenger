@@ -18,9 +18,10 @@ import com.solaria.messenger.core.integration.langsmith.LangSmithClient;
  * Caso de uso que monta o resumo do LangSmith para o painel administrativo.
  *
  * <p>
- * Junta os totais e os agrupamentos por assistente e por modelo do período. Sem datas, usa os últimos 7 dias até
- * hoje, em UTC, e o último dia entra inteiro. Sem o cliente configurado, responde desligado sem chamar o
- * LangSmith. A resposta de cada período fica em cache no MongoDB por 2 minutos, o mesmo para todos os pods.
+ * Traz só os totais do assistente {@code ai-assistant} no período, em uma única consulta ao LangSmith; os
+ * agrupamentos por assistente e por modelo voltam vazios. Sem datas, usa os últimos 7 dias até hoje, em UTC, e o
+ * último dia entra inteiro. Sem o cliente configurado, responde desligado sem chamar o LangSmith. A resposta de
+ * cada período fica em cache no MongoDB por 2 minutos, o mesmo para todos os pods.
  * </p>
  *
  * <p>
@@ -44,6 +45,7 @@ public class GetLangSmithSummaryUseCase {
     private static final Duration TTL = Duration.ofMinutes(2);
     private static final int DEFAULT_DAYS = 7;
     private static final String CACHE = "langsmith_summary_cache";
+    private static final String ASSISTANT = "ai-assistant";
     private final LangSmithClient client;
     private final MongoTemplate mongoTemplate;
     private final String projectUrl;
@@ -60,7 +62,7 @@ public class GetLangSmithSummaryUseCase {
      *
      * @param from primeiro dia do período. Sem valor, sete dias antes do fim.
      * @param to último dia do período, incluído. Sem valor, hoje em UTC.
-     * @return resumo com projeto, totais e agrupamentos, ou um resumo desligado quando não há configuração.
+     * @return resumo com projeto e totais do {@code ai-assistant}, ou um resumo desligado quando não há configuração.
      */
     public LangSmithSummaryDTO execute(LocalDate from, LocalDate to) {
         if (!client.enabled()) {
@@ -70,7 +72,7 @@ public class GetLangSmithSummaryUseCase {
         LocalDate start = from != null ? from : end.minusDays(DEFAULT_DAYS);
 
         // o cache é compartilhado entre os pods e evita consultar o LangSmith a cada abertura do painel
-        String key = start + "|" + end;
+        String key = ASSISTANT + "|" + start + "|" + end;
         CachedSummary cached = mongoTemplate.findById(key, CachedSummary.class, CACHE);
         if (cached != null && cached.expiresAt().isAfter(Instant.now())) {
             return cached.value();
@@ -78,13 +80,14 @@ public class GetLangSmithSummaryUseCase {
 
         Instant startInstant = start.atStartOfDay(ZoneOffset.UTC).toInstant();
         Instant endInstant = end.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        // uma consulta só (a de totais do ai-assistant): menos chamadas à API de estatísticas do LangSmith, que recusa com 429
         LangSmithSummaryDTO value = new LangSmithSummaryDTO(
                 true,
                 client.project(),
                 projectUrl,
-                client.totals(startInstant, endInstant),
-                client.byAssistant(startInstant, endInstant),
-                client.byModel(startInstant, endInstant));
+                client.assistantTotals(startInstant, endInstant, ASSISTANT),
+                List.of(),
+                List.of());
         mongoTemplate.save(new CachedSummary(key, value, Instant.now().plus(TTL)), CACHE);
         return value;
     }

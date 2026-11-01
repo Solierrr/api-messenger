@@ -35,6 +35,7 @@ import com.solaria.messenger.core.exception.DependencyUnavailableException;
  *     <li>{@link #enabled()} -> indica se o cliente pode consultar o LangSmith.</li>
  *     <li>{@link #project()} -> devolve o nome do projeto configurado.</li>
  *     <li>{@link #totals(Instant, Instant)} -> estatísticas totais do período.</li>
+ *     <li>{@link #assistantTotals(Instant, Instant, String)} -> estatísticas de um só assistente, em uma consulta.</li>
  *     <li>{@link #byAssistant(Instant, Instant)} -> estatísticas agrupadas pelo assistente.</li>
  *     <li>{@link #byModel(Instant, Instant)} -> estatísticas das chamadas de LLM agrupadas pelo modelo.</li>
  * </ul>
@@ -106,8 +107,26 @@ public class LangSmithClient {
      * @throws DependencyUnavailableException caso o LangSmith falhe ou o projeto não exista.
      */
     public LangSmithStatsDTO totals(Instant start, Instant end) {
-        Map<String, Object> raw = stats(start, end, null, null);
+        Map<String, Object> raw = stats(start, end, null, null, null);
         return toStats("total", raw);
+    }
+
+    /**
+     * Busca, numa única consulta, as estatísticas dos runs raiz de um assistente no período.
+     *
+     * @param start início do período.
+     * @param end fim do período.
+     * @param assistant valor do metadado {@code assistant} dos runs, como {@code ai-assistant}.
+     * @return estatísticas com o nome do assistente.
+     * @throws IllegalArgumentException caso o nome do assistente tenha aspas, barra invertida ou fique vazio.
+     * @throws DependencyUnavailableException caso o LangSmith falhe ou o projeto não exista.
+     */
+    public LangSmithStatsDTO assistantTotals(Instant start, Instant end, String assistant) {
+        if (assistant == null || assistant.isBlank() || assistant.contains("\"") || assistant.contains("\\")) {
+            throw new IllegalArgumentException("Nome de assistente inválido para o filtro do LangSmith.");
+        }
+        String filter = "and(eq(metadata_key, \"assistant\"), eq(metadata_value, \"" + assistant + "\"))";
+        return toStats(assistant, stats(start, end, null, null, filter));
     }
 
     /**
@@ -119,7 +138,7 @@ public class LangSmithClient {
      * @throws DependencyUnavailableException caso o LangSmith falhe ou o projeto não exista.
      */
     public List<LangSmithStatsDTO> byAssistant(Instant start, Instant end) {
-        return grouped(stats(start, end, "assistant", null));
+        return grouped(stats(start, end, "assistant", null, null));
     }
 
     /**
@@ -131,10 +150,10 @@ public class LangSmithClient {
      * @throws DependencyUnavailableException caso o LangSmith falhe ou o projeto não exista.
      */
     public List<LangSmithStatsDTO> byModel(Instant start, Instant end) {
-        return grouped(stats(start, end, "ls_model_name", "llm"));
+        return grouped(stats(start, end, "ls_model_name", "llm", null));
     }
 
-    private Map<String, Object> stats(Instant start, Instant end, String groupPath, String runType) {
+    private Map<String, Object> stats(Instant start, Instant end, String groupPath, String runType, String filter) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("session", List.of(projectId().toString()));
         body.put("start_time", start.toString());
@@ -144,6 +163,9 @@ public class LangSmithClient {
             body.put("is_root", true);
         } else {
             body.put("run_type", runType);
+        }
+        if (filter != null) {
+            body.put("filter", filter);
         }
         if (groupPath != null) {
             Map<String, Object> groupBy = new LinkedHashMap<>();
