@@ -16,8 +16,9 @@ import lombok.Setter;
 /**
  * DTO de resposta com os dados de uma mensagem.
  *
- * <p>Retornado pelos endpoints de envio, edição, remoção e listagem de {@code /messaging/messages}
- * e pelo endpoint interno de ingestão do chatbot.</p>
+ * <p>Retornado pelos endpoints de envio, edição, remoção e listagem de {@code /messaging/messages},
+ * pelo catch-up de {@code /messaging/updates}, pelo endpoint interno de ingestão do chatbot e como payload dos eventos
+ * {@code MESSAGE_*} em {@code /topic/users.{userId}.events}.</p>
  */
 @Getter
 @Setter
@@ -40,4 +41,7 @@ public class MessageResponseDTO {
     private MessageMetadata metadata;
     private Instant timestamp;
     private int sequence;
+    /** Versão do relógio de sincronização da última mudança (envio, edição ou exclusão). A maior vence. */
+    @Schema(description = "Versão da última mudança da mensagem. O cliente mantém a de maior valor. Vale 0 em mensagem sem carimbo")
+    private long changeVersion;
 }

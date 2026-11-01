@@ -20,8 +20,24 @@ import com.solaria.messenger.core.contract.response.LangSmithStatsDTO;
 import com.solaria.messenger.core.exception.DependencyUnavailableException;
 
 /**
- * Lê do LangSmith as estatísticas dos runs raiz do projeto (um run raiz = um turno do assistente).
- * A chave fica só aqui no backend; o web-sandbox nunca a recebe.
+ * Cliente HTTP do LangSmith que lê as estatísticas dos runs raiz do projeto.
+ *
+ * <p>
+ * Um run raiz equivale a um turno do assistente. A chave da API fica só no backend, e o web-sandbox nunca a
+ * recebe. {@link #enabled()} indica se há chave e projeto configurados. O id do projeto é buscado uma vez pelo
+ * nome e fica guardado.
+ * </p>
+ *
+ * <p>
+ * Principais operações disponibilizadas:
+ * </p>
+ * <ul>
+ *     <li>{@link #enabled()} -> indica se o cliente pode consultar o LangSmith.</li>
+ *     <li>{@link #project()} -> devolve o nome do projeto configurado.</li>
+ *     <li>{@link #totals(Instant, Instant)} -> estatísticas totais do período.</li>
+ *     <li>{@link #byAssistant(Instant, Instant)} -> estatísticas agrupadas pelo assistente.</li>
+ *     <li>{@link #byModel(Instant, Instant)} -> estatísticas das chamadas de LLM agrupadas pelo modelo.</li>
+ * </ul>
  */
 @Component
 public class LangSmithClient {
@@ -63,23 +79,57 @@ public class LangSmithClient {
         return builder.build();
     }
 
+    /**
+     * Indica se o cliente tem chave e projeto configurados.
+     *
+     * @return {@code true} quando as consultas podem ser feitas.
+     */
     public boolean enabled() {
         return hasKey && !project.isBlank();
     }
 
+    /**
+     * Devolve o nome do projeto configurado.
+     *
+     * @return nome do projeto, ou vazio quando não configurado.
+     */
     public String project() {
         return project;
     }
 
+    /**
+     * Busca as estatísticas totais dos runs raiz do período.
+     *
+     * @param start início do período.
+     * @param end fim do período.
+     * @return estatísticas com o nome {@code total}.
+     * @throws DependencyUnavailableException caso o LangSmith falhe ou o projeto não exista.
+     */
     public LangSmithStatsDTO totals(Instant start, Instant end) {
         Map<String, Object> raw = stats(start, end, null, null);
         return toStats("total", raw);
     }
 
+    /**
+     * Busca as estatísticas dos runs raiz agrupadas pelo assistente.
+     *
+     * @param start início do período.
+     * @param end fim do período.
+     * @return grupos com pelo menos um run, do maior para o menor número de runs.
+     * @throws DependencyUnavailableException caso o LangSmith falhe ou o projeto não exista.
+     */
     public List<LangSmithStatsDTO> byAssistant(Instant start, Instant end) {
         return grouped(stats(start, end, "assistant", null));
     }
 
+    /**
+     * Busca as estatísticas das chamadas de LLM agrupadas pelo modelo.
+     *
+     * @param start início do período.
+     * @param end fim do período.
+     * @return grupos com pelo menos um run, do maior para o menor número de runs.
+     * @throws DependencyUnavailableException caso o LangSmith falhe ou o projeto não exista.
+     */
     public List<LangSmithStatsDTO> byModel(Instant start, Instant end) {
         return grouped(stats(start, end, "ls_model_name", "llm"));
     }

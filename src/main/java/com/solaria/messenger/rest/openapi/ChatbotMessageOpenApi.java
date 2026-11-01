@@ -10,34 +10,20 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
-/**
- * Contrato Swagger/OpenAPI da publicação de mensagens do chatbot, em {@code /internal/messages}.
- *
- * <p>Documenta a ingestão interna da resposta do bot. A implementação fica em
- * {@link com.solaria.messenger.rest.controller.ChatbotMessageController}.</p>
- *
- * <p>Principais operações disponibilizadas:</p>
- * <ul>
- *     <li>{@link #ingestChatbotMessage(ChatbotMessageRequestDTO)} - publica a resposta do bot numa conversa existente.</li>
- * </ul>
- */
 @Tag(
     name = "Mensagens do chatbot (interno)",
     description = "Publicação da resposta do bot numa conversa. Endpoint interno, em /internal/messages, alcançável apenas pela rede interna (nunca via Kong)."
 )
 public interface ChatbotMessageOpenApi {
-
-    /** Contrato OpenAPI: publica a resposta do bot numa conversa existente. */
     @Operation(
         summary = "Publica a resposta do bot numa conversa existente",
         description = "messageType é sempre CHATBOT_TO_USER e role sempre \"assistant\". A conversa "
-                + "precisa ser do tipo CHAT_BOT e estar ativa."
+                + "precisa ser do tipo CHAT_BOT."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Mensagem publicada com sucesso"),
             @ApiResponse(responseCode = "400", description = "Dados de entrada inválidos ou conversa não é do tipo CHAT_BOT"),
-            @ApiResponse(responseCode = "404", description = "Conversa não encontrada"),
-            @ApiResponse(responseCode = "422", description = "A conversa está desativada")
+            @ApiResponse(responseCode = "404", description = "Conversa não encontrada")
     })
     ResponseEntity<MessageResponseDTO> ingestChatbotMessage(ChatbotMessageRequestDTO dto);
 }

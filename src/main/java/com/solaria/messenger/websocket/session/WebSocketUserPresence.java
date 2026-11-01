@@ -4,7 +4,7 @@ import java.util.UUID;
 
 import org.springframework.stereotype.Component;
 
-import com.solaria.messenger.core.service.port.UserPresence;
+import com.solaria.messenger.core.port.UserPresence;
 
 /** Presença online do user a partir das sessões WebSocket admitidas em qualquer pod. */
 @Component

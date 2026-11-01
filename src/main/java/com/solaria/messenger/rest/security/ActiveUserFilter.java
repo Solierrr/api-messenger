@@ -1,11 +1,13 @@
 package com.solaria.messenger.rest.security;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
@@ -16,7 +18,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import com.solaria.messenger.core.exception.BusinessException;
 import com.solaria.messenger.rest.error.ProblemDetailFactory;
 import com.solaria.messenger.rest.observability.HttpObservationErrors;
-import com.solaria.messenger.core.service.UserAccessService;
+import com.solaria.messenger.core.helper.UserAccessHelper;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -27,11 +29,15 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Filtro que valida o usuário do JWT antes de a requisição chegar ao controller
  *
- * <p>Confere se o subject do token é um UUID canônico e se o usuário está ativo na api-auth, consultando
- * {@link UserAccessService} a cada requisição. Usuário inativo ou inexistente recebe erro no formato
- * {@code ProblemDetail}, escrito diretamente na resposta, pois o filtro roda antes do Spring MVC.</p>
+ * <p>
+ * Confere se o subject do token é um UUID canônico e se o usuário está ativo na api-auth, consultando
+ * {@link UserAccessHelper}. Quem foi confirmado ativo fica 30 s sem nova consulta, guardado no Redis e valendo para
+ * todos os pods. Usuário inativo ou inexistente recebe erro no formato {@code ProblemDetail}, escrito diretamente na resposta, pois o filtro roda antes do Spring MVC.
+ * </p>
  *
- * <p>Não se aplica à documentação OpenAPI nem ao handshake WebSocket.</p>
+ * <p>
+ * Não se aplica à documentação OpenAPI nem ao handshake WebSocket.
+ * </p>
  */
 public class ActiveUserFilter extends OncePerRequestFilter {
 
@@ -39,15 +45,21 @@ public class ActiveUserFilter extends OncePerRequestFilter {
     private static final Pattern CANONICAL_UUID = Pattern.compile(
             "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
 
-    private final UserAccessService userAccessService;
+    // + userId -> "1" com TTL; existir quer dizer que a Auth confirmou o usuário ativo há menos de 30 s
+    private static final String ACTIVE_KEY = "messenger:active:";
+    private static final Duration ACTIVE_CACHE_TTL = Duration.ofSeconds(30);
+
+    private final StringRedisTemplate redis;
+    private final UserAccessHelper userAccessService;
     private final ProblemDetailAuthenticationEntryPoint authenticationEntryPoint;
     private final ProblemDetailFactory problemDetailFactory;
     private final ObjectMapper objectMapper;
 
-    public ActiveUserFilter(UserAccessService userAccessService,
+    public ActiveUserFilter(StringRedisTemplate redis, UserAccessHelper userAccessService,
             ProblemDetailAuthenticationEntryPoint authenticationEntryPoint,
             ProblemDetailFactory problemDetailFactory,
             ObjectMapper objectMapper) {
+        this.redis = redis;
         this.userAccessService = userAccessService;
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.problemDetailFactory = problemDetailFactory;
@@ -80,13 +92,36 @@ public class ActiveUserFilter extends OncePerRequestFilter {
             return;
         }
 
-        try {
-            userAccessService.requireActiveActor(UUID.fromString(subject));
-        } catch (BusinessException ex) {
-            writeBusinessError(request, response, ex);
-            return;
+        // usuário confirmado ativo há menos de 30 s, em qualquer pod, não consulta a Auth de novo
+        UUID actor = UUID.fromString(subject);
+        if (!confirmedActive(actor)) {
+            try {
+                userAccessService.requireActiveActor(actor);
+            } catch (BusinessException ex) {
+                writeBusinessError(request, response, ex);
+                return;
+            }
+            markActive(actor);
         }
         filterChain.doFilter(request, response);
+    }
+
+    /** Falha do Redis vira log e valor neutro: a requisição segue e consulta a Auth. */
+    private boolean confirmedActive(UUID actor) {
+        try {
+            return Boolean.TRUE.equals(redis.hasKey(ACTIVE_KEY + actor));
+        } catch (RuntimeException failure) {
+            log.warn("Falha ao ler o cache de usuário ativo no Redis", failure);
+            return false;
+        }
+    }
+
+    private void markActive(UUID actor) {
+        try {
+            redis.opsForValue().set(ACTIVE_KEY + actor, "1", ACTIVE_CACHE_TTL);
+        } catch (RuntimeException failure) {
+            log.warn("Falha ao gravar o cache de usuário ativo no Redis", failure);
+        }
     }
 
     /** Escreve o erro como ProblemDetail direto na resposta, pois o filtro roda antes do Spring MVC. */

@@ -32,10 +32,6 @@ public class MessageRequestDTO {
     @NotNull(message = "messageType é obrigatório")
     private MessageType messageType;
 
-
-    @Size(max = 32, message = "role deve ter no máximo 32 caracteres")
-    private String role;
-
     @NotBlank(message = "content é obrigatório")
     @Size(max = 8000, message = "content deve ter no máximo 8000 caracteres")
     private String content;

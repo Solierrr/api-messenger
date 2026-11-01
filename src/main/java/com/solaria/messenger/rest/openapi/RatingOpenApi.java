@@ -15,26 +15,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
-/**
- * Contrato Swagger/OpenAPI das avaliações, em {@code /messaging/ratings}.
- *
- * <p>Declara as operações e os códigos de resposta. A implementação fica em
- * {@link com.solaria.messenger.rest.controller.RatingController}.</p>
- *
- * <p>Principais operações disponibilizadas:</p>
- * <ul>
- *     <li>{@link #create(RatingRequestDTO)} - cria uma avaliação.</li>
- *     <li>{@link #findById(String)} - busca uma avaliação pelo identificador.</li>
- *     <li>{@link #findByEvaluated(UUID)} - lista as avaliações recebidas por um avaliado.</li>
- *     <li>{@link #findByEvaluator(UUID)} - lista as avaliações feitas por um avaliador.</li>
- *     <li>{@link #update(String, RatingUpdateRequestDTO)} - edita comentário e/ou nota.</li>
- *     <li>{@link #updateStatus(String, RatingStatusUpdateRequestDTO)} - altera o status.</li>
- * </ul>
- */
 @Tag(name = "Avaliações", description = "Avaliações entre usuários, sobre profissional ou produto")
 public interface RatingOpenApi {
-
-    /** Contrato OpenAPI: cria uma nova avaliação. */
     @Operation(
         summary = "Cria uma nova avaliação",
         description = "O avaliador (evaluatorId) é sempre o usuário autenticado da requisição. Status inicial é sempre ACTIVE. Não é permitido avaliar a si mesmo."
@@ -46,7 +28,6 @@ public interface RatingOpenApi {
     })
     ResponseEntity<RatingResponseDTO> create(RatingRequestDTO dto);
 
-    /** Contrato OpenAPI: busca uma avaliação pelo identificador. */
     @Operation(
         summary = "Busca uma avaliação pelo identificador",
         description = "qualquer usuário pode ler uma avaliação."
@@ -57,7 +38,6 @@ public interface RatingOpenApi {
     })
     ResponseEntity<RatingResponseDTO> findById(String id);
 
-    /** Contrato OpenAPI: lista as avaliações recebidas por um avaliado. */
     @Operation(
         summary = "Lista as avaliações de um usuário/produto",
         description = "Reputação pública do avaliado(produto/profissional)."
@@ -67,7 +47,6 @@ public interface RatingOpenApi {
     })
     ResponseEntity<List<RatingResponseDTO>> findByEvaluated(UUID evaluatedId);
 
-    /** Contrato OpenAPI: lista as avaliações dadas por um usuário. */
     @Operation(
         summary = "Lista as avaliações dadas por um usuário",
         description = "Listagem pública (F-17): qualquer usuário pode listar as avaliações dadas por outro."
@@ -77,7 +56,6 @@ public interface RatingOpenApi {
     })
     ResponseEntity<List<RatingResponseDTO>> findByEvaluator(UUID evaluatorId);
 
-    /** Contrato OpenAPI: edita o comentário e/ou a nota de uma avaliação. */
     @Operation(
         summary = "Edita o comentário e/ou a nota de uma avaliação",
         description = "Somente o autor original pode editá-la."
@@ -90,7 +68,6 @@ public interface RatingOpenApi {
     })
     ResponseEntity<RatingResponseDTO> update(String id, RatingUpdateRequestDTO dto);
 
-    /** Contrato OpenAPI: altera o status de uma avaliação. */
     @Operation(
         summary = "Altera o status de uma avaliação",
         description = "Somente o dono da avalição pode alterar o status da avaliação"

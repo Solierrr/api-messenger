@@ -26,24 +26,32 @@ import com.solaria.messenger.core.repository.projection.ConversationMessageHead;
 import com.solaria.messenger.core.repository.projection.LatestMessage;
 
 /**
- * Repositório Spring Data MongoDB da entidade {@link Message}.
+ * Repositório da entidade {@link Message}.
  *
  * <p>Concentra a paginação por cursor de sequência, a alocação de sequência por conversa com nova
- * tentativa sobre o índice único {@code conversation_sequence_idx}, as mutações condicionais (edição e
- * remoção lógica) e as agregações em lote de última mensagem e de mensagens não lidas.</p>
+ * tentativa sobre o índice único {@code conversation_sequence_idx}, as mutações condicionais (edição e remoção lógica,
+ * que gravam o {@code change_version} junto), a consulta de catch-up por versão e as agregações em lote de última
+ * mensagem e de mensagens não lidas.</p>
  *
  * <p>Principais operações disponibilizadas:</p>
  * <ul>
  *     <li>{@link #findByConversationIdOrderBySequenceDesc(String, Limit)} -> página das mensagens mais recentes.</li>
- *     <li>{@link #findByConversationIdAndSequenceLessThanOrderBySequenceDesc(String, int, Limit)} -> página anterior ao cursor.</li>
+ *     <li>{@link #findByConversationIdAndSequenceLessThanOrderBySequenceDesc(String, int, Limit)} -> página anterior ao
+ *         cursor.</li>
  *     <li>{@link #insertWithPersistedSequence(Message)} -> insere a mensagem com a próxima sequência persistida.</li>
- *     <li>{@link #editIfCurrent(String, String, UUID, long, String, long)} -> edita o conteúdo na época observada.</li>
- *     <li>{@link #deleteIfCurrent(String, String, UUID, long, long)} -> aplica a remoção lógica na época observada.</li>
+ *     <li>{@link #editIfCurrent(String, String, UUID, long, String, long, long)} -> edita o conteúdo na época
+ *         observada.</li>
+ *     <li>{@link #deleteIfCurrent(String, String, UUID, long, long, long)} -> aplica a remoção lógica na época
+ *         observada.</li>
+ *     <li>{@link #findUpdates(Set, Map, long, int)} -> mensagens alteradas depois de uma versão, para o catch-up.</li>
  *     <li>{@link #findLatestByConversationIds(Set)} -> cabeça persistida de cada conversa do lote.</li>
  *     <li>{@link #countUnreadByConversationAndUser(Map)} -> contagem de mensagens não lidas em lote.</li>
  * </ul>
  */
 public interface MessageRepository extends MongoRepository<Message, String> {
+
+    /** Apaga todas as mensagens da conversa. */
+    void deleteByConversationId(String conversationId);
 
     /** Mensagem de maior sequência da conversa. */
     Optional<Message> findFirstByConversationIdOrderBySequenceDesc(String conversationId);
@@ -100,17 +108,46 @@ public interface MessageRepository extends MongoRepository<Message, String> {
         return false;
     }
 
-    /** Updates seletivos preservam autoria, posição histórica e exclusão terminal. */
+    /**
+     * Updates seletivos preservam autoria, posição histórica e exclusão terminal. O {@code change_version} vai no mesmo
+     * {@code $set} do conteúdo, então a mudança e a versão entram juntas ou não entram.
+     */
     @Query("{ '_id': ?0, 'conversation_id': ?1, 'sender_id': ?2, 'deleted': { '$ne': true }, "
             + "'$or': [ { 'mutation_epoch': ?3 }, { 'mutation_epoch': { '$exists': false }, '$expr': { '$eq': [ ?3, 0 ] } } ] }")
-    @Update("{ '$set': { 'content': ?4, 'edited': true, 'mutation_epoch': ?5 } }")
-    long editIfCurrent(String id, String conversationId, UUID actor, long epoch, String content, long nextEpoch);
+    @Update("{ '$set': { 'content': ?4, 'edited': true, 'mutation_epoch': ?5, 'change_version': ?6 } }")
+    long editIfCurrent(String id, String conversationId, UUID actor, long epoch, String content, long nextEpoch,
+            long changeVersion);
 
-    /** Aplica o tombstone somente se autoria e época de mutação ainda forem as observadas. */
+    /**
+     * Aplica o tombstone somente se autoria e época de mutação ainda forem as observadas, já com o carimbo da versão.
+     */
     @Query("{ '_id': ?0, 'conversation_id': ?1, 'sender_id': ?2, 'deleted': { '$ne': true }, "
             + "'$or': [ { 'mutation_epoch': ?3 }, { 'mutation_epoch': { '$exists': false }, '$expr': { '$eq': [ ?3, 0 ] } } ] }")
-    @Update("{ '$set': { 'deleted': true, 'mutation_epoch': ?4 }, '$unset': { 'content': '' } }")
-    long deleteIfCurrent(String id, String conversationId, UUID actor, long epoch, long nextEpoch);
+    @Update("{ '$set': { 'deleted': true, 'mutation_epoch': ?4, 'change_version': ?5 }, '$unset': { 'content': '' } }")
+    long deleteIfCurrent(String id, String conversationId, UUID actor, long epoch, long nextEpoch, long changeVersion);
+
+    /**
+     * Mensagens com {@code change_version} maior que {@code since}, em ordem crescente de versão. Nas conversas
+     * perdidas, só entram as mensagens até a versão em que o usuário saiu.
+     */
+    default List<Message> findUpdates(Set<String> readable, Map<String, Long> leftAtVersions, long since, int limit) {
+        List<Document> branches = new ArrayList<>();
+        if (!readable.isEmpty()) {
+            branches.add(new Document("conversation_id", new Document("$in", List.copyOf(readable)))
+                    .append("change_version", new Document("$gt", since)));
+        }
+        leftAtVersions.forEach((id, leftAt) -> branches.add(new Document("conversation_id", id)
+                .append("change_version", new Document("$gt", since).append("$lte", leftAt))));
+        if (branches.isEmpty()) return List.of();
+        return aggregateByChangeVersion(new Document("$or", branches), limit);
+    }
+
+    // Um $or com limite superior por conversa não cabe em método derivado, então o pipeline segue o padrão de
+    // aggregateUnreadWindows.
+    @Aggregation(pipeline = {
+            "{ '$match': ?0 }", "{ '$sort': { 'change_version': 1 } }", "{ '$limit': ?1 }"
+    })
+    List<Message> aggregateByChangeVersion(Document match, int limit);
 
     /** Cabeça persistida e última mensagem de cada conversa; conversa sem mensagens fica com sequência zero. */
     default Map<String, ConversationMessageHead> findLatestByConversationIds(Set<String> ids) {

@@ -29,7 +29,7 @@ import org.springframework.web.socket.WebSocketHttpHeaders;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
 
-import com.solaria.messenger.core.service.UserAccessService;
+import com.solaria.messenger.core.helper.UserAccessHelper;
 import com.solaria.messenger.websocket.dto.response.WsEventEnvelope;
 import com.solaria.messenger.websocket.security.StompDestinations;
 
@@ -48,7 +48,7 @@ class SimpleBrokerDeliveryTests {
     JwtDecoder jwtDecoder;
 
     @MockitoBean
-    UserAccessService userAccess;
+    UserAccessHelper userAccess;
 
     @Test
     void deliversTopicEventsToTheSubscribedClient() throws Exception {

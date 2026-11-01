@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 
 import com.solaria.messenger.core.model.Conversation;
 import com.solaria.messenger.core.repository.ConversationRepository;
-import com.solaria.messenger.core.service.ConversationAuthorizationService;
+import com.solaria.messenger.core.helper.ConversationAccessHelper;
 import com.solaria.messenger.websocket.dto.response.WsEventEnvelope;
 import com.solaria.messenger.websocket.event.ConversationSubscriptionRegistered;
 import com.solaria.messenger.websocket.security.StompDestinations;
@@ -30,12 +30,15 @@ import com.solaria.messenger.websocket.event.SessionPresenceChanged;
  * Service de presença do usuário (online/offline)
  *
  * <p>
- * A partir de eventos da sessão webscoket, publica um STOMP para os participantes autorizados, mostrando presença do user.
+ * A partir de eventos da sessão webscoket, publica um STOMP para os participantes autorizados, mostrando presença do
+ * user.
  * falhas não derrubam a sessão.
  * </p>
  * <ul>
- *     <li>{@link #onSubscriptionRegistered(ConversationSubscriptionRegistered)} -> envia o atual estado de presença dos user para uma nova sessão.</li>
- *     <li>{@link #onPresenceChanged(SessionPresenceChanged)} -> anuncia USER_ONLINE/USER_OFFLINE nas conversas do usuário.</li>
+ *     <li>{@link #onSubscriptionRegistered(ConversationSubscriptionRegistered)} -> envia o atual estado de presença dos
+ *         user para uma nova sessão.</li>
+ *     <li>{@link #onPresenceChanged(SessionPresenceChanged)} -> anuncia USER_ONLINE/USER_OFFLINE nas conversas do
+ *         usuário.</li>
  * </ul>
  */
 @Service
@@ -43,13 +46,13 @@ public class PresenceService {
 
     private static final Logger log = LoggerFactory.getLogger(PresenceService.class);
     private final ConversationRepository conversations;
-    private final ConversationAuthorizationService authorization;
+    private final ConversationAccessHelper authorization;
     private final LocalWebSocketSessionRegistry sessions;
     private final SimpMessagingTemplate messaging;
     private final MessageChannel outbound;
     private final MessageConverter converter;
 
-    public PresenceService(ConversationRepository conversations, ConversationAuthorizationService authorization,
+    public PresenceService(ConversationRepository conversations, ConversationAccessHelper authorization,
             LocalWebSocketSessionRegistry sessions, SimpMessagingTemplate messaging,
             @Qualifier("clientOutboundChannel") MessageChannel outbound,
             @Qualifier("brokerMessageConverter") MessageConverter converter) {
