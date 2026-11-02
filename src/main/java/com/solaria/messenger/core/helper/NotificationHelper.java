@@ -18,6 +18,7 @@ import com.solaria.messenger.core.model.Message;
 import com.solaria.messenger.core.model.ProjectCommunity;
 import com.solaria.messenger.core.port.ConversationEventPublisher;
 import com.solaria.messenger.core.port.MessageEventPublisher;
+import com.solaria.messenger.core.port.PresencePublisher;
 import com.solaria.messenger.core.repository.ConversationRepository;
 import com.solaria.messenger.core.support.ConversationMutationGuard;
 import com.solaria.messenger.core.support.ConversationSyncClock;
@@ -44,6 +45,7 @@ import com.solaria.messenger.core.support.ConversationSyncClock;
  *     <li>{@link ConversationMutationGuard} -> garante que a entrega sai fora da fronteira local.</li>
  *     <li>{@link ConversationEventPublisher} -> envia eventos de conversa.</li>
  *     <li>{@link MessageEventPublisher} -> envia eventos de mensagem.</li>
+ *     <li>{@link PresencePublisher} -> avisa quem está online aos participantes de uma conversa que ganhou gente.</li>
  * </ul>
  *
  * <p>
@@ -54,6 +56,7 @@ import com.solaria.messenger.core.support.ConversationSyncClock;
  *     <li>{@link #publishConversationChanged(String, Set)} -> avisa só os usuários informados.</li>
  *     <li>{@link #publishConversationsChanged(Set)} -> avisa várias conversas num lote.</li>
  *     <li>{@link #publishRemovedConversation(UUID, String)} -> avisa que o user perdeu a conversa.</li>
+ *     <li>{@link #publishPresenceOf(String)} -> avisa a presença dos participantes de uma conversa que ganhou gente.</li>
  *     <li>{@link #notifyMessageCreated(Message)} -> avisa a criação de mensagem.</li>
  *     <li>{@link #notifyMessageEdited(Message)} -> avisa a edição de mensagem.</li>
  *     <li>{@link #notifyMessageDeleted(Message)} -> avisa a exclusão de mensagem.</li>
@@ -70,10 +73,11 @@ public class NotificationHelper {
     private final ConversationMutationGuard guard;
     private final ConversationEventPublisher events;
     private final MessageEventPublisher messageEvents;
+    private final PresencePublisher presence;
 
     public NotificationHelper(ConversationRepository conversations, ConversationAccessHelper resources,
             ConversationProjectionHelper projections, ConversationSyncClock clock, ConversationMutationGuard guard,
-            ConversationEventPublisher events, MessageEventPublisher messageEvents) {
+            ConversationEventPublisher events, MessageEventPublisher messageEvents, PresencePublisher presence) {
         this.conversationRepository = conversations;
         this.resources = resources;
         this.projections = projections;
@@ -81,6 +85,7 @@ public class NotificationHelper {
         this.guard = guard;
         this.events = events;
         this.messageEvents = messageEvents;
+        this.presence = presence;
     }
 
     // conversa
@@ -184,6 +189,17 @@ public class NotificationHelper {
                 }
             }
         });
+    }
+
+    /** Avisa quem está online aos participantes de uma conversa que ganhou gente; falha só gera log */
+    public void publishPresenceOf(String conversationId) {
+        // a leitura dos participantes não pode rodar dentro da fronteira local
+        if (guard.isHeldByCurrentThread()) throw new IllegalStateException("Publicação deve ocorrer fora da fronteira.");
+        try {
+            presence.conversationJoined(conversationId);
+        } catch (RuntimeException publicationFailure) {
+            log.warn("Falha ao publicar presença da conversa {}", conversationId, publicationFailure);
+        }
     }
 
     // mensagem

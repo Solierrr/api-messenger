@@ -20,9 +20,7 @@ import static com.solaria.messenger.core.mapper.MessageMapper.toResponse;
  * Publica os eventos de mensagem no tópico privado {@code /topic/users.{userId}.events} de cada destinatário.
  *
  * <p>
- * O tópico da conversa ({@code /topic/conversations.{id}}) fica só com presença, digitação e o snapshot de presença.
- * O envelope e o {@code eventId} são montados uma vez por evento, então todos os
- * destinatários recebem o mesmo frame.
+ * O envelope e o {@code eventId} são montados uma vez por evento, então todos os destinatários recebem o mesmo frame.
  * </p>
  */
 @Component

@@ -94,6 +94,7 @@ public class CreateGroupConversationUseCase {
         GroupCreationResponseDTO result = guard.execute(() ->
                 createSelectedGroup(communityId, title, rbac.currentUserId(), requested));
         notifications.publishConversationChanged(result.conversation().getId());
+        notifications.publishPresenceOf(result.conversation().getId());
         return result;
     }
 

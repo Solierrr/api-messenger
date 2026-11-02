@@ -3,6 +3,7 @@ package com.solaria.messenger.websocket.session;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -10,6 +11,7 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -172,8 +174,17 @@ public class RedisPresenceStore {
             String epoch = epoch();
             long version = redis.opsForValue().increment(VERSION);
             Map<UUID, Boolean> online = new HashMap<>();
-            // um HLEN por user: são os participantes de uma conversa, poucos o bastante para dispensar pipeline
-            for (UUID user : users) online.put(user, count(user) > 0);
+            List<UUID> ordered = List.copyOf(users);
+            // um HLEN por user, todos num pipeline: o retrato cobre os contatos do user, que podem ser centenas
+            if (!ordered.isEmpty()) {
+                List<Object> sizes = redis.executePipelined((RedisCallback<Object>) connection -> {
+                    for (UUID user : ordered) connection.hashCommands().hLen(key(user));
+                    return null;
+                });
+                for (int i = 0; i < ordered.size(); i++) {
+                    online.put(ordered.get(i), sizes.get(i) instanceof Long size && size > 0);
+                }
+            }
             return new Snapshot(epoch, version, online);
         } catch (RuntimeException failure) {
             log.warn("Redis indisponível ao montar snapshot de presença", failure);
@@ -237,6 +248,10 @@ public class RedisPresenceStore {
         if (epoch != null) return epoch;
         redis.opsForValue().setIfAbsent(EPOCH, UUID.randomUUID().toString());
         return redis.opsForValue().get(EPOCH);
+    }
+
+    private byte[] key(UUID userId) {
+        return redis.getStringSerializer().serialize(PRESENCE + userId);
     }
 
     private long count(UUID userId) {

@@ -134,7 +134,10 @@ public class CreateDirectConversationUseCase {
             }
         });
 
-        if (changed[0]) notifications.publishConversationChanged(response.getId());
+        if (changed[0]) {
+            notifications.publishConversationChanged(response.getId());
+            notifications.publishPresenceOf(response.getId());
+        }
         return response;
     }
 

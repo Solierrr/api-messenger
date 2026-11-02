@@ -2,6 +2,7 @@ package com.solaria.messenger.websocket.presence;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -22,7 +23,7 @@ import com.solaria.messenger.websocket.event.SessionPresenceChanged;
  * Service do indicador "digitando..."
  *
  * <p>
- * Confere se o user participa da conversa, atualiza o estado local de typing e publica no tópico da conversa.
+ * Confere se o user participa da conversa, atualiza o estado local de typing e publica no canal {@code events} de cada participante autorizado.
  * </p>
  * <ul>
  *     <li>{@link #start(String, UUID)} -> avisa que o user começou a digitar.</li>
@@ -92,6 +93,7 @@ public class TypingService {
         }
     }
 
+    /** Vai ao canal {@code events} de cada participante autorizado; quem digita não recebe o próprio evento */
     private void publish(String conversationId, String userId, String type) {
         WsEventEnvelope envelope = WsEventEnvelope.builder()
                 .type(type)
@@ -99,6 +101,15 @@ public class TypingService {
                 .serverTimestamp(Instant.now())
                 .payload(Map.of("userId", userId))
                 .build();
-        messaging.convertAndSend(StompDestinations.conversationTopic(conversationId), envelope);
+        for (UUID recipient : authorization.authorizedParticipants(Set.of(conversationId))
+                .getOrDefault(conversationId, Set.of())) {
+            if (recipient.toString().equals(userId)) continue;
+            // falha com um destinatário não pode barrar os outros nem voltar ao digitador
+            try {
+                messaging.convertAndSend(StompDestinations.userTopic(recipient, "events"), envelope);
+            } catch (RuntimeException failure) {
+                log.warn("Falha ao publicar {} (conversationId={})", type, conversationId, failure);
+            }
+        }
     }
 }

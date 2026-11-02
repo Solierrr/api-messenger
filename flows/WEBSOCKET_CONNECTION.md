@@ -4,7 +4,7 @@
 
 # Conexão em tempo real
 
-Acontece quando o aplicativo abre o WebSocket e assina os tópicos. O resultado é uma sessão admitida, a presença da pessoa marcada como conectada e os eventos chegando enquanto ela tiver acesso. O protocolo completo está em [REALTIME.md](../docs/REALTIME.md).
+Acontece quando o aplicativo abre o WebSocket e assina o próprio canal de eventos. O resultado é uma sessão admitida, a presença da pessoa marcada como conectada e os eventos chegando enquanto ela tiver acesso. O protocolo completo está em [REALTIME.md](../docs/REALTIME.md).
 
 ```mermaid
 sequenceDiagram
@@ -23,15 +23,14 @@ sequenceDiagram
     else
         Msg->>Redis: grava a sessão
         Msg-->>App: CONNECTED
-        Msg-->>App: USER_ONLINE nas conversas dela, se é a primeira sessão na instância
+        Msg-->>App: USER_ONLINE aos contatos dela, se é a primeira sessão na instância
     end
     App->>Msg: SUBSCRIBE /topic/users.{id}.events, .acks e .errors
-    App->>Msg: SUBSCRIBE /topic/conversations.{conversationId}
-    Msg->>Mongo: confere a participação atual
-    alt não participa
-        Msg-->>App: erro SUBSCRIBE_NOT_ALLOWED ou UNAUTHORIZED_ACCESS em .errors
-    else participa
-        Msg-->>App: PRESENCE_SNAPSHOT só para esta sessão
+    alt tópico de outro usuário ou destino fora da lista
+        Msg-->>App: erro SUBSCRIBE_NOT_ALLOWED em .errors
+    else o próprio tópico
+        Msg->>Mongo: lê os contatos (quem divide uma conversa legível com a pessoa)
+        Msg-->>App: PRESENCE_SNAPSHOT com todos os contatos, só para esta assinatura do .events
     end
     opt a pessoa sai de um grupo ou da comunidade
         Msg->>Msg: fecha as sessões dela nesta instância (close 1008)
@@ -40,6 +39,7 @@ sequenceDiagram
     end
 ```
 
+- Não existe tópico por conversa: o `.events` traz mensagens, "digitando" e presença de todas as conversas da pessoa, e ela o assina uma vez por conexão, em qualquer tela.
 - O primeiro frame precisa chegar em até 10 s.
 - A expiração do token é conferida em todo frame, e o token vencido fecha a conexão.
 - Uma recusa de `SEND` ou de `SUBSCRIBE` descarta só o frame e não fecha a conexão.

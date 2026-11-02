@@ -1,9 +1,11 @@
 package com.solaria.messenger.core.helper;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -17,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import com.solaria.messenger.core.model.Message;
 import com.solaria.messenger.core.port.ConversationEventPublisher;
 import com.solaria.messenger.core.port.MessageEventPublisher;
+import com.solaria.messenger.core.port.PresencePublisher;
 import com.solaria.messenger.core.repository.ConversationRepository;
 import com.solaria.messenger.core.support.ConversationMutationGuard;
 import com.solaria.messenger.core.support.ConversationSyncClock;
@@ -33,6 +36,8 @@ class NotificationHelperTests {
 
     private ConversationAccessHelper access;
     private MessageEventPublisher messageEvents;
+    private PresencePublisher presence;
+    private ConversationMutationGuard guard;
     private NotificationHelper notifications;
     private Message message;
 
@@ -40,10 +45,12 @@ class NotificationHelperTests {
     void setUp() {
         access = mock(ConversationAccessHelper.class);
         messageEvents = mock(MessageEventPublisher.class);
+        presence = mock(PresencePublisher.class);
+        guard = new ConversationMutationGuard();
         ConversationSyncClock clock = mock(ConversationSyncClock.class);
         notifications = new NotificationHelper(mock(ConversationRepository.class), access,
-                mock(ConversationProjectionHelper.class), clock, new ConversationMutationGuard(),
-                mock(ConversationEventPublisher.class), messageEvents);
+                mock(ConversationProjectionHelper.class), clock, guard,
+                mock(ConversationEventPublisher.class), messageEvents, presence);
         message = new Message();
         message.setId("msg-1");
         message.setConversationId(CONVERSATION);
@@ -96,5 +103,29 @@ class NotificationHelperTests {
         assertThatCode(() -> notifications.notifyMessageCreated(message)).doesNotThrowAnyException();
 
         verify(messageEvents, never()).messageCreated(any(), any());
+    }
+
+    @Test
+    void publishPresenceOfDelegatesToThePort() {
+        notifications.publishPresenceOf(CONVERSATION);
+
+        verify(presence).conversationJoined(CONVERSATION);
+    }
+
+    @Test
+    void publishPresenceOfSwallowsPortFailures() {
+        doThrow(new IllegalStateException("redis")).when(presence).conversationJoined(CONVERSATION);
+
+        assertThatCode(() -> notifications.publishPresenceOf(CONVERSATION)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void publishPresenceOfInsideTheGuardIsRejected() {
+        assertThatThrownBy(() -> guard.execute(() -> {
+            notifications.publishPresenceOf(CONVERSATION);
+            return null;
+        })).isInstanceOf(IllegalStateException.class);
+
+        verify(presence, never()).conversationJoined(any());
     }
 }

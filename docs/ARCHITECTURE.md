@@ -40,7 +40,7 @@ Os dois adaptadores executam as mesmas regras. Mandar mensagem por `POST /messag
 |---|---|
 | `core/usecase/` | um caso de uso por operação (`SendUserMessageUseCase`, `CreateDirectConversationUseCase`, `RemoveCommunityMemberUseCase`), agrupados em `admin`, `community`, `conversation`, `group`, `message`, `nps`, `observability` e `rating` |
 | `core/helper/` | regras compartilhadas entre casos de uso: acesso (`ConversationAccessHelper`), admissão em transação (`ConversationAdmissionHelper`), escrita de mensagem (`MessageWriteHelper`), notificação (`NotificationHelper`), push offline (`OfflineMessageNotifier`), regras puras (`PureRulesHelper`) |
-| `core/port/` | portas de saída: `ConversationEventPublisher`, `MessageEventPublisher`, `SessionRevoker` e `UserPresence` |
+| `core/port/` | portas de saída: `ConversationEventPublisher`, `MessageEventPublisher`, `PresencePublisher`, `SessionRevoker` e `UserPresence` |
 | `core/support/` | `ConversationMutationGuard` e `ConversationSyncClock` |
 | `core/model/`, `core/repository/` | documentos do Mongo e acesso a eles, com as escritas condicionais por versão e a preparação de índices na partida |
 | `core/integration/` | clientes do `api-auth`, do `api-core`, do `api-notify` e do LangSmith |
@@ -85,7 +85,7 @@ O MongoDB guarda conversas, estado pessoal, mensagens, comunidades, avaliações
 - **Correção entre instâncias pelo banco.** `Conversation` e `ProjectCommunity` têm `version`, e as escritas usam a versão lida como condição, com até três tentativas que relêem e revalidam. `Message` faz o mesmo com `mutation_epoch`. Índices únicos barram duplicatas (uma direta por par, uma sequência por posição, um estado por participante, uma comunidade por projeto, um NPS por conversa).
 - **Uma transação Mongo.** O `ConversationAdmissionHelper` grava a conversa e o estado de cada participante no mesmo commit, porque um participante sem estado deixaria a lista de conversas quebrada. Transação exige replica set.
 - **Relógio de sincronização no Mongo.** O `ConversationSyncClock` aloca uma versão na coleção `sync_clock` antes de cada leitura ou escrita. Toda mensagem gravada, editada ou apagada leva essa versão em `change_version`, e a saída de uma conversa fica em `left_at_version`. Com isso o `GET /messaging/updates` entrega o que mudou desde a última versão que o cliente viu. A versão fica no Mongo e não no Redis para não colocar o Redis no caminho das rotas REST.
-- **Eventos de mensagem no tópico do usuário.** Cada participante recebe `MESSAGE_*` em `/topic/users.{userId}.events`, inclusive o autor, para que os outros aparelhos dele também recebam. O tópico da conversa ficou só com presença e digitando.
+- **Eventos de mensagem no tópico do usuário.** Cada participante recebe `MESSAGE_*` em `/topic/users.{userId}.events`, inclusive o autor, para que os outros aparelhos dele também recebam. Presença e digitando saem no mesmo canal, e não existe tópico por conversa: o usuário recebe os eventos de todas as conversas dele, em qualquer tela, como no WhatsApp.
 - **Notificar depois de gravar.** Os eventos e o push saem fora do guard, depois da escrita, e uma falha de entrega só gera log. A autorização é refeita logo antes de entregar.
 - **Push fora da requisição.** O `OfflineMessageNotifier` usa uma fila de 500 tarefas com duas threads. Fila cheia ou `api-notify` fora do ar descartam o aviso com log, sem atrasar o envio. Sem `NOTIFY_BASE_URL`, o push fica desligado. A fila vive na memória da instância, então um reinício perde os avisos pendentes. Uma fila no Redis é um ponto de melhoria possível, hoje dispensado porque o aviso é descartável.
 - **Convidados aceitos em parte.** Criar grupo, criar subgrupo, criar comunidade, adicionar membros e adicionar participantes seguem com quem pode entrar e devolvem os recusados em `rejectedParticipants`, com `USER_NOT_FOUND`, `USER_INACTIVE` ou `NOT_COMMUNITY_MEMBER`. Assim um convite errado não trava os outros. Se ninguém puder entrar, a resposta é `422`.
@@ -125,7 +125,7 @@ O `CONNECT` leva o JWT da pessoa, e o serviço só aceita a conexão com um toke
 
 Um tópico é um endereço de assinatura, parecido com um canal de rádio. Quem assina recebe tudo o que é publicado nele, e quem não assina não recebe nada.
 
-Cada pessoa assina `/topic/users.{userId}.events` para receber as mensagens e as mudanças nas suas conversas, `.acks` para a confirmação dos próprios envios e `.errors` para os erros. Cada conversa aberta na tela assina `/topic/conversations.{conversationId}`, que traz presença e digitando. O serviço confere se a pessoa pode assinar o tópico e confere de novo antes de entregar cada evento.
+Cada pessoa assina `/topic/users.{userId}.events` para receber as mensagens e as mudanças nas suas conversas, `.acks` para a confirmação dos próprios envios e `.errors` para os erros. Esse canal único também traz presença e digitando de todas as conversas. O serviço só deixa a pessoa assinar os próprios tópicos e confere de novo antes de entregar cada evento.
 
 #### Broker e relay
 
@@ -137,7 +137,7 @@ Com uma instância só, como no QA, o broker em memória do Spring faz a entrega
 
 Presença é saber quem está conectado agora. A pessoa está online quando tem pelo menos uma conexão aberta em qualquer instância do serviço.
 
-O `RedisPresenceStore` guarda no Redis as conexões abertas de cada pessoa e a instância de cada uma. Quem abre uma conversa recebe um retrato inicial (`PRESENCE_SNAPSHOT`) e depois os avisos `USER_ONLINE` e `USER_OFFLINE`. A mesma informação decide quem recebe aviso no celular, porque só quem está desconectado precisa dele.
+O `RedisPresenceStore` guarda no Redis as conexões abertas de cada pessoa e a instância de cada uma. Quem assina o canal `.events` recebe um retrato inicial (`PRESENCE_SNAPSHOT`) com o estado de todos os contatos e depois os avisos `USER_ONLINE` e `USER_OFFLINE`. A mesma informação decide quem recebe aviso no celular, porque só quem está desconectado precisa dele.
 
 #### Heartbeat e instância morta
 

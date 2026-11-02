@@ -47,6 +47,7 @@ import com.solaria.messenger.core.repository.ConversationRepository;
  *     <li>{@link #communitiesFor(List)} -> carrega as comunidades de um lote de conversas.</li>
  *     <li>{@link #authorizedParticipants(List)} -> devolve quem pode ver cada conversa do lote.</li>
  *     <li>{@link #readableConversationIds(UUID)} -> devolve os ids das conversas que o user pode ler hoje.</li>
+ *     <li>{@link #contactsOf(UUID)} -> devolve quem divide com o user alguma conversa que ele pode ler.</li>
  *     <li>{@link #authorizedParticipants(Set)} -> recarrega as conversas pelos ids e refaz a autorização.</li>
  * </ul>
  */
@@ -187,6 +188,26 @@ public class ConversationAccessHelper {
         return authorizedParticipants(candidates).entrySet().stream()
                 .filter(entry -> entry.getValue().contains(actor))
                 .map(Map.Entry::getKey)
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * Devolve quem divide com o user alguma conversa que ele pode ler hoje.
+     *
+     * <p>
+     * Segue a mesma regra de {@link #readableConversationIds(UUID)}, numa consulta só. Serve à presença: é a quem o
+     * user avisa que está online e de quem ele recebe o mesmo aviso.
+     * </p>
+     *
+     * @param actor identificador do user.
+     * @return participantes autorizados dessas conversas, sem o próprio user. Vazio quando não há nenhum.
+     */
+    public Set<UUID> contactsOf(UUID actor) {
+        List<Conversation> candidates = conversations.findByParticipantIdsContainingOrderByLastInteractionAtDesc(actor);
+        return authorizedParticipants(candidates).values().stream()
+                .filter(users -> users.contains(actor))
+                .flatMap(Set::stream)
+                .filter(user -> !user.equals(actor))
                 .collect(Collectors.toSet());
     }
 

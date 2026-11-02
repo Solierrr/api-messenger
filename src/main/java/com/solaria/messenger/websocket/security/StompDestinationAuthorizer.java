@@ -47,7 +47,7 @@ public class StompDestinationAuthorizer {
         this.events = events;
     }
 
-    /** Libera o tópico privado do próprio usuário e tópicos de conversa em que ele participa. */
+    /** Libera só os tópicos privados do próprio usuário. */
     public <T> Message<T> authorizeSubscribe(Message<T> message, StompHeaderAccessor accessor, String userId) {
         String destination = accessor.getDestination();
         if (destination == null) {
@@ -60,18 +60,8 @@ public class StompDestinationAuthorizer {
             return withoutQueueOptions(message);
         }
 
-        String conversationId = StompDestinations.conversationTopicId(destination);
-        if (conversationId == null) {
-            log.warn("SUBSCRIBE recusado (userId={}, destino={}): fora da allowlist", userId, destination);
-            return deny(userId, "SUBSCRIBE_NOT_ALLOWED", "Destino de subscription nao permitido.");
-        }
-
-        try {
-            authorization.requireParticipant(conversationId, UUID.fromString(userId));
-            return withoutQueueOptions(message);
-        } catch (BusinessException denied) {
-            return deny(userId, denied.getErrorCode(), denied.getMessage());
-        }
+        log.warn("SUBSCRIBE recusado (userId={}, destino={}): fora da allowlist", userId, destination);
+        return deny(userId, "SUBSCRIBE_NOT_ALLOWED", "Destino de subscription nao permitido.");
     }
 
     /**
