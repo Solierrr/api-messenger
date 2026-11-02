@@ -41,23 +41,21 @@ class GetLangSmithSummaryUseCaseTests {
 
         assertThat(summary.enabled()).isFalse();
         assertThat(summary.totals()).isNull();
-        verify(client, never()).totals(any(), any());
+        verify(client, never()).assistantTotals(any(), any(), any());
     }
 
     @Test
     void coversTheWholeLastDayOfThePeriodInUtc() {
         given(client.enabled()).willReturn(true);
         given(client.project()).willReturn("solaria-qa");
-        given(client.totals(any(), any())).willReturn(TOTALS);
-        given(client.byAssistant(any(), any())).willReturn(List.of());
-        given(client.byModel(any(), any())).willReturn(List.of());
+        given(client.assistantTotals(any(), any(), eq("ai-assistant"))).willReturn(TOTALS);
 
         LangSmithSummaryDTO summary = new GetLangSmithSummaryUseCase(client, mongoTemplate, " https://smith/p ")
                 .execute(LocalDate.parse("2026-10-20"), LocalDate.parse("2026-10-26"));
 
         ArgumentCaptor<Instant> start = ArgumentCaptor.forClass(Instant.class);
         ArgumentCaptor<Instant> end = ArgumentCaptor.forClass(Instant.class);
-        verify(client).totals(start.capture(), end.capture());
+        verify(client).assistantTotals(start.capture(), end.capture(), eq("ai-assistant"));
         assertThat(start.getValue()).isEqualTo(Instant.parse("2026-10-20T00:00:00Z"));
         assertThat(end.getValue()).isEqualTo(Instant.parse("2026-10-27T00:00:00Z"));
         assertThat(summary.enabled()).isTrue();
@@ -67,18 +65,34 @@ class GetLangSmithSummaryUseCaseTests {
     }
 
     @Test
+    void asksLangSmithOnceAndLeavesTheGroupingsEmpty() {
+        given(client.enabled()).willReturn(true);
+        given(client.project()).willReturn("solaria-qa");
+        given(client.assistantTotals(any(), any(), eq("ai-assistant"))).willReturn(TOTALS);
+
+        LangSmithSummaryDTO summary = new GetLangSmithSummaryUseCase(client, mongoTemplate, "")
+                .execute(LocalDate.parse("2026-10-20"), LocalDate.parse("2026-10-26"));
+
+        assertThat(summary.byAssistant()).isEmpty();
+        assertThat(summary.byModel()).isEmpty();
+        verify(client, never()).totals(any(), any());
+        verify(client, never()).byAssistant(any(), any());
+        verify(client, never()).byModel(any(), any());
+    }
+
+    @Test
     void reusesTheSharedAnswerForTheSamePeriodWhileItIsFresh() {
         given(client.enabled()).willReturn(true);
         LangSmithSummaryDTO stored = new LangSmithSummaryDTO(true, "solaria-qa", null, TOTALS, List.of(), List.of());
-        given(mongoTemplate.findById(eq("2026-10-20|2026-10-20"), eq(GetLangSmithSummaryUseCase.CachedSummary.class),
+        given(mongoTemplate.findById(eq("ai-assistant|2026-10-20|2026-10-20"), eq(GetLangSmithSummaryUseCase.CachedSummary.class),
                 eq("langsmith_summary_cache")))
-                .willReturn(new GetLangSmithSummaryUseCase.CachedSummary("2026-10-20|2026-10-20", stored,
+                .willReturn(new GetLangSmithSummaryUseCase.CachedSummary("ai-assistant|2026-10-20|2026-10-20", stored,
                         Instant.now().plusSeconds(60)));
         LocalDate day = LocalDate.parse("2026-10-20");
 
         LangSmithSummaryDTO summary = new GetLangSmithSummaryUseCase(client, mongoTemplate, "").execute(day, day);
 
         assertThat(summary).isEqualTo(stored);
-        verify(client, never()).totals(any(), any());
+        verify(client, never()).assistantTotals(any(), any(), any());
     }
 }
