@@ -1,6 +1,8 @@
 package com.solaria.messenger.core.repository;
 
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +51,9 @@ import com.solaria.messenger.core.repository.projection.LatestMessage;
  * </ul>
  */
 public interface MessageRepository extends MongoRepository<Message, String> {
+
+    /** Há alguma mensagem viva citando o arquivo? Duas mensagens podem apontar para o mesmo {@code mediaId}. */
+    boolean existsByAttachmentMediaIdAndDeletedFalse(String mediaId);
 
     /** Apaga todas as mensagens da conversa. */
     void deleteByConversationId(String conversationId);
@@ -123,7 +128,7 @@ public interface MessageRepository extends MongoRepository<Message, String> {
      */
     @Query("{ '_id': ?0, 'conversation_id': ?1, 'sender_id': ?2, 'deleted': { '$ne': true }, "
             + "'$or': [ { 'mutation_epoch': ?3 }, { 'mutation_epoch': { '$exists': false }, '$expr': { '$eq': [ ?3, 0 ] } } ] }")
-    @Update("{ '$set': { 'deleted': true, 'mutation_epoch': ?4, 'change_version': ?5 }, '$unset': { 'content': '' } }")
+    @Update("{ '$set': { 'deleted': true, 'mutation_epoch': ?4, 'change_version': ?5 }, '$unset': { 'content': '', 'attachment': '' } }")
     long deleteIfCurrent(String id, String conversationId, UUID actor, long epoch, long nextEpoch, long changeVersion);
 
     /**
@@ -141,6 +146,23 @@ public interface MessageRepository extends MongoRepository<Message, String> {
         if (branches.isEmpty()) return List.of();
         return aggregateByChangeVersion(new Document("$or", branches), limit);
     }
+
+    /**
+     * Mensagens com arquivo ainda disponível nas conversas dadas, da mudança mais recente para a mais antiga. A
+     * localização não tem {@code attachment.expires_at} e fica de fora; a excluída também.
+     */
+    default List<Message> findAvailableMedia(Set<String> conversationIds, Instant now, long beforeVersion, int limit) {
+        Document match = new Document("conversation_id", new Document("$in", List.copyOf(conversationIds)))
+                .append("deleted", new Document("$ne", true))
+                .append("attachment.expires_at", new Document("$gt", Date.from(now)))
+                .append("change_version", new Document("$lt", beforeVersion));
+        return aggregateAvailableMedia(match, limit);
+    }
+
+    @Aggregation(pipeline = {
+            "{ '$match': ?0 }", "{ '$sort': { 'change_version': -1 } }", "{ '$limit': ?1 }"
+    })
+    List<Message> aggregateAvailableMedia(Document match, int limit);
 
     // Um $or com limite superior por conversa não cabe em método derivado, então o pipeline segue o padrão de
     // aggregateUnreadWindows.
@@ -160,7 +182,7 @@ public interface MessageRepository extends MongoRepository<Message, String> {
             if (result.containsKey(message.getConversationId())) {
                 LatestMessage latest = new LatestMessage(message.getId(), message.getSequence(),
                         message.getSenderId(), message.getContent(), message.isEdited(), message.isDeleted(),
-                        message.getTimestamp());
+                        message.getTimestamp(), message.getAttachment() == null ? null : message.getAttachment().getType());
                 result.put(message.getConversationId(), new ConversationMessageHead(message.getSequence(), latest));
             }
         }

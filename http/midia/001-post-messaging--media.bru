@@ -1,0 +1,30 @@
+meta {
+  name: [mutates] POST /messaging/media
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/messaging/media
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+body:json {
+  {
+    "conversationId": "{{conversationId}}",
+    "type": "IMAGE",
+    "mimeType": "image/jpeg",
+    "sizeBytes": 2048
+  }
+}
+
+docs {
+  Pede a permissão para depositar um arquivo
+  Devolve o mediaId e o destino do envio (upload.url, upload.method e upload.headers). Envie os bytes direto ao armazenamento com exatamente esses cabeçalhos e só depois envie a mensagem com o anexo.
+  This operation may change server state.
+}

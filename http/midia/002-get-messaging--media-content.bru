@@ -1,0 +1,20 @@
+meta {
+  name: GET /messaging/media/{mediaId}/content
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/messaging/media/{{mediaId}}/content
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+docs {
+  Retira um arquivo
+  Responde 302 com o link temporário do armazenamento no cabeçalho Location. Não repasse o token ao seguir o redirecionamento. Depois de 7 dias responde 410 MEDIA_EXPIRED.
+}

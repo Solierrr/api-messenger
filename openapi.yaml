@@ -740,6 +740,110 @@ paths:
                 $ref: '#/components/schemas/ConversationResponseDTO'
       security:
       - bearerAuth: []
+  /messaging/media:
+    get:
+      tags:
+      - Mídia
+      summary: Lista as mídias ainda disponíveis
+      description: 'Para quem acabou de iniciar sessão: mídias não expiradas e não excluídas das conversas que o usuário lê,
+        da mais recente para a mais antiga. Com conversationId, só dessa conversa. A localização não aparece, porque não
+        tem arquivo. Com nextCursor, repita a chamada com cursor igual a ele. O mesmo dado chega ao vivo no evento
+        MESSAGE_CREATED.'
+      operationId: listMedia
+      parameters:
+      - name: conversationId
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        description: Tamanho da página. Ausente usa 50; valores fora de 1–100 são ajustados.
+        schema:
+          type: integer
+          format: int32
+      - name: cursor
+        in: query
+        required: false
+        description: nextCursor da página anterior; opaco.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Página de mídias
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaListResponseDTO'
+        '400':
+          description: 'INVALID_FIELD: cursor inválido'
+        '403':
+          description: O usuário não participa da conversa pedida
+      security:
+      - bearerAuth: []
+    post:
+      tags:
+      - Mídia
+      summary: Pede a permissão para depositar um arquivo
+      description: 'Devolve o mediaId e o destino do envio. O cliente envia os bytes direto ao armazenamento com o método e
+        os cabeçalhos devolvidos (eles entram na assinatura) e só depois envia a mensagem citando o mediaId no anexo. A
+        permissão vale até uploadExpiresAt e pode ser repetida. O arquivo fica disponível por 7 dias.'
+      operationId: createMediaUpload
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MediaUploadRequestDTO'
+        required: true
+      responses:
+        '201':
+          description: Permissão emitida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaUploadResponseDTO'
+        '400':
+          description: 'INVALID_FIELD: tipo, mime ou tamanho fora do permitido'
+        '403':
+          description: O usuário não participa da conversa
+        '422':
+          description: 'BUSINESS_RULE_VIOLATION: conversa com o assistente ou comunidade arquivada'
+        '503':
+          description: 'DEPENDENCY_UNAVAILABLE: armazenamento indisponível ou não configurado'
+      security:
+      - bearerAuth: []
+  /messaging/media/{mediaId}/content:
+    get:
+      tags:
+      - Mídia
+      summary: Retira um arquivo
+      description: 'Confere a participação e responde 302 com o link temporário do armazenamento no cabeçalho Location (vale
+        poucos minutos e nasce nesta chamada). Não repasse o token ao seguir o redirecionamento. Depois do prazo de 7 dias
+        responde 410 MEDIA_EXPIRED.'
+      operationId: getMediaContent
+      parameters:
+      - name: mediaId
+        in: path
+        required: true
+        description: Identificador do arquivo, do campo mediaId do anexo
+        schema:
+          type: string
+      responses:
+        '302':
+          description: Redireciona para o link temporário
+          headers:
+            Location:
+              schema:
+                type: string
+        '403':
+          description: Quem não participa mais da conversa
+        '410':
+          description: 'MEDIA_EXPIRED: o arquivo passou do prazo ou nunca existiu'
+        '503':
+          description: 'DEPENDENCY_UNAVAILABLE: armazenamento indisponível'
+      security:
+      - bearerAuth: []
   /messaging/messages:
     post:
       tags:
@@ -1418,6 +1522,175 @@ components:
           type: array
           items:
             type: string
+    AttachmentRequestDTO:
+      type: object
+      description: Anexo de uma mensagem. Em IMAGE, VIDEO, AUDIO e FILE o arquivo já foi depositado por POST /messaging/media
+        e aqui vai a descrição, com o mediaId. Em LOCATION vão as coordenadas.
+      properties:
+        type:
+          $ref: '#/components/schemas/AttachmentType'
+        mediaId:
+          type: string
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+          minimum: 1
+        name:
+          type: string
+          maxLength: 255
+          description: Só é gravado em FILE.
+        durationMs:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Só é gravado em AUDIO e VIDEO.
+        width:
+          type: integer
+          format: int32
+          minimum: 1
+        height:
+          type: integer
+          format: int32
+          minimum: 1
+        clientPreview:
+          type: string
+          maxLength: 2048
+          description: Texto opaco do cliente (por exemplo uma miniatura minúscula); o servidor guarda e devolve sem interpretar.
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+        label:
+          type: string
+          maxLength: 255
+      required:
+      - type
+    AttachmentResponseDTO:
+      type: object
+      description: Descrição do anexo devolvida na mensagem, no histórico, no catch-up e nos eventos. Campos que não valem
+        para o tipo ficam fora do JSON.
+      properties:
+        type:
+          $ref: '#/components/schemas/AttachmentType'
+        mediaId:
+          type: string
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        name:
+          type: string
+        durationMs:
+          type: integer
+          format: int64
+        width:
+          type: integer
+          format: int32
+        height:
+          type: integer
+          format: int32
+        clientPreview:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+          description: Até quando o arquivo pode ser retirado (criação do arquivo + 7 dias).
+        downloadPath:
+          type: string
+          description: Caminho da retirada (GET), que redireciona para um link temporário. Não é um endereço permanente do arquivo.
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        label:
+          type: string
+    AttachmentType:
+      type: string
+      enum:
+      - IMAGE
+      - VIDEO
+      - AUDIO
+      - FILE
+      - LOCATION
+    MediaUploadRequestDTO:
+      type: object
+      properties:
+        conversationId:
+          type: string
+          minLength: 1
+        type:
+          $ref: '#/components/schemas/AttachmentType'
+        mimeType:
+          type: string
+          minLength: 1
+        sizeBytes:
+          type: integer
+          format: int64
+          minimum: 1
+      required:
+      - conversationId
+      - type
+      - mimeType
+      - sizeBytes
+    MediaUploadResponseDTO:
+      type: object
+      properties:
+        mediaId:
+          type: string
+        upload:
+          type: object
+          properties:
+            url:
+              type: string
+            method:
+              type: string
+            headers:
+              type: object
+              additionalProperties:
+                type: string
+              description: Devem ser enviados exatamente como vieram, porque entram na assinatura.
+        uploadExpiresAt:
+          type: string
+          format: date-time
+        maxBytes:
+          type: integer
+          format: int64
+    MediaListItemResponseDTO:
+      type: object
+      properties:
+        messageId:
+          type: string
+        conversationId:
+          type: string
+        senderId:
+          type: string
+          format: uuid
+        timestamp:
+          type: string
+          format: date-time
+        attachment:
+          $ref: '#/components/schemas/AttachmentResponseDTO'
+    MediaListResponseDTO:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MediaListItemResponseDTO'
+        nextCursor:
+          type: string
+          nullable: true
     MessageRequestDTO:
       type: object
       properties:
@@ -1441,6 +1714,9 @@ components:
           type: string
           maxLength: 8000
           minLength: 0
+          description: Obrigatório sem anexo; com anexo é a legenda e pode faltar.
+        attachment:
+          $ref: '#/components/schemas/AttachmentRequestDTO'
         clientMessageId:
           type: string
       required:
@@ -1474,6 +1750,8 @@ components:
           type: string
         metadata:
           $ref: '#/components/schemas/MessageMetadata'
+        attachment:
+          $ref: '#/components/schemas/AttachmentResponseDTO'
         timestamp:
           type: string
           format: date-time

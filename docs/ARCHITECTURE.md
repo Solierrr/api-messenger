@@ -40,10 +40,10 @@ Os dois adaptadores executam as mesmas regras. Mandar mensagem por `POST /messag
 |---|---|
 | `core/usecase/` | um caso de uso por operação (`SendUserMessageUseCase`, `CreateDirectConversationUseCase`, `RemoveCommunityMemberUseCase`), agrupados em `admin`, `community`, `conversation`, `group`, `message`, `nps`, `observability` e `rating` |
 | `core/helper/` | regras compartilhadas entre casos de uso: acesso (`ConversationAccessHelper`), admissão em transação (`ConversationAdmissionHelper`), escrita de mensagem (`MessageWriteHelper`), notificação (`NotificationHelper`), push offline (`OfflineMessageNotifier`), regras puras (`PureRulesHelper`) |
-| `core/port/` | portas de saída: `ConversationEventPublisher`, `MessageEventPublisher`, `PresencePublisher`, `SessionRevoker` e `UserPresence` |
+| `core/port/` | portas de saída: `ConversationEventPublisher`, `MediaStore`, `MessageEventPublisher`, `PresencePublisher`, `SessionRevoker` e `UserPresence` |
 | `core/support/` | `ConversationMutationGuard` e `ConversationSyncClock` |
 | `core/model/`, `core/repository/` | documentos do Mongo e acesso a eles, com as escritas condicionais por versão e a preparação de índices na partida |
-| `core/integration/` | clientes do `api-auth`, do `api-core`, do `api-notify` e do LangSmith |
+| `core/integration/` | clientes do `api-auth`, do `api-core`, do `api-notify` e do LangSmith, e o armazenamento temporário da mídia no Google Cloud Storage |
 | `core/security/` | decoder JWT, `RbacAuthorizationService` e `AdminAccessService` |
 | `core/contract/`, `core/mapper/`, `core/exception/` | DTOs usados por REST e STOMP, mapeamento estático e erros de domínio com status e `errorCode` |
 | `rest/controller/`, `rest/openapi/` | rotas HTTP e as interfaces com as anotações do Swagger |
@@ -64,6 +64,7 @@ Os dois adaptadores executam as mesmas regras. Mandar mensagem por `POST /messag
 | `api-notify` | este serviço chama | `POST /internal/notifications` | `X-Service-Key` (`SERVICE_KEY_API_MESSENGER`) |
 | LangSmith | este serviço chama | API de estatísticas de runs | chave do LangSmith |
 | RabbitMQ | relay STOMP | STOMP na porta 61613 | usuário e senha do broker |
+| Google Cloud Storage | este serviço assina links; os aparelhos enviam e baixam direto | HTTPS com URL assinada (V4) | credencial do ambiente, só neste bucket |
 
 O padrão de chamada entre serviços está em [SERVICE_TO_SERVICE_AUTH.md](https://github.com/Solierrr/docs-warehouse/blob/main/docs/flows/SERVICE_TO_SERVICE_AUTH.md). A resposta do assistente está no fluxo central de [conversa com o assistente](https://github.com/Solierrr/docs-warehouse/blob/main/docs/flows/ASSISTANT_CHAT.md).
 
@@ -108,6 +109,12 @@ O MongoDB guarda conversas, estado pessoal, mensagens, comunidades, avaliações
 Esta parte explica, em linguagem simples, os termos que aparecem neste serviço e não fazem parte de um cadastro comum em Spring, aquele que só cria, lê, altera e apaga registros. Cada termo traz o que ele é e onde aparece no código.
 
 ### Tempo real
+
+#### Mídia temporária
+
+Foto, vídeo, áudio e arquivo não ficam guardados no servidor: ficam no aparelho de quem envia e no de quem recebe. Enquanto o outro lado não baixa, o arquivo espera num bucket do Google Cloud por 7 dias, como numa caixa de correio, e depois some. A mensagem leva só a descrição do arquivo.
+
+Aparece em `MediaStore`, `GcsMediaStore`, `AttachmentHelper` e nas rotas `/messaging/media`.
 
 #### WebSocket
 
@@ -264,6 +271,18 @@ As cinco operações com convidados devolvem `rejectedParticipants`, com cada pe
 É o prazo para mudar a própria mensagem depois de enviada.
 
 A pessoa edita ou apaga a mensagem até 30 minutos depois do envio, e o prazo vem de `MESSAGES_MUTATION_WINDOW`. Depois dele, a resposta é `422`.
+
+### Mídia das mensagens
+
+O armazenamento definitivo de foto, vídeo, áudio e arquivo é o aparelho de cada pessoa. O serviço só leva o arquivo de um aparelho a outro, como uma caixa de correio temporária: quem envia deposita, a mensagem leva só a descrição do anexo, quem recebe retira, e o arquivo some sozinho depois de 7 dias. Tudo o que é fluxo de quem usa o app (gravar, comprimir, miniatura, baixar, tocar, galeria, reenviar) é do aplicativo.
+
+Por que existe um bucket no meio: o destinatário costuma estar desligado quando a mídia é enviada, e um aparelho não entrega a outro que está desligado.
+
+Os bytes nunca passam pela API, pelo Kong nem pelo Cloudflare. O `CreateMediaUploadUseCase` confere a participação, o tipo e o tamanho e devolve uma permissão de envio, um link assinado de 15 minutos, que o aparelho usa direto no bucket. A assinatura inclui o tipo, o tamanho exato e o dono do arquivo, então o próprio bucket recusa um envio diferente do declarado. Depois a mensagem cita o `mediaId`, e o `AttachmentHelper` confere no bucket que o arquivo existe, é da mesma conversa, do mesmo remetente e tem o mesmo tamanho e tipo, antes de gravar a mensagem. Essa conferência consulta o bucket, por isso roda fora do `ConversationMutationGuard`.
+
+Quem recebe o evento `MESSAGE_CREATED` vê a descrição do anexo, com `expiresAt` e `downloadPath`, mas não o endereço do arquivo. Para baixar, chama `GET /messaging/media/{mediaId}/content`: o serviço confere se a pessoa ainda participa da conversa e responde `302` com um link de 10 minutos criado nessa hora. Por isso nenhuma lista nem evento carrega link, que venceria antes de alguém ler. Quem acabou de iniciar sessão e não tem nada no aparelho usa `GET /messaging/media`, que lista as mídias ainda vivas das conversas que a pessoa lê.
+
+O arquivo fica em `media/{mediaId}` e guarda a conversa e o dono nos metadados; o serviço não tem tabela de mídia. O prazo exato (criação do arquivo mais `MEDIA_TTL`) é conferido pelo serviço, que responde `410 MEDIA_EXPIRED` depois dele. A regra de ciclo de vida do bucket só limpa, com um dia de folga, porque conta em dias. Qualquer aparelho de qualquer participante baixa de forma independente durante os 7 dias, e não existe confirmação de recebimento. Excluir uma mensagem com arquivo apaga o arquivo depois do aviso; se falhar, só gera log e o prazo do bucket o remove.
 
 ### Organização interna
 

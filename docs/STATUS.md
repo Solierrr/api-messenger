@@ -15,6 +15,7 @@ Levantamento feito na `main` do repositório.
 - Envio, edição e exclusão de mensagens, com prazo de edição e exclusão (2026-10-31).
 - Tempo real com eventos de mensagem no tópico de cada usuário e catch-up por `GET /messaging/updates` (2026-10-31).
 - Mais de uma instância com relay para o RabbitMQ e presença no Redis, ou uma instância com o broker em memória (2026-10-31).
+- Mensagem com anexo: localização, imagem, vídeo, áudio e arquivo. O servidor só leva o arquivo de um aparelho a outro: guarda no bucket por 7 dias e o apaga (2026-11-02).
 - Aviso no celular para quem está desconectado, pelo `api-notify`, quando `NOTIFY_BASE_URL` está configurada (2026-10-31).
 - Histórico administrativo das conversas com o assistente e resumo do LangSmith com cache compartilhado entre as instâncias, para o painel do `web-sandbox` (2026-10-31).
 - Confirmação de usuário ativo guardada no Redis por 30 s, para todas as instâncias (2026-10-31).

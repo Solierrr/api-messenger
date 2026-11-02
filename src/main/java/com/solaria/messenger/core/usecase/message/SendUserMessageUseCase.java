@@ -7,11 +7,14 @@ import org.springframework.stereotype.Service;
 
 import com.solaria.messenger.core.contract.request.MessageRequestDTO;
 import com.solaria.messenger.core.contract.response.MessageResponseDTO;
+import com.solaria.messenger.core.exception.BusinessRuleException;
 import com.solaria.messenger.core.exception.InvalidFieldException;
+import com.solaria.messenger.core.helper.AttachmentHelper;
 import com.solaria.messenger.core.helper.ConversationAccessHelper;
 import com.solaria.messenger.core.helper.MessageWriteHelper;
 import com.solaria.messenger.core.helper.NotificationHelper;
 import com.solaria.messenger.core.helper.OfflineMessageNotifier;
+import com.solaria.messenger.core.model.Attachment;
 import com.solaria.messenger.core.model.Conversation;
 import com.solaria.messenger.core.model.Message;
 import com.solaria.messenger.core.model.enums.ConversationType;
@@ -56,16 +59,18 @@ public class SendUserMessageUseCase {
     private final RbacAuthorizationService rbac;
     private final ConversationAccessHelper access;
     private final MessageWriteHelper writes;
+    private final AttachmentHelper attachments;
     private final NotificationHelper notifications;
     private final OfflineMessageNotifier offlineNotifier;
     private final ConversationMutationGuard guard;
 
     public SendUserMessageUseCase(RbacAuthorizationService rbac, ConversationAccessHelper access,
-            MessageWriteHelper writes, NotificationHelper notifications, OfflineMessageNotifier offlineNotifier,
-            ConversationMutationGuard guard) {
+            MessageWriteHelper writes, AttachmentHelper attachments, NotificationHelper notifications,
+            OfflineMessageNotifier offlineNotifier, ConversationMutationGuard guard) {
         this.rbac = rbac;
         this.access = access;
         this.writes = writes;
+        this.attachments = attachments;
         this.notifications = notifications;
         this.offlineNotifier = offlineNotifier;
         this.guard = guard;
@@ -81,13 +86,17 @@ public class SendUserMessageUseCase {
      */
     public MessageResponseDTO execute(MessageRequestDTO dto) {
         UUID clientMessageId = parseClientMessageId(dto.getClientMessageId());
+        requireTextOrAttachment(dto);
         if (dto.getMessageType() == MessageType.CHATBOT_TO_USER) {
             throw new InvalidFieldException(
                     "messageType CHATBOT_TO_USER só pode ser publicado pelo pipeline de LLM (POST /internal/messages).");
         }
 
+        // a conferência do arquivo consulta o armazenamento (rede), então fica fora do guard, que serializa os envios da réplica
+        Attachment attachment = dto.getAttachment() == null ? null
+                : attachments.build(dto.getConversationId(), rbac.currentUserId(), dto.getAttachment());
         Message saved = guard.execute(() -> access.withAccess(dto.getConversationId(), rbac.currentUserId(),
-                conversation -> sendAuthorized(conversation, dto, clientMessageId)));
+                conversation -> sendAuthorized(conversation, dto, clientMessageId, attachment)));
 
         notifications.notifyMessageCreated(saved);
         offlineNotifier.notifyOffline(saved);
@@ -95,8 +104,12 @@ public class SendUserMessageUseCase {
     }
 
     /** Confere conversa ativa, tipo da mensagem e comunidade ativa, e grava */
-    private Message sendAuthorized(Conversation conversation, MessageRequestDTO dto, UUID clientMessageId) {
+    private Message sendAuthorized(Conversation conversation, MessageRequestDTO dto, UUID clientMessageId,
+            Attachment attachment) {
         requireMessageTypeMatchesConversation(dto.getMessageType(), conversation.getConversationType());
+        if (attachment != null && conversation.getConversationType() == ConversationType.CHAT_BOT) {
+            throw new BusinessRuleException("A conversa com o assistente não aceita anexos.");
+        }
         access.requireCommunityActive(conversation);
 
         Message message = new Message();
@@ -105,9 +118,18 @@ public class SendUserMessageUseCase {
         message.setClientMessageId(clientMessageId);
         message.setRole(ROLE_USER);
         message.setMessageType(dto.getMessageType());
-        message.setContent(dto.getContent());
+        message.setContent(dto.getContent() == null ? "" : dto.getContent());
+        message.setAttachment(attachment);
         message.setTimestamp(Instant.now());
         return writes.appendAndTouch(conversation, message);
+    }
+
+    /** Sem anexo, o texto é obrigatório; com anexo, é a legenda e pode faltar. */
+    private void requireTextOrAttachment(MessageRequestDTO dto) {
+        boolean hasText = dto.getContent() != null && !dto.getContent().isBlank();
+        if (!hasText && dto.getAttachment() == null) {
+            throw new InvalidFieldException("content é obrigatório quando a mensagem não tem anexo.");
+        }
     }
 
     /** clientMessageId é opcional, mas se vier precisa ser um UUID canônico */

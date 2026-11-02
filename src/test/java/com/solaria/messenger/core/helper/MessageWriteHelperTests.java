@@ -124,6 +124,34 @@ class MessageWriteHelperTests {
     }
 
     @Test
+    void deleteDropsTheAttachmentFromTheReturnedMessage() {
+        Message current = storedMessage();
+        current.setAttachment(new com.solaria.messenger.core.model.Attachment());
+        givenAuthorizedMutation(current);
+        given(clock.nextVersion()).willReturn(91L);
+        given(messages.deleteIfCurrent("msg-1", CONVERSATION, AUTHOR, 3L, 4L, 91L)).willReturn(1L);
+
+        MessageMutationResult result = helper.mutate("msg-1", null, true);
+
+        assertThat(result.message().getAttachment()).isNull();
+    }
+
+    @Test
+    void deleteReportsTheAttachmentItRemovedSoTheFileCanBeDropped() {
+        Message current = storedMessage();
+        com.solaria.messenger.core.model.Attachment attachment = new com.solaria.messenger.core.model.Attachment();
+        attachment.setMediaId("m1");
+        current.setAttachment(attachment);
+        givenAuthorizedMutation(current);
+        given(clock.nextVersion()).willReturn(91L);
+        given(messages.deleteIfCurrent("msg-1", CONVERSATION, AUTHOR, 3L, 4L, 91L)).willReturn(1L);
+
+        MessageMutationResult result = helper.mutate("msg-1", null, true);
+
+        assertThat(result.removedAttachment()).isSameAs(attachment);
+    }
+
+    @Test
     void repeatedDeleteWritesNothingAndKeepsTheStoredVersion() {
         Message current = storedMessage();
         current.setDeleted(true);

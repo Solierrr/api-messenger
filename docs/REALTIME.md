@@ -59,7 +59,7 @@ Todo evento usa `WsEventEnvelope`, com `type`, `conversationId`, `eventId`, `ser
 
 | `type` | Tópico | Quando | `payload` |
 |---|---|---|---|
-| `MESSAGE_CREATED` | `users.{id}.events` | mensagem nova do usuário ou do assistente, para cada participante, inclusive o autor | `MessageResponseDTO`, com `changeVersion`. O `eventId` é o `id` da mensagem |
+| `MESSAGE_CREATED` | `users.{id}.events` | mensagem nova do usuário ou do assistente, para cada participante, inclusive o autor | `MessageResponseDTO`, com `changeVersion` e, quando há, `attachment` (a descrição, com `expiresAt` e `downloadPath`; nunca o endereço do arquivo). O `eventId` é o `id` da mensagem |
 | `MESSAGE_EDITED` | `users.{id}.events` | edição efetiva | `MessageResponseDTO`, `eventId` novo |
 | `MESSAGE_DELETED` | `users.{id}.events` | exclusão efetiva | a mensagem apagada, sem o texto, `eventId` novo |
 | `MESSAGE_ACK` | `users.{id}.acks` | envio pelo STOMP | `MessageResponseDTO`. O `eventId` é o `id` da mensagem |
