@@ -30,7 +30,6 @@ class StompDestinationsTests {
 
     @Test
     void parsesTheTopicsThePublishersBuild() {
-        assertEquals("abc_1-2", StompDestinations.conversationTopicId(StompDestinations.conversationTopic("abc_1-2")));
         assertEquals(USER.toString(), StompDestinations.userTopicOwner(StompDestinations.userTopic(USER, "acks")));
         assertEquals(USER.toString(), StompDestinations.userTopicOwner(StompDestinations.userTopic(USER, "events")));
     }
@@ -44,10 +43,6 @@ class StompDestinationsTests {
     // '/' é recusado pelo RabbitMQ; '.', '*' e '#' são curingas ou separadores do amq.topic
     @Test
     void rejectsSlashesAndRabbitWildcards() {
-        assertNull(StompDestinations.conversationTopicId("/topic/conversations/abc"));
-        assertNull(StompDestinations.conversationTopicId("/topic/conversations.*"));
-        assertNull(StompDestinations.conversationTopicId("/topic/conversations.#"));
-        assertNull(StompDestinations.conversationTopicId("/topic/conversations.a.b"));
         assertNull(StompDestinations.userTopicOwner("/topic/users.*.acks"));
         assertNull(StompDestinations.userTopicOwner("/topic/users.#"));
         assertNull(StompDestinations.userTopicOwner("/topic/users." + USER + ".*"));
@@ -86,6 +81,23 @@ class StompDestinationsTests {
         Message<byte[]> old = subscribe(StompDestinations.userTopic(USER, "conversations"));
         assertNull(authorizer.authorizeSubscribe(old, StompHeaderAccessor.wrap(old), USER.toString()));
         verify(events, times(2)).publishEvent(any(StompFrameDenied.class));
+    }
+
+    // presença e digitando também saem em .events; o tópico por conversa deixou de existir
+    @Test
+    void theConversationTopicIsDeniedEvenToItsParticipants() {
+        ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+        var authorizer = new StompDestinationAuthorizer(mock(ConversationAccessHelper.class), events);
+
+        Message<byte[]> topic = subscribe("/topic/conversations.c1");
+        assertNull(authorizer.authorizeSubscribe(topic, StompHeaderAccessor.wrap(topic), USER.toString()));
+        verify(events).publishEvent(any(StompFrameDenied.class));
+    }
+
+    @Test
+    void conversationIdComesOnlyFromThePayload() {
+        Message<byte[]> frame = subscribe("/topic/conversations.c1");
+        assertNull(StompDestinations.conversationId(frame));
     }
 
     private static Message<byte[]> subscribe(String destination) {

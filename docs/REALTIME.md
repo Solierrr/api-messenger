@@ -45,14 +45,13 @@ O RabbitMQ recusa `/` depois de `/topic`, por isso o separador é `.`.
 
 | Tópico | Quem assina | Conteúdo |
 |---|---|---|
-| `/topic/users.{userId}.events` | só o próprio usuário | `MESSAGE_CREATED`, `MESSAGE_EDITED`, `MESSAGE_DELETED`, `CONVERSATION_UPDATED` e `CONVERSATION_REMOVED` de todas as conversas dele |
+| `/topic/users.{userId}.events` | só o próprio usuário | canal único das conversas dele: `MESSAGE_CREATED`, `MESSAGE_EDITED`, `MESSAGE_DELETED`, `CONVERSATION_UPDATED`, `CONVERSATION_REMOVED`, `TYPING_STARTED`, `TYPING_STOPPED`, `USER_ONLINE`, `USER_OFFLINE` e `PRESENCE_SNAPSHOT` |
 | `/topic/users.{userId}.acks` | só o próprio usuário | `MESSAGE_ACK` |
 | `/topic/users.{userId}.errors` | só o próprio usuário | `WsErrorPayload` |
-| `/topic/conversations.{conversationId}` | participantes com acesso atual | presença, digitando e `PRESENCE_SNAPSHOT` |
 
-- O id de conversa aceita só `[A-Za-z0-9_-]`, e o `userId` precisa ser um UUID em minúsculas. Isso impede assinar os curingas `*` e `#` do RabbitMQ.
+- Não existe tópico por conversa: um `SUBSCRIBE` em `/topic/conversations.*` é recusado com `SUBSCRIBE_NOT_ALLOWED`. O `userId` precisa ser um UUID em minúsculas. Isso impede assinar os curingas `*` e `#` do RabbitMQ.
 - O `SUBSCRIBE` perde os headers `durable`, `persistent`, `auto-delete`, `exclusive` e `x-*`. A fila fica exclusiva e é apagada com a sessão, então o cliente não cria uma fila que acumule eventos depois de desconectar.
-- O cliente assina `.events` antes de chamar `GET /messaging/updates`, para não perder o que mudar entre as duas coisas. O fluxo está em [CATCH_UP.md](../flows/CATCH_UP.md).
+- O cliente assina `.events` uma vez por conexão, em qualquer tela, e recebe os eventos de todas as conversas dele. Assina antes de chamar `GET /messaging/updates`, para não perder o que mudar entre as duas coisas. O fluxo está em [CATCH_UP.md](../flows/CATCH_UP.md).
 
 ## Eventos
 
@@ -66,9 +65,9 @@ Todo evento usa `WsEventEnvelope`, com `type`, `conversationId`, `eventId`, `ser
 | `MESSAGE_ACK` | `users.{id}.acks` | envio pelo STOMP | `MessageResponseDTO`. O `eventId` é o `id` da mensagem |
 | `CONVERSATION_UPDATED` | `users.{id}.events` | mudança de conversa, mensagem, participantes ou status da comunidade. Depois de alterar o estado pessoal, só para o próprio usuário | o item da lista de conversas daquele destinatário |
 | `CONVERSATION_REMOVED` | `users.{id}.events` | perda de participação | `{id, syncEpoch, syncVersion}`, sem participantes, conteúdo ou preferências |
-| `PRESENCE_SNAPSHOT` | só a sessão que assinou a conversa | logo depois que o broker registra o `SUBSCRIBE` | `{subscriptionId, presenceEpoch, presenceVersion, users}` |
-| `USER_ONLINE`, `USER_OFFLINE` | `conversations.{id}`, em cada conversa do usuário | a primeira ou a última sessão do usuário numa instância muda | `{userId, presenceEpoch, presenceVersion}` |
-| `TYPING_STARTED`, `TYPING_STOPPED` | `conversations.{id}` | início e fim de digitando | `{userId}`, sem `eventId` |
+| `PRESENCE_SNAPSHOT` | `users.{id}.events`, só para a sessão que assinou | logo depois que o broker registra o `SUBSCRIBE` do `.events`, com todos os contatos do usuário. Também, sem `subscriptionId`, para cada participante quando uma conversa ganha gente (direta nova, grupo novo, participante adicionado) | `{subscriptionId, presenceEpoch, presenceVersion, users}`, com `conversationId` nulo |
+| `USER_ONLINE`, `USER_OFFLINE` | `users.{id}.events` de cada contato, uma vez por contato | a primeira ou a última sessão do usuário numa instância muda | `{userId, presenceEpoch, presenceVersion}`, com `conversationId` nulo |
+| `TYPING_STARTED`, `TYPING_STOPPED` | `users.{id}.events` de cada participante autorizado, menos de quem digita | início e fim de digitando, mesmo em conversa silenciada ou arquivada | `{userId}`, com `conversationId` no envelope e sem `eventId` |
 
 O `WsErrorPayload` traz `code`, `message`, `clientMessageId` (quando o erro veio de um envio com correlação) e `traceId` (sempre nulo hoje). Os códigos são os mesmos do REST, descritos em [API.md](./API.md#erros).
 
@@ -83,6 +82,10 @@ O relay manda `ERROR "Connection to broker closed."` quando o RabbitMQ fecha a c
 ## Presença
 
 - O usuário está online quando tem ao menos uma sessão admitida em qualquer instância. Cada sessão fica em `messenger:presence:{userId}` no Redis.
+- Contato é quem divide com o usuário alguma conversa que ele pode ler (a mesma regra da lista de conversas), sem ele próprio. Presença é da pessoa, então o cliente junta o mapa `{userId: online}` com os `participantIds` de cada conversa para saber quem está online nela.
+- O cliente guarda a versão de presença por pessoa e **soma** cada `PRESENCE_SNAPSHOT` ao que já tem, sem substituir: o retrato parcial de uma conversa nova só traz os participantes dela.
+- Quem perde o acesso a uma conversa não gera aviso; continua no mapa do outro, mas não aparece em conversa nenhuma.
+- `shortcut:` cada conexão ou queda gera um frame por contato, sem limite; numa comunidade de centenas de membros são centenas de frames.
 - `USER_ONLINE` e `USER_OFFLINE` saem quando a primeira ou a última sessão numa instância muda, e só se o estado global ainda for o do evento.
 - `presenceEpoch` e `presenceVersion` vêm do Redis. A época só muda se o Redis perder os dados.
 - A cada 30 s, cada instância renova o próprio registro e regrava as sessões locais. Uma instância sem heartbeat por 90 s é considerada morta, e uma só instância limpa as sessões dela e publica `USER_OFFLINE`.
@@ -95,7 +98,7 @@ Sem Redis, a presença, o snapshot e o limite usam só a visão da instância, c
 - `typing.started` repetido em menos de 2 s é ignorado.
 - `typing.started` exige participação e comunidade ativa. `typing.stopped` exige só participação.
 - O estado fica em memória na instância da sessão. Uma varredura a cada 5 s remove entradas antigas sem publicar `TYPING_STOPPED`, então o cliente expira o indicador sozinho.
-- Quando a última sessão do usuário numa instância cai, ela publica `TYPING_STOPPED` nas conversas em que ele digitava.
+- Quando a última sessão do usuário numa instância cai, ela publica `TYPING_STOPPED` aos participantes das conversas em que ele digitava.
 
 ## Revogação de sessões
 

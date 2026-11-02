@@ -24,7 +24,7 @@ import org.springframework.stereotype.Component;
 
 import com.solaria.messenger.core.exception.BusinessException;
 import com.solaria.messenger.core.helper.UserAccessHelper;
-import com.solaria.messenger.websocket.event.ConversationSubscriptionRegistered;
+import com.solaria.messenger.websocket.event.UserEventsSubscribed;
 import com.solaria.messenger.websocket.session.LocalWebSocketSessionRegistry;
 import com.solaria.messenger.websocket.enums.SessionAdmission;
 import com.solaria.messenger.websocket.exception.StompAuthenticationException;
@@ -117,13 +117,14 @@ public class StompAuthChannelInterceptor implements ExecutorChannelInterceptor {
             if (ex != null || !(handler instanceof AbstractBrokerMessageHandler)
                     || accessor.getCommand() != StompCommand.SUBSCRIBE) return;
 
-            // inscrição num tópico de conversa, com subscriptionId e sessão ainda ativa
-            String conversationId = StompDestinations.conversationTopicId(accessor.getDestination());
             Jwt jwt = extractStoredJwt(accessor);
-            if (jwt != null && conversationId != null && accessor.getSubscriptionId() != null
-                    && !accessor.getSubscriptionId().isBlank() && sessions.isOperational(accessor.getSessionId())) {
-                events.publishEvent(new ConversationSubscriptionRegistered(accessor.getSessionId(),
-                        accessor.getSubscriptionId(), UUID.fromString(canonicalUserId(jwt)), conversationId));
+            // inscrição no próprio canal de eventos: dispara o retrato de presença dos contatos
+            if (jwt != null && accessor.getSubscriptionId() != null && !accessor.getSubscriptionId().isBlank()
+                    && sessions.isOperational(accessor.getSessionId())) {
+                UUID user = UUID.fromString(canonicalUserId(jwt));
+                if (StompDestinations.userTopic(user, "events").equals(accessor.getDestination())) {
+                    events.publishEvent(new UserEventsSubscribed(accessor.getSessionId(), accessor.getSubscriptionId(), user));
+                }
             }
         } finally {
             SecurityContextHolder.clearContext();

@@ -123,7 +123,10 @@ public class AddGroupParticipantsUseCase {
             }
         });
 
-        if (changed[0]) notifications.publishConversationChanged(id);
+        if (changed[0]) {
+            notifications.publishConversationChanged(id);
+            notifications.publishPresenceOf(id);
+        }
         return response;
     }
 }

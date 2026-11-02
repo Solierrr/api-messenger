@@ -6,7 +6,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.springframework.messaging.Message;
-import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,37 +19,23 @@ import com.solaria.messenger.websocket.dto.response.WsEventEnvelope;
  * senão um cliente assinaria um curinga do RabbitMQ e receberia eventos de outros.
  * </p>
  * <ul>
- *     <li>{@code /topic/conversations.{id}} -> presença, digitação e snapshot de presença de uma conversa.</li>
  *     <li>{@code /topic/users.{userId}.{acks|errors|events}} -> eventos privados do user, em todos os pods. O
- *         {@code events} leva {@code MESSAGE_*}, {@code CONVERSATION_UPDATED} e {@code CONVERSATION_REMOVED}.</li>
+ *         {@code events} é o canal único das conversas: {@code MESSAGE_*}, {@code CONVERSATION_UPDATED},
+ *         {@code CONVERSATION_REMOVED}, {@code TYPING_*}, {@code USER_ONLINE/OFFLINE} e {@code PRESENCE_SNAPSHOT}.</li>
  * </ul>
  */
 public final class StompDestinations {
 
     private static final ObjectMapper json = new ObjectMapper();
-    private static final String CONVERSATION_TOPIC = "/topic/conversations.";
     private static final String USER_TOPIC = "/topic/users.";
-    private static final Pattern CONVERSATION_TOPIC_PATTERN =
-            Pattern.compile("^/topic/conversations\\.([A-Za-z0-9_-]+)$");
     private static final Pattern USER_TOPIC_PATTERN =
             Pattern.compile("^/topic/users\\.([0-9a-f-]{36})\\.(acks|errors|events)$");
 
     private StompDestinations() { }
 
-    /** Tópico de uma conversa. */
-    public static String conversationTopic(String conversationId) {
-        return CONVERSATION_TOPIC + conversationId;
-    }
-
     /** Tópico privado do user; {@code kind} é {@code acks}, {@code errors} ou {@code events}. */
     public static String userTopic(UUID userId, String kind) {
         return USER_TOPIC + userId + "." + kind;
-    }
-
-    /** ID da conversa de um tópico {@code /topic/conversations.{id}} válido, ou {@code null} para outros destinos. */
-    static String conversationTopicId(String destination) {
-        Matcher matcher = CONVERSATION_TOPIC_PATTERN.matcher(destination == null ? "" : destination);
-        return matcher.matches() ? matcher.group(1) : null;
     }
 
     /** Dono de um tópico privado {@code /topic/users.{userId}.{tipo}} válido, ou {@code null} para outros destinos. */
@@ -60,12 +45,10 @@ public final class StompDestinations {
     }
 
     /**
-     * Conversa do frame pelo destino ou pelo {@code conversationId} do corpo; {@code null} quando o frame não pertence
+     * Conversa do frame pelo {@code conversationId} do corpo; {@code null} quando o frame não pertence
      * a uma conversa (feedback privado no tópico do usuário).
      */
     static String conversationId(Message<?> message) {
-        String destination = SimpMessageHeaderAccessor.wrap(message).getDestination();
-        if (destination != null && destination.startsWith(CONVERSATION_TOPIC)) return destination.substring(CONVERSATION_TOPIC.length());
         Object payload = message.getPayload();
         if (payload instanceof WsEventEnvelope envelope) return envelope.getConversationId();
         try {
