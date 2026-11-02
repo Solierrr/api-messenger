@@ -79,6 +79,30 @@ class LangSmithClientTests {
     }
 
     @Test
+    void assistantTotalsAsksOnceAndFiltersTheRunsByTheAssistantMetadata() {
+        expectProject();
+        server.expect(requestTo(STATS)).andExpect(method(HttpMethod.POST))
+                .andExpect(bodyContains("\"is_root\":true", "metadata_key", "\\\"assistant\\\"", "metadata_value",
+                        "\\\"ai-assistant\\\""))
+                .andRespond(withSuccess("{\"run_count\":5,\"error_rate\":0.2,\"total_cost\":0.01}",
+                        MediaType.APPLICATION_JSON));
+
+        LangSmithStatsDTO result = client.assistantTotals(START, END, "ai-assistant");
+
+        assertThat(result.name()).isEqualTo("ai-assistant");
+        assertThat(result.runs()).isEqualTo(5);
+        server.verify();
+    }
+
+    @Test
+    void assistantTotalsRejectsNamesThatCouldBreakTheFilter() {
+        assertThatThrownBy(() -> client.assistantTotals(START, END, "a\"b")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> client.assistantTotals(START, END, "a\\b")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> client.assistantTotals(START, END, " ")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> client.assistantTotals(START, END, null)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void byAssistantGroupsByMetadataSortsByRunsAndDropsEmptyGroups() {
         expectProject();
         server.expect(requestTo(STATS))

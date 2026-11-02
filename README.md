@@ -1,45 +1,43 @@
-# Finalidade do repositório
+<p align="center">
+  <img src="./assets/readme/banners/springboot.png" alt="Spring Boot" width="100%">
+</p>
 
-O `api-messenger` é o serviço de mensageria da Solaria, responsável por armazenar e servir todo o histórico de conversas trocadas na plataforma — tanto conversas usuário-a-usuário quanto conversas usuário-a-chatbot atendidas pelo pipeline de LLM. O serviço modela conversas e mensagens sobre MongoDB, expõe endpoints protegidos por JWT de usuário (emitido pelo `api-auth`) para o fluxo humano, e uma rota interna, isolada pela rede, para que o pipeline de IA (`ai-assistant`) publique respostas do chatbot e registre observabilidade de cada chamada de LLM/ferramenta (tokens consumidos, latência, especialistas acionados). Também centraliza avaliações (ratings) de profissionais e produtos.
+<p align="center">
+  <img src="./assets/readme/stacks/java.png" width="100" hspace="8" alt="Java" title="Java">
+  <img src="./assets/readme/stacks/spring-security.png" width="100" hspace="8" alt="Spring Security" title="Spring Security">
+  <img src="./assets/readme/stacks/jwt.png" width="100" hspace="8" alt="JWT" title="JWT">
+  <img src="./assets/readme/stacks/mongodb.png" width="100" hspace="8" alt="MongoDB" title="MongoDB">
+  <img src="./assets/readme/stacks/redis.png" width="100" hspace="8" alt="Redis" title="Redis">
+  <img src="./assets/readme/stacks/upstash.png" width="100" hspace="8" alt="Upstash" title="Upstash">
+  <img src="./assets/readme/stacks/swagger.png" width="100" hspace="8" alt="Swagger" title="Swagger">
+  <img src="./assets/readme/stacks/bruno.png" width="100" hspace="8" alt="Bruno" title="Bruno">
+</p>
 
-<p>
+# Central de mensagens
 
 [![License](https://img.shields.io/github/license/Solierrr/api-messenger)](https://github.com/Solierrr/api-messenger/blob/main/LICENSE)
 [![GitHub Last Commit](https://img.shields.io/github/last-commit/Solierrr/api-messenger)](https://github.com/Solierrr/api-messenger/commits)
-[![GitHub Issues](https://img.shields.io/github/issues/Solierrr/api-messenger)](https://github.com/Solierrr/api-messenger/issues)
 [![GitHub Pull Requests](https://img.shields.io/github/issues-pr/Solierrr/api-messenger)](https://github.com/Solierrr/api-messenger/pulls)
-[![GitHub Contributors](https://img.shields.io/github/contributors/Solierrr/api-messenger)](https://github.com/Solierrr/api-messenger/graphs/contributors)
 [![Release](https://img.shields.io/github/v/release/Solierrr/api-messenger)](https://github.com/Solierrr/api-messenger/releases)
 
-</p>
+Este serviço guarda e entrega as conversas da plataforma. Clientes, profissionais e empresas conversam sem sair dela, em conversas individuais, em grupos e nos subgrupos da comunidade de cada projeto. Qualquer pessoa pode iniciar uma conversa com outra a qualquer momento. O serviço também guarda as conversas de cada pessoa com o assistente virtual, a nota que ela dá ao atendimento e o registro de uso dos modelos de linguagem, que a equipe consulta num painel interno.
 
-<div align="center">
-
-<p>
-  <a href="https://github.com/syvixor/skills-icons">
-    <img src="https://skills.syvixor.com/api/icons?i=java,springboot,spring,mongodb,swagger" height="48" alt="Stack do api-messenger">
-  </a>
-</p>
-
-<p>
-
-[![Java](https://img.shields.io/badge/Java_21-437291?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
-[![Spring Boot](https://img.shields.io/badge/Spring_Boot-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
-[![Spring Security](https://img.shields.io/badge/Spring_Security-6DB33F?logo=springsecurity&logoColor=white)](https://spring.io/projects/spring-security)
-[![MongoDB](https://img.shields.io/badge/MongoDB-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
-[![Swagger](https://img.shields.io/badge/Swagger-85EA2D?logo=swagger&logoColor=black)](https://swagger.io/)
-
-</p>
-
-</div>
+As mensagens chegam em tempo real por WebSocket, com aviso de quem está conectado e de quem está digitando, e quem está desconectado recebe um aviso no celular pelo serviço de notificações. Quem volta a se conectar busca o que perdeu desde a última vez. O acesso das pessoas é validado pelo token JWT do serviço de acesso, e o cadastro central confirma quem pode criar a comunidade de um projeto. As conversas ficam no MongoDB, o Redis guarda quem está conectado, e o RabbitMQ distribui os eventos entre as instâncias do serviço.
 
 ## Aprofunde-se no Projeto!
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md), camadas do serviço, modelagem no MongoDB, endpoints internos/públicos e árvore real do repositório.
-- [RUNNING.md](./RUNNING.md), como subir o `api-messenger` localmente e impedimentos conhecidos.
-- [DEPLOYMENT.md](https://github.com/Solierrr/.github/blob/main/.github/DEPLOYMENT.md), pipeline de deploy padrão da organização (`main`/`qa`, Docker Hub, ArgoCD).
+- [OVERVIEW.md](./docs/OVERVIEW.md), o que o serviço oferece e as regras de negócio.
+- [ARCHITECTURE.md](./docs/ARCHITECTURE.md), organização do código, integrações, decisões técnicas e os termos deste serviço explicados em linguagem simples.
+- [REALTIME.md](./docs/REALTIME.md), o protocolo de tempo real, com destinos, eventos, presença e revogação de sessões.
+- [RUNNING.md](./docs/RUNNING.md), como executar e testar localmente.
+- [API.md](./docs/API.md), como autenticar, os grupos de rotas e os erros.
+- [DEPLOY.md](./docs/DEPLOY.md), ambientes e publicação.
+- [STATUS.md](./docs/STATUS.md), o que funciona, o que falta e as dívidas técnicas.
+- [Fluxos](./flows/), as conversas, as mensagens, a comunidade, o tempo real e a resposta do assistente.
+- [Banco de dados](./database/), as coleções do MongoDB e as chaves do Redis.
 
 ## Contribuindo
 
-- [CONTRIBUTING.md](./.github/CONTRIBUTING.md), convenções de commit, branch e Pull Request.
-- {a confirmar: CODE_OF_CONDUCT.md e SECURITY.md ainda não existem neste repositório — ver se devem ser adicionados ou linkados a partir do repositório `.github` compartilhado da organização}
+- [CONTRIBUTING.md](https://github.com/Solierrr/.github/blob/main/.github/CONTRIBUTING.md), convenções de commit, branch e Pull Request.
+- [CODE_OF_CONDUCT.md](https://github.com/Solierrr/.github/blob/main/CODE_OF_CONDUCT.md), código de conduta.
+- [SECURITY.md](https://github.com/Solierrr/.github/blob/main/SECURITY.md), como reportar uma vulnerabilidade.

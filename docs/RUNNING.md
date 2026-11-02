@@ -1,63 +1,58 @@
-# Rodando o Projeto Localmente
-
-Este repositório é Java 21 + Spring Boot, buildado com Maven. O processo local é sempre o mesmo: clonar, abrir na IDE, baixar as dependências via `mvnw` e subir a aplicação. O `api-messenger` depende de um MongoDB acessível e, para o fluxo autenticado por usuário, de um `api-auth` no ar expondo JWKS — verifique a seção de impedimentos abaixo antes de iniciar.
-
-<p>
-  <a href="https://github.com/syvixor/skills-icons">
-    <img src="https://skills.syvixor.com/api/icons?i=java,springboot,spring,github,mongodb" height="48" alt="Rodando o Projeto — api-messenger">
-  </a>
+<p align="center">
+  <img src="../assets/readme/banners/springboot.png" alt="Spring Boot" width="100%">
 </p>
 
-## Possíveis Impedimentos
+# Executando localmente
 
-- **JDK 21 instalado localmente**, a mesma versão usada no [`Dockerfile`](./Dockerfile) do repositório (`eclipse-temurin:21`) — rodar fora do container exige essa versão instalada e configurada como `JAVA_HOME`.
-- **MongoDB acessível**, o serviço se conecta via `DB_MONGO_URI` (padrão `mongodb://localhost:27017`) no banco `DB_MONGO_MESSENGER` (padrão `solaria_messenger_db`), ver `spring.data.mongodb.uri` em `application.properties` — sem uma instância local ou remota no ar, a aplicação sobe (não há checagem de conexão no boot), mas qualquer chamada a `/messaging/**` ou `/internal/**` que toque o banco falha. O jeito mais simples de ter um Mongo local é `docker run -d -p 27017:27017 --name mongo-messenger mongo`.
-- **JWKS do `api-auth` para validar JWT de usuário**, `JWT_JWK_SET_URI` aponta por padrão para `http://localhost:8081/.well-known/jwks.json` — sem o `api-auth` no ar nessa porta (ou a URL ajustada para o ambiente correto), qualquer rota `/messaging/**` retorna 401, já que o `NimbusJwtDecoder` não consegue buscar a chave pública para validar a assinatura.
-- **Secrets locais**, variáveis de ambiente equivalentes às injetadas em runtime pelo [Infisical](https://infisical.com) precisam ser criadas manualmente em `.env` na raiz do projeto (ver [`.env.example`](./.env.example) para a lista completa) — sem elas, a aplicação sobe mas falha ao tentar se conectar em dependências externas.
-- **Admin do histórico (opcional)**, as rotas `GET /messaging/admin/conversations` e `GET /messaging/admin/conversations/{id}` alimentam Conversas e Dashboards do web-sandbox e só respondem aos `sub` (UUID do JWT) listados em `DEBUG_ADMIN_SUBS`, separados por vírgula. Sem a variável, todo mundo recebe 403. A lista aceita `from`/`to` (datas `YYYY-MM-DD`, padrão últimos 7 dias), `assistant`, `sessionId`, `userId`, `text` e `limit` (padrão 200, máximo 2000) e olha no máximo as 2000 conversas de chatbot mais recentes do período (`truncated: true` quando passa disso). A conversa só tem `assistant` quando o serviço de IA a criou com `userDetails.assistant`; as antigas voltam como `desconhecido`. Mensagens apagadas não entram. O navegador só consegue chamar essas rotas de uma origem listada em `app.cors.allowed-origins`.
-- **LangSmith nos dashboards (opcional)**, `GET /messaging/admin/langsmith/summary?from&to` (mesmas datas e mesmo controle de acesso do histórico) devolve custo, tokens, taxa de erro e latência p50/p99 dos runs raiz do projeto do LangSmith, no total, por assistente (`metadata.assistant`) e por modelo (`metadata.ls_model_name`). Configure `SOLARIA_LANGSMITH_API_KEY` e `SOLARIA_LANGSMITH_PROJECT` (os mesmos nomes e valores dos serviços de IA; `LANGSMITH_API_KEY` e `LANGSMITH_PROJECT` também são aceitos); `LANGSMITH_URL` e `LANGSMITH_PROJECT_URL` são opcionais. Sem chave ou projeto a rota responde `enabled: false`. A resposta fica em cache por 2 minutos e uma falha do LangSmith volta como 503.
+O passo a passo comum dos serviços Java está em [JAVA.md](https://github.com/Solierrr/docs-warehouse/blob/main/readme/running/JAVA.md). Aqui fica só o que é deste serviço.
 
-## Instalação do Projeto
+## Pré-requisitos
 
-### Iniciando o repositório com o Github
+- Java 21.
+- MongoDB com replica set. Sem replica set, criar conversa e adicionar participantes falham, porque essas operações usam transação.
+- `api-auth` rodando na porta 8081, para validar o JWT e consultar a conta. Sem ele, as rotas `/messaging/**` falham.
+- Infisical CLI logado, para gerar o `.env`.
 
-<p>
-  <a href="https://github.com/syvixor/skills-icons">
-    <img src="https://skills.syvixor.com/api/icons?i=github,intellij" height="48" alt="Frameworks">
-  </a>
-</p>
+São opcionais:
 
-Clone o repositório e abra no IntelliJ IDEA.
+- Redis, para presença, revogação entre instâncias e a confirmação de usuário ativo. Sem ele, cada instância usa só a própria visão e consulta o `api-auth` em toda requisição.
+- RabbitMQ 4 com o plugin STOMP, só para testar mais de uma instância. A imagem está no [`infra-broker`](https://github.com/Solierrr/infra-broker).
+- `api-core`, só para criar comunidades.
+- `api-notify`, só para testar o aviso no celular.
 
-```Comandos para clonar o repositório
-git clone https://github.com/Solierrr/api-messenger.git
-cd ./api-messenger
-idea .
-```
+O `api-core` e este serviço usam a porta 8080 por padrão. Rode um de cada vez ou mude a porta de um deles.
 
-### Instalando dependências necessárias para rodar o projeto localmente
+## Variáveis
 
-<p>
-  <a href="https://github.com/syvixor/skills-icons">
-    <img src="https://skills.syvixor.com/api/icons?i=maven,apache" height="48" alt="Frameworks">
-  </a>
-</p>
+`make vault` grava o `.env` com as pastas `/database`, `/auth`, `/service-urls` e `/otel` do Infisical. O [`.env.example`](https://github.com/Solierrr/api-messenger/blob/main/.env.example) lista também as pastas `/broker` e `/redis`, que ficam fora do `make vault` e precisam ser preenchidas à mão quando usadas.
 
-Use sempre o wrapper (`mvnw`/`mvnw.cmd`) em vez de um Maven instalado globalmente, para garantir a mesma versão usada no CI. Antes de rodar, copie `.env.example` para `.env` e preencha as variáveis descritas na seção de impedimentos.
+Sem `.env`, o serviço sobe com os padrões locais, ou seja, Mongo em `localhost:27017`, banco `solaria_messenger_db`, broker em memória, Redis em `localhost:6379` e push desligado.
 
-```Comandos para instalação de dependências
-./mvnw dependency:go-offline
-./mvnw spring-boot:run
-```
+| Variável | Efeito |
+|---|---|
+| `RABBITMQ_HOST` | liga o relay para o RabbitMQ. `RABBITMQ_RELAY_ENABLED=false` força o broker em memória |
+| `NOTIFY_BASE_URL` | liga o aviso no celular pelo `api-notify` |
+| `MESSAGES_MUTATION_WINDOW` | prazo para editar e apagar mensagem, em duração ISO 8601. O padrão é `PT30M` |
+| `DEBUG_ADMIN_SUBS` | `sub` dos usuários que acessam o histórico administrativo, separados por vírgula |
+| `SOLARIA_LANGSMITH_API_KEY`, `SOLARIA_LANGSMITH_PROJECT` | ligam o resumo do LangSmith. Sem elas, a rota responde `enabled: false` |
 
-A aplicação sobe por padrão na porta `8080` (mesma porta exposta no `Dockerfile`, sem `server.port` customizado em `application.properties`). Com o serviço e o MongoDB no ar, `GET /actuator/health` é um bom smoke test: não depende do `api-auth` e confirma que o serviço subiu.
+## Comandos
 
-### Testando os endpoints
+| Comando | O que faz |
+|---|---|
+| `make dev` | sobe o serviço na porta 8080 |
+| `make test` | roda os testes (precisa de Mongo e Redis locais, como no CI) |
+| `make lint` | roda o Checkstyle, como no CI |
+| `make vault ENV=local` | gera o `.env` a partir do Infisical |
 
-<p>
-  <a href="https://github.com/syvixor/skills-icons">
-    <img src="https://skills.syvixor.com/api/icons?i=swagger" height="48" alt="Documentação da API">
-  </a>
-</p>
+## Testando uma chamada
 
-O repositório expõe a documentação OpenAPI/Swagger via `springdoc-openapi-starter-webmvc-ui` (`OpenApiConfig`), disponível publicamente (sem autenticação) em `/swagger-ui.html` com o serviço no ar. As rotas `/messaging/**` exigem um JWT de usuário válido emitido pelo `api-auth` no header `Authorization: Bearer {token}`; as rotas `/internal/**` são permitidas pela autenticação da aplicação e devem ser protegidas pela rede. A coleção Bruno versionada em `http/` oferece requests de exemplo para as rotas documentadas; selecione o ambiente `local` e preencha os tokens somente no Bruno local.
+- Swagger em http://localhost:8080/swagger-ui.html. No perfil `dev`, `POST /dev/login` devolve um JWT para colar no Authorize.
+- Coleção Bruno na pasta [`http/`](https://github.com/Solierrr/api-messenger/blob/main/http/README.md) do repositório, com conversas, mensagens, comunidades, avaliações, rotas internas e telemetria.
+- `GET /actuator/health/readiness` responde `UP` quando o Mongo está acessível.
+- Para subir o ecossistema local inteiro em Kubernetes, com duas instâncias deste serviço, RabbitMQ, Mongo e Redis, use o `infra-local/solier.ps1` e o manifesto `k8s-manifests/30-api-messenger.yaml` da pasta de trabalho local.
+
+## Problemas conhecidos
+
+- Sem coletor OpenTelemetry local, o log mostra erros de exportação para `localhost:4318`. Eles não afetam o serviço.
+- Sem o `api-core` no ar, criar comunidade responde 503 `DEPENDENCY_UNAVAILABLE`. As outras rotas não dependem dele.
