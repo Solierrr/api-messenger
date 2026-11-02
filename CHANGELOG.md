@@ -1,5 +1,38 @@
 # Changelog
 
+## [3.2.0](https://github.com/Solierrr/api-messenger/compare/v3.1.0...v3.2.0) (2026-11-02)
+
+
+### Features
+
+* add bruno api collection ([3867e01](https://github.com/Solierrr/api-messenger/commit/3867e01b0ed3934f1a5a8c4ab45e1458961e7324))
+* add new images for documentation enhancement ([#58](https://github.com/Solierrr/api-messenger/issues/58)) ([7618b68](https://github.com/Solierrr/api-messenger/commit/7618b6867cf0c260e024fa4c59ee13d6e0c07c93))
+* add service key configuration and tests for HTTP client ([#68](https://github.com/Solierrr/api-messenger/issues/68)) ([cc2927d](https://github.com/Solierrr/api-messenger/commit/cc2927d9e14a2f957af14e8c953845bf1dc3e751))
+* add the local run commands ([d42ec53](https://github.com/Solierrr/api-messenger/commit/d42ec53c7f38bdd0408b49bb0442bd28df2dc480))
+* admin historico conversas ([#71](https://github.com/Solierrr/api-messenger/issues/71)) ([65b3ffe](https://github.com/Solierrr/api-messenger/commit/65b3ffe742b5acbb91581fb8b02d4874551f007d))
+* authenticate internal routes with the service key ([#62](https://github.com/Solierrr/api-messenger/issues/62)) ([5f1a5b8](https://github.com/Solierrr/api-messenger/commit/5f1a5b8f3434fe8e9b4fc924f9c7090f53689d28))
+* bring project communities and query the project authority with the service key ([#61](https://github.com/Solierrr/api-messenger/issues/61)) ([3c0e1c0](https://github.com/Solierrr/api-messenger/commit/3c0e1c0efb1e145539936a5822d0c4b5e6db1218))
+* describe the service for the alerts routing ([b7ce922](https://github.com/Solierrr/api-messenger/commit/b7ce9226a03c1fc2a925f6954888fa43ca674c25))
+* implement message mutation window for edit and delete operations ([#79](https://github.com/Solierrr/api-messenger/issues/79)) ([eab89b7](https://github.com/Solierrr/api-messenger/commit/eab89b7d4165d6a9db591aa01abd4db53ea71bd2))
+* make the stomp broker relay optional ([#76](https://github.com/Solierrr/api-messenger/issues/76)) ([451c81a](https://github.com/Solierrr/api-messenger/commit/451c81a488620fb2ba39bd7bde3710a64740b334))
+* **nps:** add POST /messaging/nps for chatbot conversations ([#59](https://github.com/Solierrr/api-messenger/issues/59)) ([95aaac3](https://github.com/Solierrr/api-messenger/commit/95aaac3acaa80982df920913acd124ba3f63bd85))
+* push message previews to offline recipients ([#77](https://github.com/Solierrr/api-messenger/issues/77)) ([7f38768](https://github.com/Solierrr/api-messenger/commit/7f387687d6f47b363ea42700b275ff87002eb432))
+* relay messenger websocket through rabbitmq for multiple pods ([#69](https://github.com/Solierrr/api-messenger/issues/69)) ([1db50f5](https://github.com/Solierrr/api-messenger/commit/1db50f5668d2df94860cf2cfe125886f171542fa))
+* stream user events and add message catch-up ([#78](https://github.com/Solierrr/api-messenger/issues/78)) ([0b9ea06](https://github.com/Solierrr/api-messenger/commit/0b9ea06a8ec84eb5b2fa9b7d0ba3ce699c93801a))
+
+
+### Bug Fixes
+
+* apply the group, community and invite rules from the debt review ([#85](https://github.com/Solierrr/api-messenger/issues/85)) ([682388e](https://github.com/Solierrr/api-messenger/commit/682388e36a344fd0815864f7d2afe5edfed20d09))
+* complete bruno observability example ([99e26a0](https://github.com/Solierrr/api-messenger/commit/99e26a05db52f07404d1d841157217a0141fdba2))
+* convert the legacy message sequence index to unique and scope mongo health ([#75](https://github.com/Solierrr/api-messenger/issues/75)) ([55e8f26](https://github.com/Solierrr/api-messenger/commit/55e8f2611f0e5f0f1abd9515ef8aa40cb4fb91c6))
+* fall back to the own service key name ([#63](https://github.com/Solierrr/api-messenger/issues/63)) ([640488b](https://github.com/Solierrr/api-messenger/commit/640488b4298275909fb216bf9163a67f4aca8bf3))
+* import the redis template in the security config ([1c9b6f3](https://github.com/Solierrr/api-messenger/commit/1c9b6f34f39615fcad5512392d22de564d77364b))
+* name the api-messenger service messenger in the telemetry ([#84](https://github.com/Solierrr/api-messenger/issues/84)) ([88b921f](https://github.com/Solierrr/api-messenger/commit/88b921f371c96a9425f7698b297b7342c7a28e12))
+* query LangSmith once, only for ai-assistant ([#92](https://github.com/Solierrr/api-messenger/issues/92)) ([e87540f](https://github.com/Solierrr/api-messenger/commit/e87540f6c3a974c9c24d4f184039674d8b077162))
+* remove the conversation status and share the active-user check through redis ([#86](https://github.com/Solierrr/api-messenger/issues/86)) ([985b201](https://github.com/Solierrr/api-messenger/commit/985b2014ac60d366012a615de0d17257bd1dd1c2))
+* report Retry-After and body when LangSmith rejects a request ([#82](https://github.com/Solierrr/api-messenger/issues/82)) ([4dda5c8](https://github.com/Solierrr/api-messenger/commit/4dda5c8956b7e14783106dbefcc1a906f004bde6))
+
 ## [3.1.0](https://github.com/Solierrr/api-messenger/compare/v3.0.0...v3.1.0) (2026-09-30)
 
 
