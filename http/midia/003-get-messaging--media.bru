@@ -1,0 +1,26 @@
+meta {
+  name: GET /messaging/media
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/messaging/media?limit=50
+  body: none
+  auth: bearer
+}
+
+params:query {
+  limit: 50
+  ~conversationId: {{conversationId}}
+  ~cursor:
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+docs {
+  Lista as mídias ainda disponíveis
+  Para quem acabou de iniciar sessão. Com nextCursor na resposta, repita a chamada com cursor igual a ele.
+}

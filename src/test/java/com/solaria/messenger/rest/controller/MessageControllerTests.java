@@ -90,10 +90,39 @@ class MessageControllerTests {
     }
 
     @Test
-    void rejectsMessageWithoutContent() throws Exception {
+    void messageWithoutContentAndWithoutAttachmentIsRefusedAsInvalidField() throws Exception {
+        // a regra "texto ou anexo" é do caso de uso; aqui só se confere que a recusa vira 400
+        given(sendMessage.execute(any(MessageRequestDTO.class)))
+                .willThrow(new com.solaria.messenger.core.exception.InvalidFieldException("content é obrigatório quando a mensagem não tem anexo."));
+
         mockMvc.perform(post("/messaging/messages")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"conversationId\":\"conv-1\",\"messageType\":\"USER_TO_USER\",\"role\":\"user\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void acceptsAnAttachmentWithoutContent() throws Exception {
+        given(sendMessage.execute(any(MessageRequestDTO.class)))
+                .willReturn(messageResponse(MessageType.USER_TO_USER));
+
+        mockMvc.perform(post("/messaging/messages")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"conversationId\":\"conv-1\",\"messageType\":\"USER_TO_USER\","
+                                + "\"attachment\":{\"type\":\"LOCATION\",\"latitude\":-23.55,\"longitude\":-46.63,\"label\":\"Obra\"}}"))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void rejectsAnAttachmentWithoutTypeOrWithCoordinatesOutOfRange() throws Exception {
+        mockMvc.perform(post("/messaging/messages")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"conversationId\":\"conv-1\",\"messageType\":\"USER_TO_USER\",\"attachment\":{\"latitude\":1}}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/messaging/messages")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"conversationId\":\"conv-1\",\"messageType\":\"USER_TO_USER\","
+                                + "\"attachment\":{\"type\":\"LOCATION\",\"latitude\":91,\"longitude\":0}}"))
                 .andExpect(status().isBadRequest());
     }
 

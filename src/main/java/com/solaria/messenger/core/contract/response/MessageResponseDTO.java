@@ -3,6 +3,7 @@ package com.solaria.messenger.core.contract.response;
 import java.time.Instant;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.solaria.messenger.core.model.MessageMetadata;
 import com.solaria.messenger.core.model.enums.MessageType;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -39,6 +40,9 @@ public class MessageResponseDTO {
     private boolean edited;
     private boolean deleted;
     private MessageMetadata metadata;
+    /** Anexo da mensagem; fora do JSON quando não há (texto puro ou mensagem excluída). */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private AttachmentResponseDTO attachment;
     private Instant timestamp;
     private int sequence;
     /** Versão do relógio de sincronização da última mudança (envio, edição ou exclusão). A maior vence. */

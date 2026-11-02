@@ -19,6 +19,7 @@ O contrato fica no [`openapi.yaml`](https://github.com/Solierrr/api-messenger/bl
 |---|---|---|
 | Conversas | `/messaging/conversations` | criar diretas, grupos e conversas com o assistente, listar as conversas da pessoa, alterar leitura, silêncio e arquivo, e gerir participantes e gestor de um grupo |
 | Mensagens | `/messaging/messages` | enviar, editar, apagar e paginar o histórico de uma conversa |
+| Mídia | `/messaging/media` | pedir a permissão de depositar um arquivo, retirá-lo por redirecionamento e listar as mídias ainda disponíveis. O servidor só leva o arquivo de um aparelho a outro |
 | Catch-up | `/messaging/updates` | buscar as mensagens que mudaram depois da última versão que o cliente viu |
 | Comunidades | `/messaging/communities` | criar a comunidade de um projeto, arquivar e reativar, gerir membros e papéis, e criar ou listar subgrupos |
 | Avaliações | `/messaging/ratings` | criar, consultar, editar e mudar o status de avaliações de profissionais e produtos |
@@ -32,6 +33,8 @@ As regras de cada grupo estão em [OVERVIEW.md](./OVERVIEW.md) e nos [fluxos](..
 ## Limites
 
 - A mensagem tem até 8000 caracteres. O título de grupo tem até 120.
+- O texto é opcional quando há anexo (legenda). Um anexo por mensagem.
+- A mídia fica 7 dias e tem teto por tipo: imagem 10 MB, áudio 16 MB, vídeo 64 MB e arquivo 25 MB. A lista de mídia devolve de 1 a 100 itens, com 50 por padrão.
 - O histórico e o catch-up devolvem de 1 a 500 mensagens por página, com 100 por padrão. Um valor fora da faixa é ajustado, sem erro.
 - O histórico aceita um cursor só, `sinceSequence` ou `beforeSequence`, e devolve sempre em ordem crescente de `sequence`.
 - A avaliação vai de 0.0 a 5.0, com comentário de até 1000 caracteres. O NPS vai de 0 a 10.

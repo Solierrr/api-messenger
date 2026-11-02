@@ -23,6 +23,7 @@ import com.solaria.messenger.core.exception.MessageMutationNotAppliedException;
 import com.solaria.messenger.core.exception.MessageMutationUncertainException;
 import com.solaria.messenger.core.exception.MessageSendFailedException;
 import com.solaria.messenger.core.exception.ResourceNotFoundException;
+import com.solaria.messenger.core.model.Attachment;
 import com.solaria.messenger.core.model.Conversation;
 import com.solaria.messenger.core.model.Message;
 import com.solaria.messenger.core.model.enums.ConversationType;
@@ -230,8 +231,9 @@ public class MessageWriteHelper {
             // reflete a gravação no objeto em memória para a resposta
             current.setMutationEpoch(nextEpoch);
             current.setChangeVersion(version);
+            Attachment removed = delete ? current.getAttachment() : null;
             applyInMemory(current, content, delete);
-            return new MessageMutationResult(current, true);
+            return new MessageMutationResult(current, true, removed);
         });
     }
 
@@ -262,6 +264,7 @@ public class MessageWriteHelper {
         if (delete) {
             message.setDeleted(true);
             message.setContent(null);
+            message.setAttachment(null);
         } else {
             message.setContent(content);
             message.setEdited(true);

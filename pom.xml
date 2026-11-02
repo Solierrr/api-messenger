@@ -37,6 +37,14 @@
 				<artifactId>opentelemetry-semconv</artifactId>
 				<version>1.41.1</version>
 			</dependency>
+			<!-- versões alinhadas das bibliotecas do Google Cloud (cliente do Cloud Storage) -->
+			<dependency>
+				<groupId>com.google.cloud</groupId>
+				<artifactId>libraries-bom</artifactId>
+				<version>26.83.0</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
 		</dependencies>
 	</dependencyManagement>
 
@@ -57,6 +65,11 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-mongodb</artifactId>
+		</dependency>
+		<!-- armazenamento temporário da mídia (links assinados; o servidor não toca nos bytes) -->
+		<dependency>
+			<groupId>com.google.cloud</groupId>
+			<artifactId>google-cloud-storage</artifactId>
 		</dependency>
 		<!-- presença e revogação entre pods (Upstash) -->
 		<dependency>

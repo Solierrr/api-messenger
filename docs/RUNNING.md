@@ -32,6 +32,8 @@ Sem `.env`, o serviço sobe com os padrões locais, ou seja, Mongo em `localhost
 |---|---|
 | `RABBITMQ_HOST` | liga o relay para o RabbitMQ. `RABBITMQ_RELAY_ENABLED=false` força o broker em memória |
 | `NOTIFY_BASE_URL` | liga o aviso no celular pelo `api-notify` |
+| `MEDIA_BUCKET` | nome do bucket do Google Cloud Storage onde a mídia espera a retirada. Sem ele, `/messaging/media/**` responde `503` e o resto do serviço funciona. A credencial vem do ambiente |
+| `MEDIA_TTL` | por quanto tempo a mídia fica disponível, em duração ISO 8601. O padrão é `P7D`. Tem que ser igual à retenção do bucket |
 | `MESSAGES_MUTATION_WINDOW` | prazo para editar e apagar mensagem, em duração ISO 8601. O padrão é `PT30M` |
 | `DEBUG_ADMIN_SUBS` | `sub` dos usuários que acessam o histórico administrativo, separados por vírgula |
 | `SOLARIA_LANGSMITH_API_KEY`, `SOLARIA_LANGSMITH_PROJECT` | ligam o resumo do LangSmith. Sem elas, a rota responde `enabled: false` |

@@ -3,6 +3,7 @@ package com.solaria.messenger.core.contract.request;
 import com.solaria.messenger.core.model.enums.MessageType;
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -32,7 +33,11 @@ public class MessageRequestDTO {
     @NotNull(message = "messageType é obrigatório")
     private MessageType messageType;
 
-    @NotBlank(message = "content é obrigatório")
+    /** Obrigatório sem anexo; com anexo é a legenda e pode faltar (a regra fica no caso de uso). */
     @Size(max = 8000, message = "content deve ter no máximo 8000 caracteres")
     private String content;
+
+    @Valid
+    @Schema(nullable = true, description = "Anexo opcional: imagem, vídeo, áudio, arquivo ou localização. Sem anexo, content é obrigatório")
+    private AttachmentRequestDTO attachment;
 }

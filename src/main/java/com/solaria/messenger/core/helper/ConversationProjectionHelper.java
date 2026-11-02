@@ -143,7 +143,8 @@ public class ConversationProjectionHelper {
         // preview da última mensagem
         LatestMessage latest = head == null ? null : head.lastMessage();
         Preview preview = latest == null ? null : new Preview(
-                latest.id(), latest.sequence(), latest.senderId(), latest.content(), latest.edited(), latest.deleted(), latest.timestamp());
+                latest.id(), latest.sequence(), latest.senderId(), latest.content(), latest.edited(), latest.deleted(), latest.timestamp(),
+                latest.attachmentType());
 
         // última interação: a mais recente entre a conversa e a última mensagem
         Instant interaction = conversation.getLastInteractionAt();
