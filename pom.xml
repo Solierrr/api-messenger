@@ -37,6 +37,17 @@
 				<artifactId>opentelemetry-semconv</artifactId>
 				<version>1.41.1</version>
 			</dependency>
+			<!-- o libraries-bom fixa o protobuf em 4.33.2, abaixo do gencode 4.34.0 do exportador OTLP -->
+			<dependency>
+				<groupId>com.google.protobuf</groupId>
+				<artifactId>protobuf-java</artifactId>
+				<version>4.34.0</version>
+			</dependency>
+			<dependency>
+				<groupId>com.google.protobuf</groupId>
+				<artifactId>protobuf-java-util</artifactId>
+				<version>4.34.0</version>
+			</dependency>
 			<!-- versões alinhadas das bibliotecas do Google Cloud (cliente do Cloud Storage) -->
 			<dependency>
 				<groupId>com.google.cloud</groupId>
