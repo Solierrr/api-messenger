@@ -2,12 +2,15 @@ package com.solaria.messenger.core.usecase.conversation;
 
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import com.solaria.messenger.core.contract.request.ChatbotConversationRequestDTO;
 import com.solaria.messenger.core.contract.response.ConversationResponseDTO;
+import com.solaria.messenger.core.exception.DuplicateResourceException;
 import com.solaria.messenger.core.helper.NotificationHelper;
 import com.solaria.messenger.core.model.Conversation;
 import com.solaria.messenger.core.model.enums.ConversationType;
@@ -38,7 +41,8 @@ import static com.solaria.messenger.core.mapper.ConversationMapper.toResponse;
  * Principal operação disponibilizada:
  * </p>
  * <ul>
- *     <li>{@link #execute(ChatbotConversationRequestDTO)} -> cria a conversa com o chatbot.</li>
+ *     <li>{@link #execute(ChatbotConversationRequestDTO)} -> cria a conversa com o chatbot, ou reaproveita a
+ *     do mesmo usuário quando o pedido traz um {@code conversationId} que já existe.</li>
  * </ul>
  */
 @Service
@@ -63,14 +67,36 @@ public class CreateChatbotConversationUseCase {
      */
     public ConversationResponseDTO execute(ChatbotConversationRequestDTO dto) {
         UUID currentUserId = rbac.currentUserId();
+        String requestedId = dto.getConversationId();
+
+        if (requestedId != null) {
+            Optional<Conversation> existing = conversationRepository.findById(requestedId);
+            if (existing.isPresent()) return reuse(existing.get(), currentUserId);
+        }
 
         Conversation conversation = newConversation(ConversationType.CHAT_BOT, currentUserId,
                 new LinkedHashSet<>(List.of(currentUserId)));
+        if (requestedId != null) conversation.setId(requestedId);
         conversation.setUserType(dto.getUserType());
         conversation.setUserDetails(dto.getUserDetails());
 
-        Conversation saved = conversationRepository.save(conversation);
+        Conversation saved;
+        try {
+            saved = conversationRepository.save(conversation);
+        } catch (DuplicateKeyException race) {
+            // Duas chamadas com o mesmo id ao mesmo tempo: a perdedora relê a conversa que a outra criou.
+            if (requestedId == null) throw race;
+            return reuse(conversationRepository.findById(requestedId).orElseThrow(() -> race), currentUserId);
+        }
         notifications.publishConversationChanged(saved.getId());
         return toResponse(saved);
+    }
+
+    /** Reaproveita a conversa só se for do chatbot e do usuário atual; qualquer outra com esse id é conflito. */
+    private ConversationResponseDTO reuse(Conversation existing, UUID currentUserId) {
+        if (existing.getConversationType() != ConversationType.CHAT_BOT || !existing.hasParticipant(currentUserId)) {
+            throw new DuplicateResourceException("Já existe uma conversa com esse conversationId");
+        }
+        return toResponse(existing);
     }
 }

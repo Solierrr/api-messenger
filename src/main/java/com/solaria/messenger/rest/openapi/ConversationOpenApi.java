@@ -87,7 +87,8 @@ public interface ConversationOpenApi {
     )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Conversa criada com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Dados de entrada inválidos")
+            @ApiResponse(responseCode = "400", description = "Dados de entrada inválidos"),
+            @ApiResponse(responseCode = "409", description = "Já existe uma conversa de outro usuário (ou de outro tipo) com o conversationId")
     })
     ResponseEntity<ConversationResponseDTO> createChatbotConversation(ChatbotConversationRequestDTO dto);
 
