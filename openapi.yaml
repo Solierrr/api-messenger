@@ -1108,6 +1108,10 @@ components:
           type: object
           additionalProperties:
             type: object
+        conversationId:
+          type: string
+          description: Id da conversa escolhido por quem chama (opcional). Se já existir uma conversa do chatbot com esse id e do mesmo usuário, ela é reaproveitada.
+          pattern: ^[A-Za-z0-9][A-Za-z0-9_-]{7,63}$
       required:
       - environment
     ChatbotMessageRequestDTO:
